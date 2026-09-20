@@ -155,13 +155,27 @@
   margin: 0;
   padding: 0;
 }
-.speed-line {
+/* 묶음이 커지면 가운데 정렬은 값이 첫 항목에서 멀어진다. 종족값 화면과 같이
+   위에 맞춰 값이 묶음의 시작을 가리키게 한다. */
+.speed-group {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 28px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--line);
+}
+.speed-group-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+/* 묶음 안의 구분은 묶음 사이의 구분보다 약해야 같은 값이라는 게 읽힌다. */
+.speed-group-items > li + li {
+  border-top: 1px dotted var(--line);
+  margin-top: 8px;
+  padding-top: 8px;
 }
 .speed-value {
   font-size: 22px;
@@ -177,7 +191,7 @@
 :root[data-theme='dark'] .speed-prominent .speed-value {
   color: #ff9382;
 }
-.speed-line-body {
+.speed-line {
   min-width: 0;
 }
 .speed-line-head {

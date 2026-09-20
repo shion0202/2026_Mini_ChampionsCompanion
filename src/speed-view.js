@@ -39,29 +39,37 @@ export function renderSpeedRows(rows, { mode = 'base' } = {}) {
 
 // 실전 스피드 라인. 왼쪽에 실수치, 오른쪽에 그 값이 나오는 조건을 적는다.
 // 상위 15위이며 스피드 종족값 70 이상인 줄만 색을 달리해 환경 기준선을 표시한다.
+const speedEntry = line => {
+  const percent =
+    line.percent === null ? '' : ` <small class="speed-percent">${line.percent}%</small>`;
+  const effect = line.effect
+    ? `<span class="speed-effect">${esc(line.effect)}</span>`
+    : '<span class="speed-effect speed-plain">효과 미적용</span>';
+  const via = line.effectName
+    ? `<small class="speed-via">${esc(line.effectName)}` +
+      `${line.effectNote ? ` · ${esc(line.effectNote)}` : ''}${percent}</small>`
+    : '';
+  return (
+    `<li class="speed-line">` +
+    `<p class="speed-line-head">` +
+    `<span class="speed-preset">${esc(line.preset)}</span>` +
+    `<span class="speed-base">${line.base}족</span>${effect}</p>` +
+    `<div class="speed-mon">${named(line)}${via}</div>` +
+    `</li>`
+  );
+};
+
 export function renderSpeedLines(lines) {
   if (!lines.length) return EMPTY;
-  return `<ol class="speed-lines">${lines
-    .map(line => {
-      const percent =
-        line.percent === null ? '' : ` <small class="speed-percent">${line.percent}%</small>`;
-      const effect = line.effect
-        ? `<span class="speed-effect">${esc(line.effect)}</span>`
-        : '<span class="speed-effect speed-plain">효과 미적용</span>';
-      const via = line.effectName
-        ? `<small class="speed-via">${esc(line.effectName)}` +
-          `${line.effectNote ? ` · ${esc(line.effectNote)}` : ''}${percent}</small>`
-        : '';
-      return (
-        `<li class="speed-line${line.prominent ? ' speed-prominent' : ''}">` +
-        `<span class="speed-value">${line.value}</span>` +
-        `<div class="speed-line-body">` +
-        `<p class="speed-line-head">` +
-        `<span class="speed-preset">${esc(line.preset)}</span>` +
-        `<span class="speed-base">${line.base}족</span>${effect}</p>` +
-        `<div class="speed-mon">${named(line)}${via}</div>` +
-        `</div></li>`
-      );
-    })
+  // 같은 실수치는 한 줄에 묶는다. 같은 스피드라는 사실이 이 화면에서 읽어내야 할
+  // 것이라, 같은 숫자를 여러 번 적으면 오히려 서로 다른 값처럼 보인다.
+  return `<ol class="speed-lines">${speedGroups(lines, 'value')
+    .map(
+      group =>
+        `<li class="speed-group${group.rows.some(row => row.prominent) ? ' speed-prominent' : ''}">` +
+        `<span class="speed-value">${group.value}</span>` +
+        `<ul class="speed-group-items">${group.rows.map(speedEntry).join('')}</ul>` +
+        `</li>`,
+    )
     .join('')}</ol>`;
 }

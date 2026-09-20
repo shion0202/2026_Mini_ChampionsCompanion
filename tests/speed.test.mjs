@@ -196,3 +196,34 @@ test('base and actual views now carry the ranking sprite', () => {
   // 이미지가 없는 항목도 자리를 지켜야 줄이 흔들리지 않는다.
   assert.match(renderSpeedRows(rows, { mode: 'base' }), /no-portrait|speed-portrait/);
 });
+
+test('equal speed values share one row instead of repeating the number', () => {
+  const at = (label, value, base) => ({
+    label,
+    base,
+    preset: '준속',
+    value,
+    prominent: label === '메가한카리아스Z',
+    condition: '스케일샷 (S+1)',
+    effect: 'S+1',
+    effectNote: null,
+    effectName: '스케일샷',
+    percent: 17.8,
+    sprite: null,
+  });
+  const markup = renderSpeedLines([
+    at('메가한카리아스Z', 304, 151),
+    at('메가번치코', 304, 100),
+    at('파라블레이즈', 300, 85),
+  ]);
+  assert.equal(markup.match(/class="speed-value"/g).length, 2, '304가 두 번 적히면 안 된다');
+  assert.equal(markup.match(/class="speed-group[ "]/g).length, 2);
+  assert.equal(markup.match(/class="speed-line"/g).length, 3, '항목은 셋 다 남아야 한다');
+  assert.match(markup, /<span class="speed-value">304<\/span>/);
+  // 묶음 안에 한 마리라도 상위권이면 그 값이 환경 기준선이다.
+  assert.match(markup, /class="speed-group speed-prominent"[^]*?304/);
+  // [0]은 <ol> 여는 부분이므로 묶음은 1번부터다.
+  const [, first, second] = markup.split('<li class="speed-group');
+  assert.ok(first.includes('speed-prominent'), '304 묶음은 강조된다');
+  assert.ok(!second.includes('speed-prominent'), '300 묶음은 강조되지 않는다');
+});
