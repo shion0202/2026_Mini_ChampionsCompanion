@@ -2460,12 +2460,23 @@ select optgroup {
 .filter-group > summary::-webkit-details-marker {
   display: none;
 }
+/* Drawn instead of ⌄/⌃: those glyphs sit at opposite ends of their em box, so the
+   marker dropped below the summary text when closed and rose above it when open.
+   A rotated corner keeps one shape, and the two states are mirrors of each other.
+   Rotation alone leaves the ink off-centre, so each state shifts back by the same
+   amount in opposite directions. */
 .filter-group > summary:after {
-  content: '⌄';
-  color: var(--muted);
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-35%) rotate(45deg);
+  transition: transform 0.15s ease;
 }
 .filter-group[open] > summary:after {
-  content: '⌃';
+  transform: translateY(35%) rotate(225deg);
 }
 .filter-group > summary strong {
   font-size: 13px;
