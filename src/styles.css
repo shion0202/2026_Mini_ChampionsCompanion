@@ -554,13 +554,14 @@ h2 {
   font-weight: 650;
   color: var(--muted);
 }
+/* Scrolls with the page. Sticking it under the header made a short tab follow the
+   scroll and park its end against the ranking list, which moved the reader's place
+   every time the content changed height. */
 .detail-panel {
   background: white;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
-  position: sticky;
-  top: 159px;
   min-width: 0;
 }
 .detail-placeholder {
