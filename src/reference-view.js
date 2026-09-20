@@ -158,18 +158,10 @@ export function renderLearnsetShell(
     `<div id="learnset-rows"></div>`
   );
 }
-export function renderLearnsetRows(
-  data,
-  locale,
-  pokemon,
-  query,
-  type,
-  category,
-  trait = '',
-  modes = {},
-) {
-  const ids = data.species[pokemon.id]?.learnset ?? [];
-  const moves = ids
+// Shared by a Pokemon's learnset and the standalone move index, so both lists
+// filter, sort and render identically.
+export function selectMoves(data, locale, ids, { query, type, category, trait = '', modes = {} }) {
+  return ids
     .map(id => ({ id, ...data.move[id] }))
     .filter(
       m =>
@@ -182,17 +174,35 @@ export function renderLearnsetRows(
     .sort((a, b) =>
       label(data, locale, 'move', a.id).localeCompare(label(data, locale, 'move', b.id), 'ko'),
     );
+}
+export function moveTable(data, locale, moves) {
   const moveRow = m =>
     `<tr><td>${effectButton('move', m.id, label(data, locale, 'move', m.id))}` +
     `<div>${types([m.type])}</div></td>` +
     `<td>${CATEGORY_NAMES[m.category]}</td><td>${m.power || '—'}</td>` +
     `<td>${m.accuracy === true ? '—' : m.accuracy}</td><td>${m.pp}</td></tr>`;
+  return (
+    `<div class="move-table-wrap"><table class="move-table"><thead><tr>` +
+    `<th>기술 / 타입</th><th>분류</th><th>위력</th><th>명중</th><th>PP</th>` +
+    `</tr></thead><tbody>${moves.map(moveRow).join('')}</tbody></table></div>`
+  );
+}
+export function renderLearnsetRows(
+  data,
+  locale,
+  pokemon,
+  query,
+  type,
+  category,
+  trait = '',
+  modes = {},
+) {
+  const ids = data.species[pokemon.id]?.learnset ?? [];
+  const moves = selectMoves(data, locale, ids, { query, type, category, trait, modes });
   return {
     count: moves.length,
     html: moves.length
-      ? `<div class="move-table-wrap"><table class="move-table"><thead><tr>` +
-        `<th>기술 / 타입</th><th>분류</th><th>위력</th><th>명중</th><th>PP</th>` +
-        `</tr></thead><tbody>${moves.map(moveRow).join('')}</tbody></table></div>`
+      ? moveTable(data, locale, moves)
       : '<div class="empty-state">조건에 맞는 기술이 없습니다.</div>',
   };
 }

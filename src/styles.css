@@ -2604,3 +2604,58 @@ select optgroup {
 #current-source-times {
   white-space: pre-line;
 }
+
+/* Standalone move, item and ability index. */
+.dex-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 16px 0 24px;
+}
+.dex-panel #dex-kinds .segmented {
+  width: 100%;
+}
+.dex-controls {
+  display: flex;
+  justify-content: flex-end;
+}
+.dex-list {
+  display: grid;
+  gap: 8px;
+}
+.dex-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+}
+.dex-row:hover {
+  border-color: var(--teal);
+}
+.dex-row .item-art {
+  grid-row: span 2;
+}
+.dex-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dex-name strong {
+  font-size: 14px;
+}
+.dex-name span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.dex-effect {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-line;
+}

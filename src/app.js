@@ -3,7 +3,7 @@ import { normalizeIndex, formatDate, CATEGORY_LABELS, SEASON_REGULATIONS } from 
 import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
-import { filterValues } from './filters.js';
+import { filterValues, filterSummary } from './filters.js';
 import { megaSprite } from './images.js';
 import {
   renderReference,
@@ -11,6 +11,8 @@ import {
   renderLearnsetRows,
   renderEffect,
   renderSpreads,
+  selectMoves,
+  moveTable,
 } from './reference-view.js';
 import {
   esc,
@@ -34,8 +36,13 @@ import {
   filterGroup,
   filterHelp,
   rankingFilterFooter,
+  DEX_KINDS,
+  dexKindSwitch,
+  dexEmpty,
+  dexList,
 } from './app-view.js';
 import {
+  dexEntries,
   preferences,
   resolveSeason,
   resolveContext,
@@ -99,6 +106,13 @@ Object.assign(state, {
   learnCategory: [],
   learnTrait: [],
   learnModes: {},
+  dex: null,
+  dexQuery: '',
+  dexType: [],
+  dexCategory: [],
+  dexTrait: [],
+  dexModes: {},
+  dexLimit: 50,
 });
 let toastTimer;
 function toast(text) {
@@ -295,6 +309,81 @@ function updateLearnset() {
   $('learnset-rows').innerHTML = result.html;
   $('learnset-count').textContent = `${result.count}개`;
 }
+
+function dexVisible() {
+  if (!state.reference || !state.locale) return [];
+  if (state.dex !== 'move')
+    return dexEntries(state.reference, state.locale, state.dex, state.dexQuery);
+  return selectMoves(state.reference, state.locale, Object.keys(state.reference.move), {
+    query: state.dexQuery,
+    type: state.dexType,
+    category: state.dexCategory,
+    trait: state.dexTrait,
+    modes: state.dexModes,
+  });
+}
+function renderDex() {
+  if (!state.dex) return;
+  $('dex-kinds').innerHTML = dexKindSwitch(state.dex);
+  const moves = state.dex === 'move';
+  $('dex-filter').hidden = !moves;
+  const summaries = moves
+    ? [
+        filterSummary(state.dexType, TYPE_LABELS, state.dexModes.type),
+        filterSummary(state.dexCategory, MOVE_CATEGORIES, state.dexModes.category),
+        filterSummary(state.dexTrait, MOVE_TRAITS, state.dexModes.trait),
+      ].filter(Boolean)
+    : [];
+  $('dex-filter').innerHTML = rankingFilterButton(summaries.length);
+  $('dex-filter').setAttribute(
+    'aria-label',
+    `기술 필터${summaries.length ? ` (${summaries.length}개 적용)` : ''}`,
+  );
+  $('dex-filter-summary').textContent = summaries.join(' / ');
+  $('dex-filter-summary').hidden = !summaries.length;
+  if (!state.reference || !state.locale) {
+    $('dex-count').textContent = '—';
+    $('dex-more').hidden = true;
+    // The Korean dictionary arrives with the ranking; the dex waits for both.
+    $('dex-rows').innerHTML = state.reference
+      ? loadingState('도감을 불러오는 중')
+      : referenceStatus(state.refError);
+    return;
+  }
+  const entries = dexVisible();
+  $('dex-count').textContent = `${entries.length}개`;
+  $('dex-more').hidden = entries.length <= state.dexLimit;
+  $('dex-more').textContent =
+    `더 보기 (${Math.min(state.dexLimit, entries.length)} / ${entries.length})`;
+  if (!entries.length) {
+    $('dex-rows').innerHTML = dexEmpty(state.dex);
+    return;
+  }
+  const shown = entries.slice(0, state.dexLimit);
+  $('dex-rows').innerHTML = moves
+    ? moveTable(state.reference, state.locale, shown)
+    : dexList(shown, state.dex);
+}
+function openDex(kind, { navigate = true } = {}) {
+  state.dex = kind in DEX_KINDS ? kind : 'move';
+  state.dexLimit = 50;
+  if (navigate) history.pushState({ dex: state.dex }, '', `#dex=${state.dex}`);
+  $('workspace').hidden = true;
+  $('dex').hidden = false;
+  // The season and battle format scope the statistics, not the reference data.
+  $('toolbar').hidden = true;
+  $('dex-link').setAttribute('aria-pressed', 'true');
+  renderDex();
+  window.scrollTo(0, 0);
+  $('dex-search').focus({ preventScroll: true });
+}
+function closeDex() {
+  state.dex = null;
+  $('dex').hidden = true;
+  $('workspace').hidden = false;
+  $('toolbar').hidden = false;
+  $('dex-link').setAttribute('aria-pressed', 'false');
+}
 async function loadReference() {
   state.refError = false;
   try {
@@ -309,6 +398,7 @@ async function loadReference() {
     $('gimmick-filter').querySelector('fieldset').disabled = !state.reference;
     updateGroupSummary($('gimmick-filter'));
   }
+  if (state.dex) renderDex();
   if (selectedEntry()) renderCategory();
 }
 
@@ -335,8 +425,9 @@ function clearSelection() {
   renderDetail();
 }
 function goToRanking({ top = false } = {}) {
-  if (state.selected || location.hash)
+  if (state.selected || state.dex || location.hash)
     history.pushState(null, '', location.pathname + location.search);
+  closeDex();
   clearSelection();
   window.scrollTo(0, top ? 0 : state.listScroll);
 }
@@ -485,7 +576,13 @@ function updateGroupSummary(group) {
 function openFilters(kind) {
   filterKind = kind;
   const ranking = kind === 'ranking';
-  $('filter-title').textContent = ranking ? '랭킹 필터' : '배우는 기술 필터';
+  const dex = kind === 'dex';
+  $('filter-title').textContent = ranking ? '랭킹 필터' : dex ? '기술 필터' : '배우는 기술 필터';
+  // The learnset and the move index filter on the same three properties.
+  const moveGroups = (prefix, type, category, trait, modes) =>
+    group(`${prefix}-type`, 'type', '타입', TYPE_LABELS, type, modes.type) +
+    group(`${prefix}-category`, 'category', '분류', MOVE_CATEGORIES, category, modes.category) +
+    group(`${prefix}-trait`, 'trait', '기술 성질', MOVE_TRAITS, trait, modes.trait);
   $('filter-fields').innerHTML =
     filterHelp() +
     (ranking
@@ -508,33 +605,38 @@ function openFilters(kind) {
           !state.reference,
         ) +
         rankingFilterFooter(state.favoriteOnly)
-      : group(
-          'learnset-type',
-          'type',
-          '타입',
-          TYPE_LABELS,
-          state.learnType,
-          state.learnModes.type,
-        ) +
-        group(
-          'learnset-category',
-          'category',
-          '분류',
-          MOVE_CATEGORIES,
-          state.learnCategory,
-          state.learnModes.category,
-        ) +
-        group(
-          'learnset-trait',
-          'trait',
-          '기술 성질',
-          MOVE_TRAITS,
-          state.learnTrait,
-          state.learnModes.trait,
-        ));
+      : dex
+        ? moveGroups('dex', state.dexType, state.dexCategory, state.dexTrait, state.dexModes)
+        : moveGroups(
+            'learnset',
+            state.learnType,
+            state.learnCategory,
+            state.learnTrait,
+            state.learnModes,
+          ));
   $('filter-dialog').showModal();
 }
 $('ranking-filter').onclick = () => openFilters('ranking');
+$('dex-link').onclick = () =>
+  state.dex ? goToRanking({ top: true }) : openDex(state.dex ?? 'move');
+$('dex-filter').onclick = () => openFilters('dex');
+$('dex-search').addEventListener('input', event => {
+  state.dexQuery = event.target.value;
+  state.dexLimit = 50;
+  renderDex();
+});
+$('dex-more').onclick = () => {
+  state.dexLimit += 50;
+  renderDex();
+};
+$('dex-kinds').addEventListener('click', event => {
+  const button = event.target.closest('[data-dex-kind]');
+  if (!button || button.dataset.dexKind === state.dex) return;
+  state.dex = button.dataset.dexKind;
+  state.dexLimit = 50;
+  history.replaceState({ dex: state.dex }, '', `#dex=${state.dex}`);
+  renderDex();
+});
 $('close-filter').onclick = () => $('filter-dialog').close();
 $('filter-fields').addEventListener('change', event => {
   const group = event.target.closest('[data-filter-group]');
@@ -568,6 +670,13 @@ $('filter-form').onsubmit = event => {
     state.favoriteOnly = $('filter-favorite').checked;
     state.limit = 30;
     if (!state.loading) renderList();
+  } else if (filterKind === 'dex') {
+    state.dexType = values.type;
+    state.dexCategory = values.category;
+    state.dexTrait = values.trait;
+    state.dexModes = modes;
+    state.dexLimit = 50;
+    renderDex();
   } else {
     state.learnType = values.type;
     state.learnCategory = values.category;
@@ -576,9 +685,9 @@ $('filter-form').onsubmit = event => {
     renderCategory();
   }
   $('filter-dialog').close();
-  (filterKind === 'ranking' ? $('ranking-filter') : $('learnset-filter'))?.focus({
-    preventScroll: true,
-  });
+  (
+    ({ ranking: $('ranking-filter'), dex: $('dex-filter') })[filterKind] ?? $('learnset-filter')
+  )?.focus({ preventScroll: true });
 };
 
 $('sort').onchange = event => {
@@ -724,7 +833,14 @@ document.addEventListener(
   true,
 );
 window.addEventListener('popstate', () => {
-  const id = new URLSearchParams(location.hash.slice(1)).get('pokemon');
+  const params = new URLSearchParams(location.hash.slice(1));
+  const dex = params.get('dex');
+  if (dex) {
+    openDex(dex, { navigate: false });
+    return;
+  }
+  closeDex();
+  const id = params.get('pokemon');
   if (id && state.list.some(p => p.id === id)) selectPokemon(id, { navigate: false });
   else {
     clearSelection();
@@ -775,3 +891,6 @@ if ('serviceWorker' in navigator && window.isSecureContext)
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 load();
 loadReference();
+// Opening a shared #dex link lands on the index rather than the ranking.
+const startupDex = new URLSearchParams(location.hash.slice(1)).get('dex');
+if (startupDex) openDex(startupDex, { navigate: false });

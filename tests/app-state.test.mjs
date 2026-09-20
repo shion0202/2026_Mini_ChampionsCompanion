@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  dexEntries,
   preferences,
   resolveSeason,
   resolveContext,
@@ -150,6 +151,49 @@ test('moving to another Pokemon resets the tab, the form and every learnset filt
   // The ranking search and the selection itself are not part of the reset.
   assert.equal(state.query, 'keep me');
   assert.equal(state.selected, 'salamence');
+});
+
+const dexReference = {
+  held_item: {
+    leftovers: { name: 'Leftovers', label: '먹다남은음식', effect: '매턴 회복한다.' },
+    lifeorb: { name: 'Life Orb', label: '생명의구슬', effect: '위력이 오른다.' },
+    choiceband: { name: 'Choice Band', label: '구애머리띠', effect: '공격이 오른다.' },
+    unnamed: { label: '이름없음' },
+  },
+};
+const dexLocale = { label: (kind, name) => `${kind}:${name}` };
+
+test('dexEntries sorts by Korean label and carries the record through', () => {
+  const entries = dexEntries(dexReference, dexLocale, 'held_item', '');
+  assert.deepEqual(
+    entries.map(e => e.label),
+    ['구애머리띠', '먹다남은음식', '생명의구슬'],
+  );
+  assert.equal(entries[0].id, 'choiceband');
+  assert.equal(entries[0].effect, '공격이 오른다.');
+});
+test('dexEntries drops records with no source name rather than showing a blank row', () => {
+  assert.ok(!dexEntries(dexReference, dexLocale, 'held_item', '').some(e => e.id === 'unnamed'));
+});
+test('dexEntries searches Korean, initial consonants and English', () => {
+  const find = query => dexEntries(dexReference, dexLocale, 'held_item', query).map(e => e.id);
+  assert.deepEqual(find('생명'), ['lifeorb']);
+  assert.deepEqual(find('ㄱㅇㅁㄹㄸ'), ['choiceband']);
+  assert.deepEqual(find('life orb'), ['lifeorb']);
+  assert.deepEqual(find('zzzznomatch'), []);
+});
+test('dexEntries falls back to the dictionary when the record has no label', () => {
+  const entries = dexEntries(
+    { ability: { intimidate: { name: 'Intimidate' } } },
+    dexLocale,
+    'ability',
+    '',
+  );
+  assert.equal(entries[0].label, 'ability:Intimidate');
+});
+test('an unknown category or missing reference yields nothing instead of throwing', () => {
+  assert.deepEqual(dexEntries(dexReference, dexLocale, 'nope', ''), []);
+  assert.deepEqual(dexEntries(null, dexLocale, 'held_item', ''), []);
 });
 
 test('sortLabel names the field and the direction', () => {

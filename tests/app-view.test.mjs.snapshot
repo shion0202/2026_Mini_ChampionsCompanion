@@ -25,6 +25,29 @@ exports[`detailShell: previous button shown, Singles 1`] = `
     <div class="detail-source"><span>자료 날짜 <strong>2026.09.18</strong></span><details><summary>자료 시각 자세히</summary><p>자료: M-6 / 싱글 / 2026.09.18 (제공처 표기, 시간대 미제공)</p><p>API 생성: 2026. 09. 18. 18:00 KST</p><p>기기 조회: 2025. 09. 18. 17:00 KST</p></details></div>
 `;
 
+exports[`dexEmpty names the category being searched 1`] = `
+[
+  "<div class=\\"empty-state\\"><span class=\\"empty-symbol\\">⌕</span><h3>조건에 맞는 기술이 없어요</h3><p>검색어와 적용한 필터를 확인해 주세요.</p></div>",
+  "<div class=\\"empty-state\\"><span class=\\"empty-symbol\\">⌕</span><h3>조건에 맞는 도구이 없어요</h3><p>검색어와 적용한 필터를 확인해 주세요.</p></div>"
+]
+`;
+
+exports[`dexKindSwitch marks the selected category 1`] = `
+[
+  "<div class=\\"segmented\\" role=\\"group\\" aria-label=\\"도감 항목\\"><button data-dex-kind=\\"move\\" aria-pressed=\\"true\\">기술</button><button data-dex-kind=\\"held_item\\" aria-pressed=\\"false\\">도구</button><button data-dex-kind=\\"ability\\" aria-pressed=\\"false\\">특성</button></div>",
+  "<div class=\\"segmented\\" role=\\"group\\" aria-label=\\"도감 항목\\"><button data-dex-kind=\\"move\\" aria-pressed=\\"false\\">기술</button><button data-dex-kind=\\"held_item\\" aria-pressed=\\"false\\">도구</button><button data-dex-kind=\\"ability\\" aria-pressed=\\"true\\">특성</button></div>"
+]
+`;
+
+exports[`dexList: abilities render without artwork 1`] = `
+<div class="dex-list"><button class="dex-row" data-effect-type="ability" data-effect-id="intimidate" aria-label="위협 효과 보기"><span class="dex-name"><strong>위협</strong><span lang="en">Intimidate</span></span><span class="dex-effect">상대의 공격을
+1단계 떨어뜨린다.</span></button></div>
+`;
+
+exports[`dexList: held items carry artwork and open the effect popup 1`] = `
+<div class="dex-list"><button class="dex-row" data-effect-type="held_item" data-effect-id="lifeorb" aria-label="생명의구슬 효과 보기"><span class="item-art"><img class="item-image" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/life-orb.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span><span class="dex-name"><strong>생명의구슬</strong><span lang="en">Life Orb</span></span><span class="dex-effect">위력이 1.3배가 된다.</span></button><button class="dex-row" data-effect-type="held_item" data-effect-id="noeffect" aria-label="미확인 &lt;도구&gt; 효과 보기"><span class="item-art"><img class="item-image" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystery-item-co.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span><span class="dex-name"><strong>미확인 &lt;도구&gt;</strong><span lang="en">Mystery &quot;Item&quot; &amp; Co</span></span><span class="dex-effect">효과 설명이 제공되지 않습니다.</span></button></div>
+`;
+
 exports[`errorState escapes the reported message 1`] = `
 <div class="empty-state error-state"><span class="empty-symbol">↻</span><h3>통계를 불러오지 못했어요</h3><p>네트워크 연결과 통계 제공처 상태를 확인해 주세요.</p><p class="error-detail">&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; 실패</p><button id="retry" class="primary-button">다시 시도</button></div>
 `;

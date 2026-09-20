@@ -1,7 +1,7 @@
 // Values derived from the app state, split out of app.js so the decisions can be
 // checked without a browser. Nothing here touches the DOM; app.js still owns the
 // state object, the rendering and the event wiring.
-import { formatDate } from './data.js';
+import { formatDate, matchesQuery } from './data.js';
 import { filterSummary } from './filters.js';
 
 // Reads what the browser kept for this device. A blocked or corrupt store must
@@ -72,6 +72,20 @@ export const selectionReset = () => ({
   learnTrait: [],
   learnModes: {},
 });
+
+// Name, initial-consonant and English search over one reference category. Moves
+// carry their own filters and go through selectMoves in reference-view.js instead.
+export function dexEntries(reference, locale, kind, query) {
+  const records = reference?.[kind] ?? {};
+  return Object.entries(records)
+    .map(([id, record]) => ({
+      ...record,
+      id,
+      label: record.label || locale.label(kind, record.name ?? id),
+    }))
+    .filter(record => record.name && matchesQuery(record, query))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+}
 
 const SORT_LABELS = { rank: '사용 순위', name: '이름', dex: '도감 번호' };
 export const sortLabel = (sort, reverse) =>

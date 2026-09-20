@@ -20,6 +20,7 @@
         <span>CHAMPIONS<span class="brand-sub">COMPANION</span></span>
       </a>
       <div class="header-actions">
+        <button id="dex-link" class="text-button" aria-pressed="false">도감</button>
         <button id="install" class="text-button" hidden>앱 설치</button>
         <select id="theme" class="theme-select" aria-label="화면 테마"><option value="system">기기 설정</option><option value="light">라이트</option><option value="dark">다크</option></select>
         <button id="about" class="icon-button" aria-label="데이터 출처와 이용 안내">?</button>
@@ -32,7 +33,7 @@
       <div><p class="eyebrow">YOUR NEXT MOVE, INFORMED.</p><h1 id="page-title">배틀의 흐름을 읽다<span>.</span></h1><p class="intro-copy">지금 주목할 포켓몬부터 자주 쓰는 기술까지.</p></div>
       <div class="intro-note"><span class="status-dot"></span>포켓몬 챔피언스 <span class="note-divider">/</span> 배틀 통계</div>
     </section>
-    <section class="toolbar" aria-label="통계 범위">
+    <section id="toolbar" class="toolbar" aria-label="통계 범위">
       <div class="format-switch" role="group" aria-label="배틀 형식">
         <button data-format="Singles" aria-pressed="true"><span aria-hidden="true">Ⅰ</span> 싱글배틀</button>
         <button data-format="Doubles" aria-pressed="false"><span aria-hidden="true">Ⅱ</span> 더블배틀</button>
@@ -59,6 +60,18 @@
         <div class="detail-placeholder"><div class="placeholder-mark" aria-hidden="true">↗</div><p class="eyebrow">BATTLE INSIGHTS</p><h2>다음 배틀을 위한 한 수</h2><p>포켓몬을 선택하면 기술과 도구,<br>함께 쓰는 포켓몬을 확인할 수 있어요.</p><div class="placeholder-tags"><span>기술</span><span>도구</span><span>같은 팀</span></div></div>
       </section>
     </div>
+    <section id="dex" class="dex-panel" aria-label="기술 도구 특성 도감" hidden>
+      <div class="list-heading"><h2>도감</h2><span id="dex-count" class="count">—</span></div>
+      <div id="dex-kinds"></div>
+      <div class="search-box"><span aria-hidden="true">⌕</span><input id="dex-search" type="search" placeholder="이름, 초성, 영문 검색" autocomplete="off" aria-label="도감 검색"></div>
+      <div class="dex-controls">
+        <button id="dex-filter" class="filter-button" aria-label="기술 필터" aria-haspopup="dialog"></button>
+      </div>
+      <p id="dex-filter-summary" class="active-filter-summary" hidden></p>
+      <div id="dex-rows"></div>
+      <button id="dex-more" class="load-more" hidden>더 보기</button>
+      <p class="category-tip">앱에 수록된 도감 버전 기준입니다. 항목을 누르면 한국어 효과를 볼 수 있습니다.</p>
+    </section>
     <footer class="footer"><span>CHAMPIONS COMPANION <span class="version">v0.2</span></span><p>팬 제작 비공식 도구</p></footer>
   </main>
   <div id="toast" class="toast" role="status" hidden></div>

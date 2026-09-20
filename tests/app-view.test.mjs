@@ -29,6 +29,9 @@ import {
   filterGroup,
   filterHelp,
   rankingFilterFooter,
+  dexKindSwitch,
+  dexEmpty,
+  dexList,
 } from '../src/app-view.js';
 
 snapshot.setDefaultSnapshotSerializers([
@@ -248,6 +251,39 @@ test('filterGroup: a disabled group still reports why', t => {
     ),
   );
 });
+test('dexKindSwitch marks the selected category', t => {
+  t.assert.snapshot([dexKindSwitch('move'), dexKindSwitch('ability')]);
+});
+test('dexEmpty names the category being searched', t => {
+  t.assert.snapshot([dexEmpty('move'), dexEmpty('held_item')]);
+});
+test('dexList: held items carry artwork and open the effect popup', t => {
+  t.assert.snapshot(
+    dexList(
+      [
+        { id: 'lifeorb', name: 'Life Orb', label: '생명의구슬', effect: '위력이 1.3배가 된다.' },
+        { id: 'noeffect', name: 'Mystery "Item" & Co', label: '미확인 <도구>' },
+      ],
+      'held_item',
+    ),
+  );
+});
+test('dexList: abilities render without artwork', t => {
+  t.assert.snapshot(
+    dexList(
+      [
+        {
+          id: 'intimidate',
+          name: 'Intimidate',
+          label: '위협',
+          effect: '상대의 공격을\n1단계 떨어뜨린다.',
+        },
+      ],
+      'ability',
+    ),
+  );
+});
+
 test('filter dialog help and ranking footer', t => {
   t.assert.snapshot([filterHelp(), rankingFilterFooter(false), rankingFilterFooter(true)]);
 });

@@ -272,6 +272,37 @@ export function filterGroup(id, key, title, options, values, mode, disabled, sum
   );
 }
 
+export const DEX_KINDS = { move: '기술', held_item: '도구', ability: '특성' };
+
+export const dexKindSwitch = kind =>
+  `<div class="segmented" role="group" aria-label="도감 항목">` +
+  Object.entries(DEX_KINDS)
+    .map(
+      ([key, label]) =>
+        `<button data-dex-kind="${key}" aria-pressed="${kind === key}">${label}</button>`,
+    )
+    .join('') +
+  `</div>`;
+
+export const dexEmpty = kind =>
+  `<div class="empty-state"><span class="empty-symbol">⌕</span>` +
+  `<h3>조건에 맞는 ${DEX_KINDS[kind]}이 없어요</h3>` +
+  `<p>검색어와 적용한 필터를 확인해 주세요.</p></div>`;
+
+// Rows reuse data-effect-type/data-effect-id, so the existing popup handler opens
+// them without extra wiring. Moves are rendered by moveTable instead.
+export function dexList(entries, kind) {
+  const row = record =>
+    `<button class="dex-row" data-effect-type="${esc(kind)}" data-effect-id="${esc(record.id)}"` +
+    ` aria-label="${esc(record.label)} 효과 보기">` +
+    `${kind === 'held_item' ? itemArtwork(record.name) : ''}` +
+    `<span class="dex-name"><strong>${esc(record.label)}</strong>` +
+    `<span lang="en">${esc(record.name)}</span></span>` +
+    `<span class="dex-effect">${esc(record.effect ?? '효과 설명이 제공되지 않습니다.')}</span>` +
+    `</button>`;
+  return `<div class="dex-list">${entries.map(row).join('')}</div>`;
+}
+
 export const filterHelp = () =>
   '<p class="category-tip filter-help">항목을 펼쳐 여러 값을 선택하세요.' +
   ' 항목 안에서는 AND/OR를 선택하고, 서로 다른 항목의 조건은 모두 만족해야 합니다.</p>';
