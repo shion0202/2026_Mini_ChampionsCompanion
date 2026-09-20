@@ -3,7 +3,13 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { moveTraits } from '../src/move-traits.js';
 import { supplementCatalog } from './reference-catalog.mjs';
-import { supplementZaItems, supplementZaCatalog, supplementGigantamax } from './rom-text.mjs';
+import {
+  supplementZaItems,
+  loadZaCatalog,
+  applyZaNames,
+  applyZaEffects,
+  supplementGigantamax,
+} from './rom-text.mjs';
 const SHOWDOWN = '2ddfa0476f8207e12e204b1c69f7c7683b17633c';
 const CHAMPOUT = '50e7233b78c3b81df29563f9695386c28e77fc95';
 const root = new URL('../', import.meta.url);
@@ -233,12 +239,16 @@ for (const [name, value] of Object.entries(chart)) {
 }
 // ROM text first: it is the localised wording from the games these entries are
 // actually from. PokéAPI then fills whatever is still blank.
-const zaCatalog = await supplementZaCatalog(result, get);
+const catalog = await loadZaCatalog(get);
+const zaNames = applyZaNames(result, catalog);
 const zaFilled = await supplementZaItems(result, getBuffer);
 const gmaxFilled = await supplementGigantamax(result, getBuffer);
+// PokéAPI carries the main-series wording, which describes turn-based battles the
+// way Champions does. Z-A only fills what no main-series game has: generation 9.
 await supplementCatalog(result, get);
+const zaEffects = applyZaEffects(result, catalog);
 console.log(
-  `Z-A names: ${JSON.stringify(zaCatalog)} | Z-A item fallback: ${zaFilled} | Gigantamax: ${gmaxFilled}`,
+  `Z-A names: ${JSON.stringify(zaNames)} | Z-A effects: ${JSON.stringify(zaEffects)} | Z-A item fallback: ${zaFilled} | Gigantamax: ${gmaxFilled}`,
 );
 await mkdir(new URL('public/data/', root), { recursive: true });
 await writeFile(new URL('public/data/reference.json', root), JSON.stringify(result));

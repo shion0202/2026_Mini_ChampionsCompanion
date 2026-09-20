@@ -90,8 +90,13 @@ node scripts/verify-browser.mjs
 
 부족한 한국어 이름·설명은 아래 순서로 보완합니다. 모두 리비전을 고정하며, 챔피언스 자체 텍스트가 있으면 덮어쓰지 않습니다.
 
-1. `scripts/rom-text.mjs` — Legends Z-A 덤프([plza-text](https://github.com/CPokemon/plza-text))에서 기술·도구·특성의 이름과 설명을 가져옵니다. 9세대 항목의 한국어 설명은 PokéAPI에 없어 이 출처가 유일합니다. 같은 파일에서 [za-textport](https://github.com/projectpokemon/za-textport)로 Z-A 메가스톤 이름을 보충하고, 소드·실드 덤프([swsh-text](https://github.com/CPokemon/swsh-text))에서 거다이맥스 기술의 이름과 설명을 가져옵니다. PokéAPI는 다이맥스 기술 19개만 수록하고 거다이맥스는 다루지 않습니다.
-2. `scripts/reference-catalog.mjs` — 남은 항목을 고정 PokéAPI 버전으로 채웁니다.
+이름과 설명은 우선순위가 다릅니다. 이름은 가장 최근의 공식 한국어 표기를, 설명은 턴제 배틀을 기준으로 쓴 본가 문구를 먼저 씁니다.
+
+1. 이름 — Legends Z-A 덤프([plza-text](https://github.com/CPokemon/plza-text))를 먼저 씁니다. 여기에 없는 Z-A 메가스톤은 [za-textport](https://github.com/projectpokemon/za-textport)로 보충하고, 거다이맥스 기술은 소드·실드 덤프([swsh-text](https://github.com/CPokemon/swsh-text))에서 가져옵니다. PokéAPI는 다이맥스 기술 19개만 수록하고 거다이맥스는 다루지 않습니다.
+2. 설명 — 고정 PokéAPI 버전(`scripts/reference-catalog.mjs`)을 먼저 씁니다. Z-A는 실시간 배틀에 맞춰 설명을 고쳐 써서, 예컨대 칼춤을 `한동안 자신의 공격을 올린다`로 적습니다. 턴제인 챔피언스에는 본가의 `공격을 2단계 올린다` 쪽이 맞습니다.
+3. 그래도 비어 있으면 Z-A 설명을 씁니다. 스칼렛·바이올렛 텍스트 덤프는 공개된 것이 없어, 9세대 항목의 한국어 설명은 Z-A가 유일한 출처입니다.
+
+챔피언스 자체 텍스트가 있으면 어느 단계에서도 덮어쓰지 않습니다. 화면에서는 다른 작품에서 가져온 설명에 출처를 함께 표시합니다.
 
 Showdown이 폼별로 나눈 항목(`As One (Glastrier)`, `Embody Aspect (Teal)` 등)은 괄호를 뗀 이름으로 한 번 더 찾습니다. 게임은 해당 특성을 하나로 표기하기 때문입니다.
 

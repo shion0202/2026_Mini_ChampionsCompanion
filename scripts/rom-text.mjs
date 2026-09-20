@@ -63,7 +63,7 @@ export async function supplementZaItems(result, getBuffer) {
 // label (TOKUSEI_037 with TOKUSEIINFO_037); moves cannot, because their
 // description labels are hashes, so they pair up by row instead. Cross-checking
 // the move names against PokéAPI matched 862 of 866, which is what fixes the rows.
-export async function supplementZaCatalog(result, getText) {
+export async function loadZaCatalog(getText) {
   const base = `https://raw.githubusercontent.com/CPokemon/plza-text/${PLZA_TEXT}/`;
   const load = file =>
     Promise.all(
@@ -84,35 +84,57 @@ export async function supplementZaCatalog(result, getText) {
     load('wazainfo.txt').then(([, korean]) => [korean]),
   ]);
 
-  const filled = { ability: 0, held_item: 0, move: 0 };
-  const apply = (kind, english, korean, describe) => {
-    const byName = new Map();
-    english.forEach((row, index) => {
-      if (row.text) byName.set(key(row.text), { index, label: korean[index]?.text });
-    });
-    for (const record of Object.values(result[kind])) {
-      // Showdown splits some entries per form, as in "Embody Aspect (Teal)".
-      const found =
-        byName.get(key(record.name)) ?? byName.get(key(record.name.replace(/\s*\(.*\)\s*$/, '')));
-      if (!found) continue;
-      if (found.label && (!record.label || record.label === record.name)) {
-        record.label = found.label;
-        filled[kind]++;
-      }
-      const effect = describe(found);
-      if (!record.effect && readable(effect)) {
-        record.effect = unescapeBreaks(effect);
-        record.effectVersion = 'legends-za';
-      }
-    }
-  };
   const suffixed = (rows, prefix) => {
     const byLabel = new Map(rows.map(row => [row.label, row.text]));
-    return ({ index }) => byLabel.get(`${prefix}_${String(index).padStart(3, '0')}`);
+    return index => byLabel.get(`${prefix}_${String(index).padStart(3, '0')}`);
   };
-  apply('ability', abilityEn, abilityKo, suffixed(abilityInfo, 'TOKUSEIINFO'));
-  apply('held_item', itemEn, itemKo, suffixed(itemInfo, 'ITEMINFO'));
-  apply('move', moveEn, moveKo, ({ index }) => moveInfo[index]?.text);
+  const collect = (english, korean, describe) => {
+    const byName = new Map();
+    english.forEach((row, index) => {
+      if (row.text)
+        byName.set(key(row.text), { label: korean[index]?.text, effect: describe(index) });
+    });
+    return byName;
+  };
+  return {
+    ability: collect(abilityEn, abilityKo, suffixed(abilityInfo, 'TOKUSEIINFO')),
+    held_item: collect(itemEn, itemKo, suffixed(itemInfo, 'ITEMINFO')),
+    move: collect(moveEn, moveKo, index => moveInfo[index]?.text),
+  };
+}
+
+// Showdown splits some entries per form, as in "Embody Aspect (Teal)"; the games
+// name them once.
+const lookup = (byName, name) =>
+  byName.get(key(name)) ?? byName.get(key(name.replace(/\s*\(.*\)\s*$/, '')));
+
+// Names come from Z-A because it is the most recent official Korean wording.
+export function applyZaNames(result, catalog) {
+  const filled = { ability: 0, held_item: 0, move: 0 };
+  for (const kind of Object.keys(catalog))
+    for (const record of Object.values(result[kind])) {
+      const found = lookup(catalog[kind], record.name);
+      if (!found?.label || (record.label && record.label !== record.name)) continue;
+      record.label = found.label;
+      filled[kind]++;
+    }
+  return filled;
+}
+
+// Descriptions are a last resort: Z-A rewrote them for its own battle system, so
+// "한동안 자신의 공격을 올린다" replaces the turn-based "공격을 2단계 올린다".
+// This runs after PokéAPI so only entries no main-series game describes use them.
+export function applyZaEffects(result, catalog) {
+  const filled = { ability: 0, held_item: 0, move: 0 };
+  for (const kind of Object.keys(catalog))
+    for (const record of Object.values(result[kind])) {
+      if (record.effect) continue;
+      const found = lookup(catalog[kind], record.name);
+      if (!readable(found?.effect)) continue;
+      record.effect = unescapeBreaks(found.effect);
+      record.effectVersion = 'legends-za';
+      filled[kind]++;
+    }
   return filled;
 }
 
