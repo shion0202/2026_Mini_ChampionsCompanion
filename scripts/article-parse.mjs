@@ -92,11 +92,14 @@ export function parseTitle(title) {
   const monthly = /MCS|月間/.test(text);
   const seasonal = text.replace(/MCS\s*\d+(\.\d+)?/g, ' ');
   const rank = seasonal.match(/最終\s*(\d+)\s*位/) ?? text.match(/最終\s*(\d+)\s*位/);
-  // 시즌은 シーズン 뒤나 구분자 뒤의 M-숫자 / S숫자만 받는다. レギュM-B는 시즌이
-  // 아니고 MCS의 연월도 시즌이 아니다.
+  // シーズン 뒤, 하이픈이 붙은 M-숫자, 구분자 뒤의 S숫자 순으로 본다. 하이픈이
+  // 있으면 어디에 있든 시즌이지만(チャンピオンズM-3처럼 붙여 쓴다), 없으면
+  // 구분자 뒤에서만 받는다. レギュM-B는 숫자가 없어 걸리지 않고 MCS의 연월은
+  // 위에서 지웠다.
   const season =
-    seasonal.match(/シーズン\s*[MS]\s*-?\s*(\d+)/) ??
-    seasonal.match(/(?:^|[【\s\-／/|])[MS]\s*-?\s*(\d+)(?![.\d])/);
+    seasonal.match(/シーズン\s*(?:[MS]\s*-?\s*)?(\d+)/) ??
+    seasonal.match(/[MS]\s*-\s*(\d+)(?![.\d])/) ??
+    seasonal.match(/(?:^|[【\s／/|])[MS]\s*(\d+)(?![.\d])/);
   const format = /ダブル/.test(text) ? 'Doubles' : /シングル/.test(text) ? 'Singles' : null;
   return {
     rank: rank ? Number(rank[1]) : null,
@@ -227,3 +230,55 @@ export function digest(page, index) {
   if (candidates.filter(c => c.items.length).length < 6) flags.push('items-incomplete');
   return { candidates, flags };
 }
+
+// チャンピオンズ만으로는 포켓몬 외 결과가 섞이지만 종족 필터와 순위 파싱이
+// 걸러낸다. 앞의 두 개는 공백만 다르다. 하테나가 복합어를 어떻게 쪼개는지
+// 확인하는 비용보다 둘 다 던지는 비용이 싸다.
+export const GAME_TERMS = [
+  'ポケモンチャンピオンズ',
+  'ポケモン チャンピオンズ',
+  'ポケチャン',
+  'チャンピオンズ',
+];
+
+// 형식은 검색어에 넣지 않는다. 측정하니 シングル을 더하는 것만으로 하테나의 AND
+// 검색이 고유 URL을 44건에서 5건으로 깎았다. 구축기사 제목이 형식을 밝히지 않는
+// 경우가 흔하기 때문이다. 형식은 받아온 뒤 제목으로 거른다.
+export function searchQueries({ season }) {
+  const number = Number(String(season).replace(/[^0-9]/g, ''));
+  const queries = [];
+  for (const term of GAME_TERMS)
+    for (const label of [`M-${number}`, `S${number}`]) queries.push(`${term} ${label} 最終`);
+  return [...new Set(queries)];
+}
+
+// 블로그 첫 페이지는 기사가 아니다. 포켓몬 이름이 잔뜩 있어 후보 수 검사를
+// 통과해 버리므로 주소로 먼저 거른다.
+export const looksLikeArticle = url => {
+  try {
+    return new URL(url).pathname.replace(/\/+$/, '').length > 0;
+  } catch {
+    return false;
+  }
+};
+
+export function rssLinks(body) {
+  return [...body.matchAll(/<item\s[^]*?<\/item>/g)].map(match => {
+    const item = match[0];
+    const field = tag => item.match(new RegExp(`<${tag}[^>]*>([^]*?)</${tag}>`))?.[1] ?? null;
+    const date = field('dc:date');
+    return {
+      title: flatten(field('title') ?? ''),
+      url: (field('link') ?? '').trim(),
+      date: date ? date.slice(0, 10) : null,
+    };
+  });
+}
+
+// 競馬의 チャンピオンズカップ와 最終予想이 같은 검색어에 걸린다. 측정한 회차에서
+// 고유 URL 44건 중 35건이 경마 예상 글이었다. 최종 N위나 포켓몬 표기가 제목에
+// 없으면 받아오지 않는다. 받아오고 나서 거르면 요청과 시간만 버린다.
+export const looksRelevant = title => {
+  const text = normalize(title);
+  return /最終\s*\d+\s*位/.test(text) || /ポケモン|ポケチャン|構築/.test(text);
+};

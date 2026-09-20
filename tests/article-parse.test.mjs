@@ -2,7 +2,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildIndex, digest, normalize, parseTitle, readPage } from '../scripts/article-parse.mjs';
+import {
+  buildIndex,
+  digest,
+  normalize,
+  parseTitle,
+  readPage,
+  looksLikeArticle,
+  looksRelevant,
+  rssLinks,
+  searchQueries,
+} from '../scripts/article-parse.mjs';
 
 const read = name =>
   readFile(new URL(`../public/data/${name}.json`, import.meta.url)).then(JSON.parse);
@@ -208,4 +218,78 @@ test('digest flags what it could not settle', () => {
   const { flags } = digest({ text: 'ガブリアス', images: [], excerpt: '' }, index);
   assert.ok(flags.includes('few-candidates'));
   assert.ok(flags.includes('no-image'));
+});
+
+test('queries pair every game term with the season in both notations', () => {
+  const queries = searchQueries({ season: 'M5' });
+  assert.equal(queries.length, 8);
+  assert.ok(queries.every(q => q.includes('最終')));
+  assert.ok(queries.some(q => q.includes('ポケモンチャンピオンズ') && q.includes('M-5')));
+  assert.ok(queries.some(q => q.includes('ポケチャン')));
+  assert.ok(queries.some(q => q.includes('S5')));
+  assert.equal(new Set(queries).size, queries.length, '같은 검색어가 두 번 나가면 안 된다');
+});
+
+test('the format never enters the query, only the filter', () => {
+  // 측정: 형식 토큰을 넣으면 하테나의 AND 검색이 고유 URL을 44건에서 5건으로
+  // 깎는다. 구축기사 제목이 싱글을 밝히지 않는 경우가 흔하기 때문이다.
+  assert.ok(searchQueries({ season: 'M5' }).every(q => !/シングル|ダブル/.test(q)));
+  assert.deepEqual(
+    searchQueries({ season: 'M5', format: 'Singles' }),
+    searchQueries({ season: 'M5' }),
+  );
+});
+
+test('a blog index is not an article', () => {
+  assert.equal(looksLikeArticle('https://syndr.hatenablog.com/'), false);
+  assert.equal(looksLikeArticle('https://syndr.hatenablog.com'), false);
+  assert.equal(looksLikeArticle('https://taka-poke.hatenablog.com/entry/2026/07/09/020617'), true);
+  assert.equal(looksLikeArticle('https://pokesol.app/u/x/articles/abc'), true);
+  assert.equal(looksLikeArticle('내용 없음'), false);
+});
+
+test('rssLinks reads the entries out of a Hatena bookmark feed', () => {
+  const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel rdf:about="https://b.hatena.ne.jp/q/x"><title>검색</title><link>https://b.hatena.ne.jp/q/x</link></channel>
+<item rdf:about="https://example.com/a">
+<title>&#x3010;M-5&#x3011;&#x6700;&#x7D42;2&#x4F4D;</title>
+<link>https://example.com/a</link>
+<dc:date>2026-09-10T17:48:18+09:00</dc:date>
+</item>
+<item rdf:about="https://example.com/b">
+<title>무관한 뉴스</title>
+<link>https://example.com/b</link>
+</item>
+</rdf:RDF>`;
+  const links = rssLinks(feed);
+  assert.equal(links.length, 2, 'channel의 link를 item으로 세면 안 된다');
+  assert.equal(links[0].url, 'https://example.com/a');
+  assert.equal(links[0].title, '【M-5】最終2位');
+  assert.equal(links[0].date, '2026-09-10');
+  assert.equal(links[1].date, null);
+});
+
+test('horse racing shares the search words, so the title is filtered first', () => {
+  // 측정: チャンピオンズ와 最終이 競馬의 チャンピオンズカップ・最終予想에 걸려
+  // 고유 URL 44건 중 35건이 경마 예상 글이었다. 받아오기 전에 제목으로 거른다.
+  assert.equal(looksRelevant('【2025チャンピオンズC最終予想】3連単3連複勝負馬券公開'), false);
+  assert.equal(looksRelevant('最終予想 東海S - てきとーに競馬予想'), false);
+  assert.equal(looksRelevant('ダイワメジャーとは [単語記事] - ニコニコ大百科'), false);
+  assert.equal(looksRelevant('ASCII.jp - 記事アーカイブ'), false);
+
+  assert.equal(looksRelevant('【M-5】神速ルカリザスタン【最終2位】'), true);
+  assert.equal(looksRelevant('シーズンM-3シングル　最終35位:R2510'), true);
+  assert.equal(
+    looksRelevant('【ポケモンチャンピオンズ考察】ここ10年で私が過去最弱になった理由'),
+    true,
+  );
+  assert.equal(looksRelevant('M-4シーズン使用構築❰シン・デスギャラクシー❱最終46位'), true);
+});
+
+test('the season is read even without a separator or a letter', () => {
+  // 둘 다 실제 수집물에서 나온 제목이다.
+  assert.equal(parseTitle('チャンピオンズM-3最終44位 R2505 復活ガブラッキー').season, 'M3');
+  assert.equal(parseTitle('シーズン4使用構築　ギャラミミ積みリレー　最終25位').season, 'M4');
+  assert.equal(parseTitle('獄炎乱舞リザYロップ　M-3最終2434　最終153位').season, 'M3');
 });
