@@ -7,7 +7,7 @@ const EMPTY = '<div class="empty-state"><p>조건에 맞는 포켓몬이 없습�
 // 이름만 있으면 어떤 폼인지 바로 안 보인다. 랭킹과 같은 이미지를 쓴다.
 const named = row => `${portrait(row, 'speed-portrait')}<span>${esc(row.label)}</span>`;
 
-export function renderSpeedRows(rows, { mode = 'base', preset = 0, ascending = false } = {}) {
+export function renderSpeedRows(rows, { mode = 'base' } = {}) {
   if (!rows.length) return EMPTY;
   if (mode === 'base')
     return `<div class="speed-tiers">${speedGroups(rows)
@@ -18,17 +18,18 @@ export function renderSpeedRows(rows, { mode = 'base', preset = 0, ascending = f
             .join('')}</ul></section>`,
       )
       .join('')}</div>`;
+  // 네 열은 모두 같은 종족값에서 나오므로 어느 열을 기준으로 정렬해도 순서가
+  // 같다. 그래서 기준 열을 고르는 장치를 두지 않는다.
   return `<div class="speed-table-wrap"><table class="speed-table">
-    <caption>Lv.50 스피드 실수치 비교</caption>
+    <caption>스피드 실수치 비교</caption>
     <thead><tr><th scope="col">포켓몬</th>${SPEED_PRESETS.map(
-      (p, i) =>
-        `<th scope="col"${i === preset ? ` class="speed-selected" aria-sort="${ascending ? 'ascending' : 'descending'}"` : ''}>${p.label}</th>`,
+      p => `<th scope="col">${p.label}</th>`,
     ).join('')}</tr></thead>
     <tbody>${rows
       .map(
         row =>
           `<tr><th scope="row"><span class="speed-mon">${named(row)}</span><small>${row.base}족</small></th>${row.values
-            .map((value, i) => `<td${i === preset ? ' class="speed-selected"' : ''}>${value}</td>`)
+            .map(value => `<td>${value}</td>`)
             .join('')}</tr>`,
       )
       .join('')}</tbody>

@@ -84,7 +84,7 @@ const saved = preferences(storage);
 const favorites = saved.favorites;
 const state = {
   page: 'ranking',
-  speed: { mode: 'base', preset: 0, query: '', type: '', includeMega: true, ascending: false },
+  speed: { mode: 'base', query: '', type: '', includeMega: true, ascending: false },
   speedLimit: 80,
   articleData: null,
   articleError: false,
@@ -492,7 +492,6 @@ function renderSpeed() {
       button.setAttribute('aria-pressed', String(button.dataset.speedMode === state.speed.mode)),
     );
   const battle = state.speed.mode === 'battle';
-  $('speed-preset-field').hidden = state.speed.mode !== 'actual';
   $('speed-actual-help').hidden = state.speed.mode !== 'actual';
   $('speed-battle-help').hidden = !battle;
   $('speed-more').hidden = true;
@@ -849,7 +848,6 @@ $('speed-controls').addEventListener('input', () => {
   Object.assign(state.speed, {
     query: $('speed-search').value,
     type: $('speed-type').value,
-    preset: Number($('speed-preset').value),
     includeMega: $('speed-mega').checked,
     ascending: $('speed-order').value === 'asc',
   });

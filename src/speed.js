@@ -6,7 +6,7 @@ import { megaSprite } from './images.js';
 export const SPEED_PRESETS = [
   { label: '최속' },
   { label: '준속' },
-  { label: '무투자' },
+  { label: '무보정' },
   { label: '최저' },
 ];
 const collator = new Intl.Collator('ko-KR', { numeric: true });

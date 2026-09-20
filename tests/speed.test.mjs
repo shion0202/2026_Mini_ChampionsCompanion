@@ -69,12 +69,14 @@ test('groups merge equal speed and each ordering uses the selected numeric value
   }
 });
 
-test('views label tiers, selected sorting column, empty results and escape names', () => {
+test('views label tiers, every preset column, empty results and escape names', () => {
   const rows = speedRows(reference, locale, { query: '보만다' });
   assert.match(renderSpeedRows(rows, { mode: 'base' }).replace(/<[^>]*>/g, ''), /100족/);
-  const actual = renderSpeedRows(rows, { mode: 'actual', preset: 2 });
-  assert.match(actual, /aria-sort="descending"/);
-  assert.match(actual, /무투자/);
+  const actual = renderSpeedRows(rows, { mode: 'actual' });
+  for (const label of ['최속', '준속', '무보정', '최저']) assert.match(actual, new RegExp(label));
+  // 네 열이 같은 종족값에서 나와 정렬 순서가 같으므로 기준 열을 고르지 않는다.
+  assert.ok(!actual.includes('speed-selected'), '기준 열 표시가 남아 있다');
+  assert.ok(!actual.includes('aria-sort'), '정렬 기준이 없는데 정렬 표시가 남아 있다');
   assert.match(renderSpeedRows([], { mode: 'base' }), /조건에 맞는 포켓몬이 없습니다/);
   assert.ok(
     renderSpeedRows([{ ...rows[0], label: '<script>' }], { mode: 'base' }).includes(
