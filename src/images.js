@@ -17,5 +17,10 @@ export function itemSprite(name) {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${GEN9_ITEMS.has(filename + '.png') ? 'gen9/' : ''}${filename}.png`;
 }
 export function itemArtwork(name) {
-  return `<span class="item-art"><img class="item-image" src="${itemSprite(name)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span>`;
+  return (
+    `<span class="item-art">` +
+    `<img class="item-image" src="${itemSprite(name)}" alt=""` +
+    ` loading="lazy" referrerpolicy="no-referrer">` +
+    `<span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span>`
+  );
 }

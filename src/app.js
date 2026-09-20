@@ -141,7 +141,10 @@ function controls() {
     $('season').innerHTML = state.index.seasons
       .map(
         s =>
-          `<option value="${s.season}">${s.season === state.index.seasons[0].season ? '[최신] ' : ''}${s.season.replace('M', 'M-')}${SEASON_REGULATIONS[s.season] ? ` (${SEASON_REGULATIONS[s.season]})` : ''}</option>`,
+          `<option value="${s.season}">` +
+          `${s.season === state.index.seasons[0].season ? '[최신] ' : ''}` +
+          `${s.season.replace('M', 'M-')}` +
+          `${SEASON_REGULATIONS[s.season] ? ` (${SEASON_REGULATIONS[s.season]})` : ''}</option>`,
       )
       .join('');
     $('season').value = state.season;
@@ -158,7 +161,11 @@ function sourceStatus() {
     return;
   }
   $('source-status').innerHTML =
-    `<button class="source-chip" id="source-info"><span class="status-dot ${state.stale ? 'stale' : ''}"></span>자료 ${formatDate(state.snapshot.date)}<span class="source-kind">${state.stale ? '보관 자료' : ''}</span><span aria-hidden="true">ⓘ</span></button>`;
+    `<button class="source-chip" id="source-info">` +
+    `<span class="status-dot ${state.stale ? 'stale' : ''}"></span>` +
+    `자료 ${formatDate(state.snapshot.date)}` +
+    `<span class="source-kind">${state.stale ? '보관 자료' : ''}</span>` +
+    `<span aria-hidden="true">ⓘ</span></button>`;
   $('current-source-times').textContent =
     `자료 날짜: ${formatDate(state.snapshot.date)}\nAPI 생성: ${fmtTime(state.snapshot.generatedAt)}\n기기 조회: ${fmtTime(state.fetchedAt)}`;
   $('source-info').onclick = () => $('about-dialog').showModal();
@@ -191,16 +198,26 @@ function renderList() {
   $('load-more').hidden = visible.length <= state.limit;
   if (!visible.length) {
     $('ranking').innerHTML =
-      `<div class="empty-state"><span class="empty-symbol">${state.favoriteOnly ? '☆' : '⌕'}</span><h3>조건에 맞는 포켓몬이 없어요</h3><p>검색어와 적용한 필터를 확인해 주세요.</p><button id="reset-filters" class="text-button">필터 초기화</button></div>`;
+      `<div class="empty-state"><span class="empty-symbol">${state.favoriteOnly ? '☆' : '⌕'}</span>` +
+      `<h3>조건에 맞는 포켓몬이 없어요</h3>` +
+      `<p>검색어와 적용한 필터를 확인해 주세요.</p>` +
+      `<button id="reset-filters" class="text-button">필터 초기화</button></div>`;
     return;
   }
+  const dexNumber = p =>
+    state.sort === 'dex'
+      ? `<span class="dex-number">No.${p.dex ? String(p.dex).padStart(3, '0') : '—'}</span>`
+      : '';
+  const pokemonInfo = p =>
+    `<span class="pokemon-info">${dexNumber(p)}<strong>${esc(p.label)}</strong>` +
+    `<span class="type-list">${typeBadges(p.types)}</span></span>`;
   $('ranking').innerHTML = visible
     .slice(0, state.limit)
     .map(
       p => `<div class="pokemon-row ${state.selected === p.id ? 'selected' : ''}">
     <button class="pokemon-select" data-pokemon="${p.id}" aria-label="${esc(p.label)} ${p.rank}위 통계 보기" ${state.selected === p.id ? 'aria-current="true"' : ''}>
       <span class="rank ${p.rank <= 3 ? 'rank-top' : ''}" aria-label="사용 순위 ${p.rank}위">${p.rank.toString().padStart(2, '0')}</span>
-      <span class="portrait-wrap">${portrait(p)}</span><span class="pokemon-info">${state.sort === 'dex' ? `<span class="dex-number">No.${p.dex ? String(p.dex).padStart(3, '0') : '—'}</span>` : ''}<strong>${esc(p.label)}</strong><span class="type-list">${typeBadges(p.types)}</span></span>
+      <span class="portrait-wrap">${portrait(p)}</span>${pokemonInfo(p)}
     </button>
     <button class="favorite-button" data-favorite="${p.id}" aria-label="${esc(p.label)} 즐겨찾기" aria-pressed="${favorites.has(p.id)}">${favorites.has(p.id) ? '★' : '☆'}</button>
   </div>`,
@@ -228,28 +245,64 @@ function renderHero() {
   const key = `${shown.name}:${favorites.has(p.id)}`;
   if (container.dataset.shown === key) return;
   container.dataset.shown = key;
-  container.innerHTML = `<div class="hero-copy"><span class="rank-pill">#${p.rank} <span>사용 순위</span></span><h2 tabindex="-1" id="pokemon-title">${esc(shown.label)}</h2><p class="english-name"><span lang="en">${esc(shown.name)}</span>${p.dex ? ` <span>№ ${String(p.dex).padStart(3, '0')}</span>` : ''}</p>${state.locale.pokemonJapanese(shown.name) ? `<p class="japanese-name" lang="ja">${esc(state.locale.pokemonJapanese(shown.name))}</p>` : ''}<div class="type-list">${typeBadges(shown.types)}</div></div><div class="hero-art">${portrait(shown, 'hero-portrait')}<span class="hero-image-fallback" hidden>이미지 미제공</span></div><button class="favorite-button hero-favorite" data-favorite="${p.id}" aria-label="${esc(p.label)} 즐겨찾기" aria-pressed="${favorites.has(p.id)}">${favorites.has(p.id) ? '★' : '☆'}</button>`;
+  const japanese = state.locale.pokemonJapanese(shown.name);
+  const heroCopy =
+    `<div class="hero-copy"><span class="rank-pill">#${p.rank} <span>사용 순위</span></span>` +
+    `<h2 tabindex="-1" id="pokemon-title">${esc(shown.label)}</h2>` +
+    `<p class="english-name"><span lang="en">${esc(shown.name)}</span>` +
+    `${p.dex ? ` <span>№ ${String(p.dex).padStart(3, '0')}</span>` : ''}</p>` +
+    `${japanese ? `<p class="japanese-name" lang="ja">${esc(japanese)}</p>` : ''}` +
+    `<div class="type-list">${typeBadges(shown.types)}</div></div>`;
+  const heroArt =
+    `<div class="hero-art">${portrait(shown, 'hero-portrait')}` +
+    `<span class="hero-image-fallback" hidden>이미지 미제공</span></div>`;
+  const heroFavorite =
+    `<button class="favorite-button hero-favorite" data-favorite="${p.id}"` +
+    ` aria-label="${esc(p.label)} 즐겨찾기" aria-pressed="${favorites.has(p.id)}">` +
+    `${favorites.has(p.id) ? '★' : '☆'}</button>`;
+  container.innerHTML = heroCopy + heroArt + heroFavorite;
 }
 function renderDetail() {
   const p = selectedEntry();
   if (!p) {
     $('detail').innerHTML =
-      `<div class="detail-placeholder"><div class="placeholder-mark" aria-hidden="true">↗</div><p class="eyebrow">BATTLE INSIGHTS</p><h2>다음 배틀을 위한 한 수</h2><p>포켓몬을 선택하면 기술과 도구,<br>함께 쓰는 포켓몬을 확인할 수 있어요.</p><div class="placeholder-tags"><span>기술</span><span>도구</span><span>같은 팀</span></div></div>`;
+      `<div class="detail-placeholder">` +
+      `<div class="placeholder-mark" aria-hidden="true">↗</div>` +
+      `<p class="eyebrow">BATTLE INSIGHTS</p><h2>다음 배틀을 위한 한 수</h2>` +
+      `<p>포켓몬을 선택하면 기술과 도구,<br>함께 쓰는 포켓몬을 확인할 수 있어요.</p>` +
+      `<div class="placeholder-tags"><span>기술</span><span>도구</span><span>같은 팀</span></div></div>`;
     return;
   }
+  const hasPrevious =
+    history.state?.previousPokemon && state.list.some(p => p.id === history.state.previousPokemon);
+  const mobileNav =
+    `<div class="detail-mobile-nav"><div class="detail-navigation">` +
+    `<button id="previous-pokemon" class="text-button" ${hasPrevious ? '' : 'hidden'}>← 이전</button>` +
+    `<button id="back" class="text-button">랭킹으로</button></div>` +
+    `<span>${state.format === 'Singles' ? '싱글배틀' : '더블배틀'}` +
+    ` (${state.season.replace('M', 'M-')})</span></div>`;
+  const tab = ([category, label]) =>
+    `<button role="tab" id="tab-${category}" data-category="${category}"` +
+    ` aria-controls="category-content" aria-selected="${state.category === category}"` +
+    ` tabindex="${state.category === category ? 0 : -1}">${label}</button>`;
+  const detailSource =
+    `<div class="detail-source">` +
+    `<span>자료 날짜 <strong>${formatDate(state.snapshot.date)}</strong></span>` +
+    `<details><summary>자료 시각 자세히</summary>` +
+    `<p>자료: ${state.season.replace('M', 'M-')} / ${state.format === 'Singles' ? '싱글' : '더블'}` +
+    ` / ${formatDate(state.snapshot.date)} (제공처 표기, 시간대 미제공)</p>` +
+    `<p>API 생성: ${fmtTime(state.snapshot.generatedAt)}</p>` +
+    `<p>기기 조회: ${fmtTime(state.fetchedAt)}</p></details></div>`;
   $('detail').innerHTML = `
-    <div class="detail-mobile-nav"><div class="detail-navigation"><button id="previous-pokemon" class="text-button" ${history.state?.previousPokemon && state.list.some(p => p.id === history.state.previousPokemon) ? '' : 'hidden'}>← 이전</button><button id="back" class="text-button">랭킹으로</button></div><span>${state.format === 'Singles' ? '싱글배틀' : '더블배틀'} (${state.season.replace('M', 'M-')})</span></div>
+    ${mobileNav}
     <div class="pokemon-hero"></div>
     <div class="detail-tabs" role="tablist" aria-label="통계와 도감 항목">${Object.entries(
       DETAIL_LABELS,
     )
-      .map(
-        ([category, label]) =>
-          `<button role="tab" id="tab-${category}" data-category="${category}" aria-controls="category-content" aria-selected="${state.category === category}" tabindex="${state.category === category ? 0 : -1}">${label}</button>`,
-      )
+      .map(tab)
       .join('')}</div>
     <div id="category-content" class="category-content" role="tabpanel" aria-labelledby="tab-${state.category}" tabindex="0"></div>
-    <div class="detail-source"><span>자료 날짜 <strong>${formatDate(state.snapshot.date)}</strong></span><details><summary>자료 시각 자세히</summary><p>자료: ${state.season.replace('M', 'M-')} / ${state.format === 'Singles' ? '싱글' : '더블'} / ${formatDate(state.snapshot.date)} (제공처 표기, 시간대 미제공)</p><p>API 생성: ${fmtTime(state.snapshot.generatedAt)}</p><p>기기 조회: ${fmtTime(state.fetchedAt)}</p></details></div>`;
+    ${detailSource}`;
   $('back').onclick = () => goToRanking();
   $('previous-pokemon').onclick = () => history.back();
   renderCategory();
@@ -268,8 +321,12 @@ function renderCategory() {
   $('category-content').setAttribute('aria-labelledby', `tab-${category}`);
   if (category === 'overview' || category === 'learnset') {
     if (!state.reference) {
-      $('category-content').innerHTML =
-        `<div class="empty-state">${state.refError ? '도감 자료를 불러오지 못했습니다.<br><button class="text-button" data-ref-retry>다시 시도</button>' : '도감 자료를 불러오는 중입니다.'}</div>`;
+      $('category-content').innerHTML = `<div class="empty-state">${
+        state.refError
+          ? '도감 자료를 불러오지 못했습니다.<br>' +
+            '<button class="text-button" data-ref-retry>다시 시도</button>'
+          : '도감 자료를 불러오는 중입니다.'
+      }</div>`;
       return;
     }
     $('category-content').innerHTML =
@@ -299,7 +356,12 @@ function renderCategory() {
     stat_points: 'HP, 공격, 방어, 특수공격, 특수방어, 스피드 순서입니다.',
     ability: '제공처가 집계한 특성별 채용률입니다.',
   };
-  const header = `<div class="category-heading"><h3>${CATEGORY_LABELS[category]}</h3><span>${rows.length ? `상위 ${rows.length}${category === 'teammate' ? '마리' : '개'}` : '자료 없음'}</span></div>`;
+  const headerCount = rows.length
+    ? `상위 ${rows.length}${category === 'teammate' ? '마리' : '개'}`
+    : '자료 없음';
+  const header =
+    `<div class="category-heading"><h3>${CATEGORY_LABELS[category]}</h3>` +
+    `<span>${headerCount}</span></div>`;
   if (!rows.length) {
     $('category-content').innerHTML =
       header + '<div class="empty-state"><p>이 자료에는 해당 통계가 제공되지 않습니다.</p></div>';
@@ -319,14 +381,33 @@ function renderCategory() {
         const label =
           state.reference?.[category]?.[toId(r.name)]?.label ??
           state.locale.label(category, r.name);
+        const up = r.up
+          ? `<span class="stat-up">${esc(STAT_NAMES[r.up] ?? r.up)} ↑</span>`
+          : '<span>보정 없음</span>';
+        const down = r.down
+          ? `<span class="stat-down">${esc(STAT_NAMES[r.down] ?? r.down)} ↓</span>`
+          : '';
         const sub =
-          category === 'stat_alignment'
-            ? `<small class="stat-adjust">${r.up ? `<span class="stat-up">${esc(STAT_NAMES[r.up] ?? r.up)} ↑</span>` : '<span>보정 없음</span>'}${r.down ? `<span class="stat-down">${esc(STAT_NAMES[r.down] ?? r.down)} ↓</span>` : ''}</small>`
-            : '';
-        const inner = `<span class="stat-rank">${r.rank}</span>${teammate && target ? `<span class="team-portrait">${portrait(target)}</span>` : ''}${category === 'held_item' ? itemArtwork(r.name) : ''}<span class="stat-name"><strong>${['move', 'held_item', 'ability'].includes(category) ? effectButton(category, toId(r.name), label) : esc(label)}</strong>${sub}${teammate && !target ? '<small>이 시즌 목록에 없음</small>' : ''}</span>${teammate ? `<span class="row-arrow">${target ? '↗' : '—'}</span>` : `<span class="stat-percent${percentClass(r.percent)}">${percentageText(r.percent)}</span>`}`;
+          category === 'stat_alignment' ? `<small class="stat-adjust">${up}${down}</small>` : '';
+        const name = ['move', 'held_item', 'ability'].includes(category)
+          ? effectButton(category, toId(r.name), label)
+          : esc(label);
+        const trailing = teammate
+          ? `<span class="row-arrow">${target ? '↗' : '—'}</span>`
+          : `<span class="stat-percent${percentClass(r.percent)}">${percentageText(r.percent)}</span>`;
+        const inner =
+          `<span class="stat-rank">${r.rank}</span>` +
+          `${teammate && target ? `<span class="team-portrait">${portrait(target)}</span>` : ''}` +
+          `${category === 'held_item' ? itemArtwork(r.name) : ''}` +
+          `<span class="stat-name"><strong>${name}</strong>${sub}` +
+          `${teammate && !target ? '<small>이 시즌 목록에 없음</small>' : ''}</span>` +
+          trailing;
         return target
-          ? `<button class="stat-row teammate-row" data-pokemon="${target.id}" aria-label="${esc(label)} 통계 보기">${inner}</button>`
-          : `<div class="stat-row"><span class="stat-bar" style="width:${r.percent ?? 0}%" aria-hidden="true"></span>${inner}</div>`;
+          ? `<button class="stat-row teammate-row" data-pokemon="${target.id}"` +
+              ` aria-label="${esc(label)} 통계 보기">${inner}</button>`
+          : `<div class="stat-row">` +
+              `<span class="stat-bar" style="width:${r.percent ?? 0}%" aria-hidden="true"></span>` +
+              `${inner}</div>`;
       })
       .join('') +
     `</div><p class="category-tip">${tips[category]}</p>`;
@@ -477,7 +558,11 @@ async function load(force = false) {
     const message =
       error.name === 'TimeoutError' ? '통계 서버의 응답이 늦어지고 있습니다.' : error.message;
     $('ranking').innerHTML =
-      `<div class="empty-state error-state"><span class="empty-symbol">↻</span><h3>통계를 불러오지 못했어요</h3><p>네트워크 연결과 통계 제공처 상태를 확인해 주세요.</p><p class="error-detail">${esc(message)}</p><button id="retry" class="primary-button">다시 시도</button></div>`;
+      `<div class="empty-state error-state"><span class="empty-symbol">↻</span>` +
+      `<h3>통계를 불러오지 못했어요</h3>` +
+      `<p>네트워크 연결과 통계 제공처 상태를 확인해 주세요.</p>` +
+      `<p class="error-detail">${esc(message)}</p>` +
+      `<button id="retry" class="primary-button">다시 시도</button></div>`;
     $('retry').onclick = () => load(true);
     $('detail').innerHTML =
       '<div class="detail-placeholder"><h2>자료를 기다리고 있어요</h2><p>조회가 완료되면 통계를 확인할 수 있습니다.</p></div>';
@@ -534,22 +619,33 @@ function filterGroup(id, key, title, options, current, mode = 'or', disabled = f
       ? '정보 불러오기 실패'
       : '불러오는 중'
     : filterSummary(values, options, mode) || '전체';
-  return `<details id="${id}" class="filter-group" data-filter-group="${key}"><summary><strong>${title}</strong><span data-group-summary>${esc(summary)}</span></summary><fieldset aria-label="${title}" ${disabled ? 'disabled' : ''}><div class="filter-mode" role="group" aria-label="${title} 조건 결합">${[
+  const modes = [
     ['or', '하나라도 (OR)'],
     ['and', '모두 (AND)'],
   ]
     .map(
       ([value, label]) =>
-        `<label><input type="radio" name="${id}-mode" value="${value}" ${mode === value ? 'checked' : ''}><span>${label}</span></label>`,
+        `<label><input type="radio" name="${id}-mode" value="${value}"` +
+        ` ${mode === value ? 'checked' : ''}><span>${label}</span></label>`,
     )
-    .join('')}</div><div class="filter-choices">${Object.entries(options)
+    .join('');
+  const choices = Object.entries(options)
     .map(
       ([value, label]) =>
-        `<label><input type="checkbox" data-choice value="${value}" data-label="${esc(label)}" ${values.includes(value) ? 'checked' : ''}><span>${esc(label)}</span></label>`,
+        `<label><input type="checkbox" data-choice value="${value}" data-label="${esc(label)}"` +
+        ` ${values.includes(value) ? 'checked' : ''}><span>${esc(label)}</span></label>`,
     )
-    .join(
-      '',
-    )}</div><button type="button" class="filter-group-clear" data-clear-group>선택 해제</button></fieldset></details>`;
+    .join('');
+  return (
+    `<details id="${id}" class="filter-group" data-filter-group="${key}">` +
+    `<summary><strong>${title}</strong>` +
+    `<span data-group-summary>${esc(summary)}</span></summary>` +
+    `<fieldset aria-label="${title}" ${disabled ? 'disabled' : ''}>` +
+    `<div class="filter-mode" role="group" aria-label="${title} 조건 결합">${modes}</div>` +
+    `<div class="filter-choices">${choices}</div>` +
+    `<button type="button" class="filter-group-clear" data-clear-group>선택 해제</button>` +
+    `</fieldset></details>`
+  );
 }
 function groupValues(group) {
   return [...group.querySelectorAll('[data-choice]:checked')].map(input => input.value);
@@ -572,7 +668,8 @@ function openFilters(kind) {
   const ranking = kind === 'ranking';
   $('filter-title').textContent = ranking ? '랭킹 필터' : '배우는 기술 필터';
   const help =
-    '<p class="category-tip filter-help">항목을 펼쳐 여러 값을 선택하세요. 항목 안에서는 AND/OR를 선택하고, 서로 다른 항목의 조건은 모두 만족해야 합니다.</p>';
+    '<p class="category-tip filter-help">항목을 펼쳐 여러 값을 선택하세요.' +
+    ' 항목 안에서는 AND/OR를 선택하고, 서로 다른 항목의 조건은 모두 만족해야 합니다.</p>';
   $('filter-fields').innerHTML =
     help +
     (ranking
@@ -594,7 +691,11 @@ function openFilters(kind) {
           state.rankModes.gimmick,
           !state.reference,
         ) +
-        `<div class="filter-footer-note"><label class="filter-checkbox"><input id="filter-favorite" type="checkbox" name="favorite" ${state.favoriteOnly ? 'checked' : ''}>즐겨찾기만 보기</label><p class="category-tip">세대는 원종이 처음 등장한 세대를 기준으로 합니다.<br>타입은 메가진화 전의 폼을 기준으로 합니다.</p></div>`
+        `<div class="filter-footer-note"><label class="filter-checkbox">` +
+        `<input id="filter-favorite" type="checkbox" name="favorite"` +
+        ` ${state.favoriteOnly ? 'checked' : ''}>즐겨찾기만 보기</label>` +
+        `<p class="category-tip">세대는 원종이 처음 등장한 세대를 기준으로 합니다.<br>` +
+        `타입은 메가진화 전의 폼을 기준으로 합니다.</p></div>`
       : filterGroup(
           'learnset-type',
           'type',
