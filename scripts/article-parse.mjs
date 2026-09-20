@@ -81,3 +81,59 @@ export function buildIndex(reference, ko) {
     baseOf,
   };
 }
+
+// 아이콘과 아바타는 본문 이미지가 아니다. 측정한 기사에서 첫 이미지가 블로그
+// 아이콘이었고 실제 팀 이미지는 그다음이었다.
+const DECORATION = /icon|avatar|profile|square|emoji|badge|blank|spacer/i;
+
+export function parseTitle(title) {
+  const text = normalize(title);
+  // MCS는 월간 챌린지다. MCS26.07의 숫자를 시즌으로 읽지 않도록 먼저 지운다.
+  const monthly = /MCS|月間/.test(text);
+  const seasonal = text.replace(/MCS\s*\d+(\.\d+)?/g, ' ');
+  const rank = seasonal.match(/最終\s*(\d+)\s*位/) ?? text.match(/最終\s*(\d+)\s*位/);
+  // 시즌은 シーズン 뒤나 구분자 뒤의 M-숫자 / S숫자만 받는다. レギュM-B는 시즌이
+  // 아니고 MCS의 연월도 시즌이 아니다.
+  const season =
+    seasonal.match(/シーズン\s*[MS]\s*-?\s*(\d+)/) ??
+    seasonal.match(/(?:^|[【\s\-／/|])[MS]\s*-?\s*(\d+)(?![.\d])/);
+  const format = /ダブル/.test(text) ? 'Doubles' : /シングル/.test(text) ? 'Singles' : null;
+  return {
+    rank: rank ? Number(rank[1]) : null,
+    season: season ? `M${Number(season[1])}` : null,
+    format,
+    monthly,
+  };
+}
+
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+const decode = value =>
+  value
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, digits) => String.fromCodePoint(Number(digits)))
+    .replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (whole, name) => ENTITIES[name] ?? whole);
+const flatten = value =>
+  normalize(decode(value.replace(/<[^>]+>/g, ' ')))
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export function readPage(html) {
+  const meta = name =>
+    html.match(
+      new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']*)["']`, 'i'),
+    )?.[1] ?? null;
+  const body = html.replace(/<(script|style)\b[^]*?<\/\1>/gi, ' ');
+  const text = flatten(body);
+  const images = [...body.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)]
+    .map(match => match[1])
+    .filter(url => /^https?:/.test(url) && !DECORATION.test(url))
+    .slice(0, 3);
+  return {
+    title: meta('og:title') ?? flatten(html.match(/<title[^>]*>([^]*?)<\/title>/i)?.[1] ?? ''),
+    siteName: meta('og:site_name'),
+    publishedAt: (meta('article:published_time') ?? '').slice(0, 10) || null,
+    text,
+    images,
+    excerpt: text.slice(0, 300),
+  };
+}
