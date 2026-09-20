@@ -72,6 +72,9 @@ export class ApiClient {
   previousSnapshot(context) {
     this.prune();
     const candidates = [...this.snapshots.values()];
+    // Collect first: read() drops expired entries, and removing during an indexed
+    // walk shifts the remaining keys down and skips one.
+    const matches = [];
     try {
       for (let i = 0; i < this.storage.length; i++) {
         const key = this.storage.key(i);
@@ -81,13 +84,14 @@ export class ApiClient {
           /^\/data\/meta\/(M\d+)\/(\d{2}_\d{2}_\d{4})\/(Singles|Doubles)\.json$/,
         );
         if (!match || match[1] !== context.season || match[3] !== context.format) continue;
-        const item = this.read(path, raw =>
-          normalizeSnapshot(raw, { season: match[1], date: match[2], format: match[3] }),
-        );
-        if (item) candidates.push(item);
+        matches.push({ path, season: match[1], date: match[2], format: match[3] });
       }
     } catch {
       /* Session copies still work when browser storage is unavailable. */
+    }
+    for (const { path, season, date, format } of matches) {
+      const item = this.read(path, raw => normalizeSnapshot(raw, { season, date, format }));
+      if (item) candidates.push(item);
     }
     return (
       candidates

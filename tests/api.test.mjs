@@ -91,6 +91,40 @@ test('fallback rejects expired, corrupt, mismatched and later-date cached snapsh
   await assert.rejects(client.getSnapshot({ season: 'M6', format: 'Singles', date: '20_09_2026' }));
 });
 
+test('a record dropped during the storage scan does not hide the next one', async () => {
+  let now = DAY,
+    fail = false;
+  const store = memory();
+  const client = new ApiClient({
+    storage: store,
+    now: () => now,
+    fetcher: async url => {
+      if (fail) throw Error('missing new file');
+      const [, season, date, format] = url.match(/meta\/(M\d+)\/([^/]+)\/(Singles|Doubles)/);
+      return response(snapshot(date, format, season));
+    },
+  });
+  await client.getSnapshot({ season: 'M6', format: 'Singles', date: '16_09_2026' });
+  now += 1000;
+  await client.getSnapshot({ season: 'M6', format: 'Singles', date: '17_09_2026' });
+  // Force the scan to read from storage rather than the session copies.
+  client.snapshots.clear();
+  // A clock moved backwards leaves a future-dated record: prune keeps it, read drops it.
+  // Removing it mid-scan must not shift the remaining keys past the valid one behind it.
+  const keys = [];
+  for (let i = 0; i < store.length; i++) keys.push(store.key(i));
+  const future = keys.find(k => k.includes('16_09_2026'));
+  store.setItem(
+    future,
+    JSON.stringify({ ...JSON.parse(store.getItem(future)), fetchedAt: now + DAY }),
+  );
+  fail = true;
+  now += 1000;
+  const result = await client.getSnapshot({ season: 'M6', format: 'Singles', date: '18_09_2026' });
+  assert.equal(result.data.date, '17_09_2026');
+  assert.equal(result.stale, true);
+});
+
 test('session fallback works when storage is unavailable and a later success replaces it', async () => {
   let now = DAY,
     raw = snapshot('18_09_2026');
