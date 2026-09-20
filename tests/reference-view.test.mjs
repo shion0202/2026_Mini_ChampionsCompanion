@@ -98,6 +98,15 @@ test('renderEffect: held item renders its artwork in the heading', t => {
 test('renderEffect: ability', t => {
   t.assert.snapshot(renderEffect(data, locale, 'ability', 'intimidate'));
 });
+// One entry per source so the game names stay readable rather than falling back
+// to the version identifiers the build records.
+test('renderEffect: a borrowed description names the game it came from', t => {
+  t.assert.snapshot(
+    ['absorb', 'gmaxwildfire', 'nihillight']
+      .map(key => renderEffect(data, locale, 'move', key).html)
+      .join('\n'),
+  );
+});
 test('renderEffect: unknown key never invents an explanation', t => {
   t.assert.snapshot(renderEffect(data, locale, 'move', 'zzznotreal'));
 });

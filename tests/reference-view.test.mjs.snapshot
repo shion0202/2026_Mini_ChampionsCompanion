@@ -17,6 +17,16 @@ exports[`percentClass boundaries 1`] = `
 ]
 `;
 
+exports[`renderEffect: a borrowed description names the game it came from 1`] = `
+<div class="effect-metrics"><span class="type-badge type-grass">풀</span><span>특수</span><span>위력 20</span><span>명중 100%</span><span>PP 25</span><span>우선도 0</span></div><div class="move-traits" aria-label="기술 성질"><span>흡수</span></div><p class="effect-description">양분을 흡수하여 공격한다.
+상대에게 입힌 데미지의
+절반에 해당하는 HP를 회복할 수 있다.</p><p class="category-tip">챔피언스 미수록 항목입니다. (다른 작품의 설명: 스칼렛·바이올렛)</p>
+<div class="effect-metrics"><span class="type-badge type-fire">불꽃</span><span>물리</span><span>위력 10</span><span>명중 필중/검사 없음</span><span>PP 10</span><span>우선도 0</span></div><p class="effect-description">거다이맥스한 리자몽이 사용하는 불꽃타입 공격. 4턴 동안 데미지를 준다.</p><p class="category-tip">챔피언스 미수록 항목입니다. (다른 작품의 설명: 소드·실드)</p>
+<div class="effect-metrics"><span class="type-badge type-dragon">드래곤</span><span>특수</span><span>위력 100</span><span>명중 100%</span><span>PP 5</span><span>우선도 0</span></div><p class="effect-description">온갖 법칙을 무시하는 강한 빛을 발사한다.
+페어리타입 포켓몬에게도 맞으며
+상대의 능력 변화에 상관없이 데미지를 준다.</p><p class="category-tip">챔피언스 미수록 항목입니다. (다른 작품의 설명: 레전드 Z-A)</p>
+`;
+
 exports[`renderEffect: ability 1`] = `
 {
   "title": "위협",

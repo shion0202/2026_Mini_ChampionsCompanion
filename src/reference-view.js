@@ -123,6 +123,25 @@ export function renderReference(data, locale, pokemon, formId, mode) {
     <p class="category-tip">폼 전환은 도감에서만 적용되며, 통계는 ${esc(pokemon.label)} 기준입니다.</p>`;
 }
 const CATEGORY_NAMES = { Physical: '물리', Special: '특수', Status: '변화' };
+// Borrowed descriptions name the game they came from. The keys are the version
+// identifiers the build records; downloadable content is shown as its base game.
+export const GAME_LABELS = {
+  'x-y': 'X·Y',
+  'omega-ruby-alpha-sapphire': '오메가루비·알파사파이어',
+  'sun-moon': '썬·문',
+  'ultra-sun-ultra-moon': '울트라썬·울트라문',
+  'lets-go-pikachu-lets-go-eevee': '레츠고! 피카츄·이브이',
+  'sword-shield': '소드·실드',
+  'the-isle-of-armor': '소드·실드',
+  'the-crown-tundra': '소드·실드',
+  'brilliant-diamond-shining-pearl': '브릴리언트다이아몬드·샤이닝펄',
+  'legends-arceus': '레전드 아르세우스',
+  'scarlet-violet': '스칼렛·바이올렛',
+  'the-teal-mask': '스칼렛·바이올렛',
+  'the-indigo-disk': '스칼렛·바이올렛',
+  'legends-za': '레전드 Z-A',
+  'mega-dimension': '레전드 Z-A',
+};
 export function renderLearnsetShell(
   data,
   pokemon,
@@ -224,10 +243,7 @@ export function renderEffect(data, locale, kind, key) {
         `<span>우선도 ${record.priority > 0 ? '+' : ''}${record.priority}</span></div>`
       : '';
   const japanese = record.japanese || locale.japanese?.(kind, record.name);
-  const effectVersion =
-    { 'sword-shield': '소드·실드', 'lets-go-pikachu-lets-go-eevee': '레츠고! 피카츄·이브이' }[
-      record.effectVersion
-    ] ?? record.effectVersion;
+  const effectVersion = GAME_LABELS[record.effectVersion] ?? record.effectVersion;
   const names = `<div class="effect-names"><span lang="en">${esc(record.name)}</span>${japanese ? `<span lang="ja">${esc(japanese)}</span>` : ''}</div>`;
   const traits =
     kind === 'move' && record.traits?.length
