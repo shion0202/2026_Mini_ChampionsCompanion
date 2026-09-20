@@ -91,7 +91,14 @@ export function parseTitle(title) {
   // MCS는 월간 챌린지다. MCS26.07의 숫자를 시즌으로 읽지 않도록 먼저 지운다.
   const monthly = /MCS|月間/.test(text);
   const seasonal = text.replace(/MCS\s*\d+(\.\d+)?/g, ' ');
-  const rank = seasonal.match(/最終\s*(\d+)\s*位/) ?? text.match(/最終\s*(\d+)\s*位/);
+  // 最終이 붙은 순위를 가장 믿는다. 그게 없으면 시즌 표기 바로 뒤의 N位만 받되
+  // 세 자리까지로 제한한다. レート2579나 2538/2515 같은 네 자리는 순위가 아니라
+  // 레이팅이다. 순위 인증은 일본어 커뮤니티 밖에도 있어 한국어 표기도 읽는다.
+  const rank =
+    seasonal.match(/最終\s*(\d+)\s*位/) ??
+    text.match(/最終\s*(\d+)\s*位/) ??
+    text.match(/최종\s*(\d+)\s*위/) ??
+    seasonal.match(/[MS]\s*-?\s*\d+\s*[:：]\s*(\d{1,3})\s*位/);
   // シーズン 뒤, 하이픈이 붙은 M-숫자, 구분자 뒤의 S숫자 순으로 본다. 하이픈이
   // 있으면 어디에 있든 시즌이지만(チャンピオンズM-3처럼 붙여 쓴다), 없으면
   // 구분자 뒤에서만 받는다. レギュM-B는 숫자가 없어 걸리지 않고 MCS의 연월은
@@ -234,12 +241,7 @@ export function digest(page, index) {
 // チャンピオンズ만으로는 포켓몬 외 결과가 섞이지만 종족 필터와 순위 파싱이
 // 걸러낸다. 앞의 두 개는 공백만 다르다. 하테나가 복합어를 어떻게 쪼개는지
 // 확인하는 비용보다 둘 다 던지는 비용이 싸다.
-export const GAME_TERMS = [
-  'ポケモンチャンピオンズ',
-  'ポケモン チャンピオンズ',
-  'ポケチャン',
-  'チャンピオンズ',
-];
+export const GAME_TERMS = ['ポケモンチャンピオンズ', 'ポケモン チャンピオンズ', 'ポケチャン'];
 
 // 형식은 검색어에 넣지 않는다. 측정하니 シングル을 더하는 것만으로 하테나의 AND
 // 검색이 고유 URL을 44건에서 5건으로 깎았다. 구축기사 제목이 형식을 밝히지 않는
@@ -280,5 +282,7 @@ export function rssLinks(body) {
 // 없으면 받아오지 않는다. 받아오고 나서 거르면 요청과 시간만 버린다.
 export const looksRelevant = title => {
   const text = normalize(title);
-  return /最終\s*\d+\s*位/.test(text) || /ポケモン|ポケチャン|構築/.test(text);
+  // 순위를 읽어내는 규칙은 parseTitle 하나로 둔다. 여기서 정규식을 다시 쓰면
+  // 【M-5:36位】처럼 最終이 없는 표기를 한쪽만 알아보는 일이 생긴다.
+  return parseTitle(text).rank !== null || /ポケモン|ポケチャン|構築|포켓몬|구축/.test(text);
 };

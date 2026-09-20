@@ -16,6 +16,9 @@ import {
 const root = new URL('../', import.meta.url);
 const AGENT = 'ChampionsCompanion/0.2 (+https://github.com/Verebell)';
 const PAUSE = 1000;
+// b.hatena.ne.jp의 robots.txt가 Crawl-delay: 5를 요구한다. 검색은 그쪽으로만
+// 나가므로 본문 요청보다 느리게 돈다.
+const FEED_PAUSE = 5000;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const argument = name => {
@@ -84,7 +87,7 @@ for (const query of searchQueries({ season })) {
   } catch (error) {
     console.error(`검색 실패 (${query}): ${error.message}`);
   }
-  await wait(PAUSE);
+  await wait(FEED_PAUSE);
 }
 console.log(`검색 ${feeds}회로 후보 ${found.size}건`);
 

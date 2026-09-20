@@ -222,7 +222,7 @@ test('digest flags what it could not settle', () => {
 
 test('queries pair every game term with the season in both notations', () => {
   const queries = searchQueries({ season: 'M5' });
-  assert.equal(queries.length, 8);
+  assert.equal(queries.length, 6);
   assert.ok(queries.every(q => q.includes('最終')));
   assert.ok(queries.some(q => q.includes('ポケモンチャンピオンズ') && q.includes('M-5')));
   assert.ok(queries.some(q => q.includes('ポケチャン')));
@@ -292,4 +292,40 @@ test('the season is read even without a separator or a letter', () => {
   assert.equal(parseTitle('チャンピオンズM-3最終44位 R2505 復活ガブラッキー').season, 'M3');
   assert.equal(parseTitle('シーズン4使用構築　ギャラミミ積みリレー　最終25位').season, 'M4');
   assert.equal(parseTitle('獄炎乱舞リザYロップ　M-3最終2434　最終153位').season, 'M3');
+});
+
+// 실제 M-5 목록에서 가져온 제목들이다. 표기가 제각각이라 픽스처로 고정해 둔다.
+test('real M-5 titles all yield a rank and the season', () => {
+  const titles = [
+    ['【S5最終1位】臥薪嘗胆アーマーガア', 1],
+    ['【M-5】神速ルカリザスタン【最終2位】', 2],
+    ['【M-5 最終5位】大空魔術', 5],
+    ['【M-5最終10位、レート2579】力戦奮闘ルカリザスタン改　【ポケモンチャンピオンズ】', 10],
+    ['【チャンピオンズM-5最終13位レート2570】呪いハッサムサイクル', 13],
+    ['ポケモンチャンピオンズM-5シングル最終17位最終レート2549サイクルもどきギャラハッサム', 17],
+    ['シーズン5 最終19位 構築記事', 19],
+    ['M-5:2538/2515 【最終32位&46位】お願いサザングロス', 32],
+    ['【M-5:36位】超越ロップアマガ', 36],
+  ];
+  for (const [title, rank] of titles) {
+    const parsed = parseTitle(title);
+    assert.equal(parsed.rank, rank, title);
+    assert.equal(parsed.season, 'M5', title);
+    assert.ok(looksRelevant(title), title);
+  }
+});
+
+test('a Korean title from a Naver post is read too', () => {
+  // 순위 인증은 일본어 커뮤니티 밖에도 있다. 시즌이 없으면 3단계가 본문으로 판단한다.
+  const parsed = parseTitle('최종 23위, 2535점 메치트-엑자몽 대면구축');
+  assert.equal(parsed.rank, 23);
+  assert.equal(parsed.season, null);
+  assert.ok(looksRelevant('최종 23위, 2535점 메치트-엑자몽 대면구축'));
+  assert.ok(looksRelevant('메가루카리오 구축'));
+});
+
+test('a rating is never mistaken for a rank', () => {
+  // レート나 점수는 네 자리다. 最終 없이 숫자만 있을 때는 세 자리까지만 받는다.
+  assert.equal(parseTitle('M-5:2538/2515 お願いサザングロス').rank, null);
+  assert.equal(parseTitle('【M-5】レート2579 力戦奮闘').rank, null);
 });
