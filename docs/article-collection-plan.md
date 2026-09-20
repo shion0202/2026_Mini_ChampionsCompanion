@@ -194,6 +194,9 @@ test('the index reads base, mega and regional names', () => {
   assert.equal(index.pokemon.get('メガルカリオ'), 'lucariomega');
   assert.equal(index.pokemon.get('アローラキュウコン'), 'ninetalesalola');
   assert.equal(index.pokemon.get('ガラルヤドン'), 'slowpokegalar');
+  // 폼이 나뉜 종족의 메가는 forme이 'M-Mega' 꼴이라 꼬리표를 붙이지 않는다.
+  // 어차피 기본 종족으로 묶어 세므로 후보를 놓치지 않는다.
+  assert.equal(index.pokemon.get('メガニャオニクス'), 'meowsticmmega');
 });
 
 test('longer names come first so a mega is never read as its base', () => {
@@ -287,8 +290,11 @@ export function buildIndex(reference, ko) {
     baseOf.set(key, reference.species[base] ? base : key);
     const baseName = japanese[base];
     if (!baseName) continue;
-    // forme은 'Mega', 'Mega-Y', 'Alola' 같은 값이다. 메가는 꼬리만 붙인다.
-    if (species.forme.startsWith('Mega')) put(`メガ${baseName}${species.forme.slice(5)}`, key);
+    // forme은 'Mega', 'Mega-Y', 'Alola' 같은 값이다. 다만 폼이 나뉜 종족은
+    // 'M-Mega', 'Curly-Mega'처럼 메가가 뒤에 붙으므로, 꼬리표가 뒤에 있는
+    // 쪽만 이름에 붙이고 나머지는 メガ+기본명으로 둔다.
+    if (/Mega/.test(species.forme))
+      put(`メガ${baseName}${/^Mega-(.)$/.exec(species.forme)?.[1] ?? ''}`, key);
     const region = REGION_PREFIX[species.forme];
     if (region) put(`${region}${baseName}`, key);
   }
