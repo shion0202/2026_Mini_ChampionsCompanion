@@ -20,13 +20,17 @@
         <span>CHAMPIONS<span class="brand-sub">COMPANION</span></span>
       </a>
       <div class="header-actions">
-        <button id="dex-link" class="text-button" aria-pressed="false">도감</button>
         <button id="install" class="text-button" hidden>앱 설치</button>
         <select id="theme" class="theme-select" aria-label="화면 테마"><option value="system">기기 설정</option><option value="light">라이트</option><option value="dark">다크</option></select>
         <button id="about" class="icon-button" aria-label="데이터 출처와 이용 안내">?</button>
         <button id="refresh" class="refresh-button" aria-label="통계 새로고침"><span class="refresh-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2.3 5.7"/></svg></span><span class="refresh-label">새로고침</span></button>
       </div>
     </div>
+    <nav class="category-nav" aria-label="주요 메뉴">
+      <button id="ranking-link" aria-pressed="true">랭킹</button>
+      <button id="dex-link" aria-pressed="false">도감</button>
+      <button id="types-link" aria-pressed="false">상성표</button>
+    </nav>
   </header>
   <main class="page">
     <section class="intro" aria-labelledby="page-title">
@@ -65,12 +69,22 @@
       <div id="dex-kinds"></div>
       <div class="search-box"><span aria-hidden="true">⌕</span><input id="dex-search" type="search" placeholder="이름, 초성, 영문 검색" autocomplete="off" aria-label="도감 검색"></div>
       <div class="dex-controls">
+        <label class="dex-search-mode">검색 범위 <select id="dex-search-mode"><option value="name">이름</option><option value="effect">효과 설명</option></select></label>
         <button id="dex-filter" class="filter-button" aria-label="기술 필터" aria-haspopup="dialog"></button>
       </div>
       <p id="dex-filter-summary" class="active-filter-summary" hidden></p>
       <div id="dex-rows"></div>
       <button id="dex-more" class="load-more" hidden>더 보기</button>
-      <p class="category-tip">앱에 수록된 도감 버전 기준입니다. 항목을 누르면 한국어 효과를 볼 수 있습니다.</p>
+      <p class="category-tip">앱에 수록된 데이터 버전 기준이며, 시즌별 출전 규칙과는 다릅니다. 챔피언스 미수록 기술의 수치는 다른 작품 기준입니다.</p>
+    </section>
+    <section id="type-chart" class="type-chart-panel" aria-labelledby="type-chart-title" hidden>
+      <div class="list-heading"><h2 id="type-chart-title">타입 상성표</h2></div>
+      <div class="segmented type-chart-switch" role="group" aria-label="상성표 보기 방식">
+        <button data-type-chart-mode="defense" aria-pressed="true">방어 상성 확인</button>
+        <button data-type-chart-mode="matrix" aria-pressed="false">전체 상성표</button>
+      </div>
+      <p class="type-chart-note">두 타입을 선택하면 각 타입의 배율을 곱해 복합 타입으로 계산합니다. 특성과 도구의 효과는 포함하지 않습니다.</p>
+      <div id="type-chart-content"></div>
     </section>
     <footer class="footer"><span>CHAMPIONS COMPANION <span class="version">v0.2</span></span><p>팬 제작 비공식 도구</p></footer>
   </main>
@@ -87,6 +101,7 @@
     <p>배틀 도감과 기술 성질: <a href="https://github.com/smogon/pokemon-showdown/tree/master/data/mods/champions" target="_blank" rel="noopener noreferrer">Pokémon Showdown Champions</a><br>한국어 효과, 일본어 명칭과 폼별 기술: <a href="https://github.com/projectpokemon/champout" target="_blank" rel="noopener noreferrer">Project Pokémon champout</a> (<a href="./public/data/showdown-license.txt" target="_blank" rel="noopener noreferrer">Showdown 라이선스</a>)</p>
     <p>메가·도구 이미지: <a href="https://github.com/PokeAPI/sprites" target="_blank" rel="noopener noreferrer">PokéAPI sprites</a>. 메가는 챔피언스 이미지를 우선하며, 없는 폼은 HOME 이미지를 사용합니다. 도구는 최신 gen9 폴더를 함께 참조합니다. 로딩할 수 없는 이미지는 미제공 표시로 대체합니다.</p>
     <p>도감은 앱에 수록된 버전입니다. 과거 시즌의 규칙이나 출전 허용 여부를 의미하지 않습니다. 방어상성은 타입 배율 아래에 타입별 특성 효과를 함께 표시합니다. 멀티스케일 등 전 타입에 적용되는 효과, 접촉 조건, 날씨, 도구, 상대의 특성 무시와 개별 기술 예외는 제외합니다. 표시 배율은 참고용이며 실제 데미지 계산값은 아닙니다.</p><p>능력 포인트 합산은 공개된 상위 배분 중 같은 능력치를 32포인트로 준 항목들의 합계입니다. 개별 배분의 약어는 16포인트와 최대 투자량의 75% 중 작은 값을 기준으로, 그 이상은 대문자, 나머지 양수는 소문자로 표시합니다. 약어가 같아도 32포인트 기준이 다르면 합산하지 않습니다.</p>
+    <p>도감의 챔피언스 수록 필터는 게임 데이터의 유효 기술, 도구 목록, 유효 포켓몬의 특성을 기준으로 합니다. 시즌별 허용 목록은 아닙니다. 누락된 한국어 명칭과 설명은 PokéAPI로 보완하며, 다른 작품의 설명에는 작품명을 표시합니다. 효과 검색은 실제 한국어 설명에 포함된 문구를 찾으며, 설명이 없는 항목이나 동의어는 검색되지 않을 수 있습니다.</p>
     <p class="muted">포켓몬 및 관련 이미지·명칭의 권리는 Nintendo, Creatures, GAME FREAK 등 각 권리자에게 있습니다. 이 앱은 공식 서비스가 아닙니다.</p>
     <p id="install-help" class="muted">안드로이드 Chrome에서 HTTPS 주소로 연 뒤 메뉴의 ‘홈 화면에 추가’ 또는 ‘앱 설치’를 사용할 수 있습니다. PC의 로컬 미리보기에서도 조회할 수 있습니다.</p>
   </dialog>

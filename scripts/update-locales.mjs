@@ -1,3 +1,4 @@
+import { csv } from './csv.mjs';
 // Build-time name data only. Battle statistics are never bundled or mirrored.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -9,36 +10,6 @@ const key = text =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
-
-function csv(text) {
-  const rows = [];
-  let row = [],
-    value = '',
-    quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') {
-      if (quoted && text[i + 1] === '"') {
-        value += '"';
-        i++;
-      } else quoted = !quoted;
-    } else if (c === ',' && !quoted) {
-      row.push(value);
-      value = '';
-    } else if (c === '\n' && !quoted) {
-      row.push(value.replace(/\r$/, ''));
-      if (row.some(Boolean)) rows.push(row);
-      row = [];
-      value = '';
-    } else value += c;
-  }
-  if (value || row.length) {
-    row.push(value.replace(/\r$/, ''));
-    rows.push(row);
-  }
-  const headers = rows.shift();
-  return rows.map(values => Object.fromEntries(headers.map((h, i) => [h, values[i] ?? ''])));
-}
 
 const tables = [
   ['pokemon', 'pokemon_species_names.csv', 'pokemon_species_id'],

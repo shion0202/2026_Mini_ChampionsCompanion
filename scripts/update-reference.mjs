@@ -2,6 +2,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { moveTraits } from '../src/move-traits.js';
+import { supplementCatalog } from './reference-catalog.mjs';
+import { supplementZaItems, supplementGigantamax } from './rom-text.mjs';
 const SHOWDOWN = '2ddfa0476f8207e12e204b1c69f7c7683b17633c';
 const CHAMPOUT = '50e7233b78c3b81df29563f9695386c28e77fc95';
 const root = new URL('../', import.meta.url);
@@ -15,6 +17,12 @@ async function get(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw Error(`${response.status}: ${url}`);
   return response.text();
+}
+// ROM dumps are not all UTF-8, so those readers decode the bytes themselves.
+async function getBuffer(url) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(120000) });
+  if (!response.ok) throw Error(`${response.status}: ${url}`);
+  return Buffer.from(await response.arrayBuffer());
 }
 async function table(path, name) {
   const source = await get(
@@ -72,8 +80,8 @@ const result = {
   held_item: {},
   types: {},
 };
-const [personal, gameLearnsets, gameMoves] = await Promise.all(
-  ['personal', 'waza_learn', 'waza'].map(async file =>
+const [personal, gameLearnsets, gameMoves, gameItems] = await Promise.all(
+  ['personal', 'waza_learn', 'waza', 'item'].map(async file =>
     JSON.parse(
       await get(
         `https://raw.githubusercontent.com/projectpokemon/champout/${CHAMPOUT}/masterdata/${file}.json`,
@@ -86,6 +94,13 @@ const moveIdsByNumber = Object.fromEntries(
   Object.entries(baseMoves).map(([key, move]) => [move.num, key]),
 );
 const available = key => movesByNumber[baseMoves[key]?.num]?.available === '1';
+const abilityNumbers = new Set(
+  personal
+    .filter(p => p.is_valid === '1')
+    .flatMap(p => [p.toku0, p.toku1, p.toku2])
+    .map(Number),
+);
+const itemNumbers = new Set(gameItems.map(item => Number(item.id)));
 for (const [category, file, description, records] of [
   ['move', 'wazaname', 'wazainfo_syn', overlay(baseMoves, moveChanges)],
   ['ability', 'tokusei', 'tokuseiinfo_syn', overlay(baseAbilities, abilityChanges)],
@@ -105,12 +120,21 @@ for (const [category, file, description, records] of [
   );
   for (const [key, record] of Object.entries(records)) {
     if (!record.name || record.num < 0) continue;
+    // Items dropped after generation 2 never returned and have no Korean text in
+    // any source, so they are left out rather than shown as empty rows.
+    if (category === 'held_item' && record.gen === 2 && record.isNonstandard === 'Past') continue;
     const text = translations[id(record.name)] ?? {};
     result[category][key] = {
       name: record.name,
       label: text.label ?? record.name,
       japanese: text.japanese ?? null,
       effect: text.effect ?? null,
+      champions:
+        category === 'move'
+          ? available(key)
+          : category === 'ability'
+            ? abilityNumbers.has(record.num)
+            : itemNumbers.has(record.num) && id(en[record.num] ?? '') === id(record.name),
     };
     if (category === 'move')
       Object.assign(result[category][key], {
@@ -118,11 +142,12 @@ for (const [category, file, description, records] of [
         category: record.category,
         power: record.basePower,
         accuracy: record.accuracy,
-        pp: record.noPPBoosts ? record.pp : (Math.min(record.pp, 20) / 5 + 1) * 4,
+        pp:
+          available(key) && !record.noPPBoosts ? (Math.min(record.pp, 20) / 5 + 1) * 4 : record.pp,
         priority: record.priority ?? 0,
         traits: moveTraits(record),
       });
-    if (category === 'move' && movesByNumber[record.num]) {
+    if (category === 'move' && available(key)) {
       const game = movesByNumber[record.num];
       const effectId = Number(game.ms_lbl_info.match(/(\d+)$/)?.[1]);
       result[category][key].effect =
@@ -202,6 +227,12 @@ for (const [name, value] of Object.entries(chart)) {
       .map(([attack, code]) => [attack, code === 1 ? 2 : code === 2 ? 0.5 : code === 3 ? 0 : 1]),
   );
 }
+// ROM text first: it is the localised wording from the games these entries are
+// actually from. PokéAPI then fills whatever is still blank.
+const zaFilled = await supplementZaItems(result, getBuffer);
+const gmaxFilled = await supplementGigantamax(result, getBuffer);
+await supplementCatalog(result, get);
+console.log(`Z-A item names: ${zaFilled} | Gigantamax move names: ${gmaxFilled}`);
 await mkdir(new URL('public/data/', root), { recursive: true });
 await writeFile(new URL('public/data/reference.json', root), JSON.stringify(result));
 await writeFile(

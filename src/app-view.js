@@ -297,7 +297,7 @@ export function dexList(entries, kind) {
     ` aria-label="${esc(record.label)} 효과 보기">` +
     `${kind === 'held_item' ? itemArtwork(record.name) : ''}` +
     `<span class="dex-name"><strong>${esc(record.label)}</strong>` +
-    `<span lang="en">${esc(record.name)}</span></span>` +
+    `</span>` +
     `<span class="dex-effect">${esc(record.effect ?? '효과 설명이 제공되지 않습니다.')}</span>` +
     `</button>`;
   return `<div class="dex-list">${entries.map(row).join('')}</div>`;

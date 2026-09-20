@@ -5,6 +5,7 @@ import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
 import { filterValues, filterSummary } from './filters.js';
 import { megaSprite } from './images.js';
+import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
 import {
   renderReference,
   renderLearnsetShell,
@@ -55,6 +56,7 @@ import {
 const DETAIL_LABELS = { overview: '기본 정보', ...CATEGORY_LABELS, learnset: '배우는 기술' };
 
 const $ = id => document.getElementById(id);
+history.scrollRestoration = 'manual';
 let storage;
 try {
   storage = window.localStorage;
@@ -72,6 +74,9 @@ const client = new ApiClient({ storage });
 const saved = preferences(storage);
 const favorites = saved.favorites;
 const state = {
+  page: 'ranking',
+  typeChartMode: 'defense',
+  defenseTypes: [],
   format: saved.format,
   season: saved.season,
   index: null,
@@ -108,6 +113,8 @@ Object.assign(state, {
   learnModes: {},
   dex: null,
   dexQuery: '',
+  dexSearchMode: 'name',
+  dexAvailability: '',
   dexType: [],
   dexCategory: [],
   dexTrait: [],
@@ -125,7 +132,7 @@ function toast(text) {
 }
 function notice(text) {
   $('notice').textContent = text;
-  $('notice').hidden = !text;
+  $('notice').hidden = state.page !== 'ranking' || !text;
 }
 function controls() {
   document
@@ -312,21 +319,28 @@ function updateLearnset() {
 
 function dexVisible() {
   if (!state.reference || !state.locale) return [];
-  if (state.dex !== 'move')
-    return dexEntries(state.reference, state.locale, state.dex, state.dexQuery);
-  return selectMoves(state.reference, state.locale, Object.keys(state.reference.move), {
-    query: state.dexQuery,
-    type: state.dexType,
-    category: state.dexCategory,
-    trait: state.dexTrait,
-    modes: state.dexModes,
-  });
+  const query = state.dexSearchMode === 'name' ? state.dexQuery : '';
+  const entries =
+    state.dex !== 'move'
+      ? dexEntries(state.reference, state.locale, state.dex, query)
+      : selectMoves(state.reference, state.locale, Object.keys(state.reference.move), {
+          query,
+          type: state.dexType,
+          category: state.dexCategory,
+          trait: state.dexTrait,
+          modes: state.dexModes,
+        });
+  return entries.filter(
+    entry =>
+      (!state.dexAvailability || String(entry.champions) === state.dexAvailability) &&
+      (state.dexSearchMode !== 'effect' || (entry.effect ?? '').includes(state.dexQuery.trim())),
+  );
 }
 function renderDex() {
   if (!state.dex) return;
   $('dex-kinds').innerHTML = dexKindSwitch(state.dex);
   const moves = state.dex === 'move';
-  $('dex-filter').hidden = !moves;
+  $('dex-filter').hidden = false;
   const summaries = moves
     ? [
         filterSummary(state.dexType, TYPE_LABELS, state.dexModes.type),
@@ -334,10 +348,11 @@ function renderDex() {
         filterSummary(state.dexTrait, MOVE_TRAITS, state.dexModes.trait),
       ].filter(Boolean)
     : [];
+  if (state.dexAvailability) summaries.unshift(AVAILABILITY_LABELS[state.dexAvailability]);
   $('dex-filter').innerHTML = rankingFilterButton(summaries.length);
   $('dex-filter').setAttribute(
     'aria-label',
-    `기술 필터${summaries.length ? ` (${summaries.length}개 적용)` : ''}`,
+    `도감 필터${summaries.length ? ` (${summaries.length}개 적용)` : ''}`,
   );
   $('dex-filter-summary').textContent = summaries.join(' / ');
   $('dex-filter-summary').hidden = !summaries.length;
@@ -364,25 +379,55 @@ function renderDex() {
     ? moveTable(state.reference, state.locale, shown)
     : dexList(shown, state.dex);
 }
+function showPage(page) {
+  state.page = page;
+  if (page !== 'dex') state.dex = null;
+  for (const [key, panel] of Object.entries({
+    ranking: 'workspace',
+    dex: 'dex',
+    types: 'type-chart',
+  })) {
+    $(panel).hidden = page !== key;
+    $(`${key}-link`).setAttribute('aria-pressed', String(page === key));
+  }
+  $('toolbar').hidden = page !== 'ranking';
+  $('notice').hidden = page !== 'ranking' || !$('notice').textContent;
+}
+function renderTypeChart() {
+  if (state.page !== 'types') return;
+  document
+    .querySelectorAll('[data-type-chart-mode]')
+    .forEach(button =>
+      button.setAttribute(
+        'aria-pressed',
+        String(button.dataset.typeChartMode === state.typeChartMode),
+      ),
+    );
+  $('type-chart-content').innerHTML = !state.reference
+    ? referenceStatus(state.refError)
+    : state.typeChartMode === 'matrix'
+      ? renderTypeMatrix(state.reference.types)
+      : renderTypeDefense(state.defenseTypes, state.reference.types);
+}
+function openTypeChart(mode = 'defense', { navigate = true } = {}) {
+  state.typeChartMode = mode === 'matrix' ? 'matrix' : 'defense';
+  showPage('types');
+  if (navigate)
+    history.pushState({ types: state.typeChartMode }, '', `#types=${state.typeChartMode}`);
+  renderTypeChart();
+  window.scrollTo(0, 0);
+}
 function openDex(kind, { navigate = true } = {}) {
   state.dex = kind in DEX_KINDS ? kind : 'move';
   state.dexLimit = 50;
   if (navigate) history.pushState({ dex: state.dex }, '', `#dex=${state.dex}`);
-  $('workspace').hidden = true;
-  $('dex').hidden = false;
-  // The season and battle format scope the statistics, not the reference data.
-  $('toolbar').hidden = true;
-  $('dex-link').setAttribute('aria-pressed', 'true');
+  showPage('dex');
   renderDex();
   window.scrollTo(0, 0);
   $('dex-search').focus({ preventScroll: true });
 }
 function closeDex() {
-  state.dex = null;
-  $('dex').hidden = true;
-  $('workspace').hidden = false;
-  $('toolbar').hidden = false;
-  $('dex-link').setAttribute('aria-pressed', 'false');
+  showPage('ranking');
 }
 async function loadReference() {
   state.refError = false;
@@ -399,6 +444,7 @@ async function loadReference() {
     updateGroupSummary($('gimmick-filter'));
   }
   if (state.dex) renderDex();
+  renderTypeChart();
   if (selectedEntry()) renderCategory();
 }
 
@@ -413,7 +459,8 @@ function selectPokemon(id, { navigate = true, preserveCategory = false } = {}) {
   document.body.classList.add('detail-open');
   renderList();
   renderDetail();
-  if (matchMedia('(max-width: 760px)').matches) {
+  if (state.page === 'ranking' && !preserveCategory) window.scrollTo(0, 0);
+  if (state.page === 'ranking' && matchMedia('(max-width: 760px)').matches) {
     window.scrollTo(0, 0);
     $('pokemon-title')?.focus({ preventScroll: true });
   }
@@ -427,7 +474,7 @@ function clearSelection() {
 function goToRanking({ top = false } = {}) {
   if (state.selected || state.dex || location.hash)
     history.pushState(null, '', location.pathname + location.search);
-  closeDex();
+  showPage('ranking');
   clearSelection();
   window.scrollTo(0, top ? 0 : state.listScroll);
 }
@@ -449,6 +496,7 @@ async function load(force = false) {
       const response = await fetch('./public/data/ko.json');
       if (!response.ok) throw Error('한국어 명칭을 불러오지 못했습니다.');
       state.locale = createLocale(await response.json());
+      if (state.dex) renderDex();
     }
     let indexResult;
     try {
@@ -548,6 +596,7 @@ const GENERATION_LABELS = Object.fromEntries(
 );
 const GIMMICK_LABELS = { none: '기믹 없음', mega: '메가진화' };
 const MOVE_CATEGORIES = { Physical: '물리', Special: '특수', Status: '변화' };
+const AVAILABILITY_LABELS = { true: '챔피언스 수록', false: '챔피언스 미수록' };
 let filterKind = 'ranking';
 // Binds the pure markup builder to the current state.
 function group(id, key, title, options, current, mode = 'or', disabled = false) {
@@ -577,14 +626,16 @@ function openFilters(kind) {
   filterKind = kind;
   const ranking = kind === 'ranking';
   const dex = kind === 'dex';
-  $('filter-title').textContent = ranking ? '랭킹 필터' : dex ? '기술 필터' : '배우는 기술 필터';
+  $('filter-title').textContent = ranking ? '랭킹 필터' : dex ? '도감 필터' : '배우는 기술 필터';
   // The learnset and the move index filter on the same three properties.
   const moveGroups = (prefix, type, category, trait, modes) =>
     group(`${prefix}-type`, 'type', '타입', TYPE_LABELS, type, modes.type) +
     group(`${prefix}-category`, 'category', '분류', MOVE_CATEGORIES, category, modes.category) +
     group(`${prefix}-trait`, 'trait', '기술 성질', MOVE_TRAITS, trait, modes.trait);
   $('filter-fields').innerHTML =
-    filterHelp() +
+    (dex && state.dex !== 'move'
+      ? '<p class="category-tip filter-help">앱에 수록된 게임 데이터 기준입니다. 시즌별 허용 여부와는 다릅니다.</p>'
+      : filterHelp()) +
     (ranking
       ? group(
           'generation-filter',
@@ -606,7 +657,17 @@ function openFilters(kind) {
         ) +
         rankingFilterFooter(state.favoriteOnly)
       : dex
-        ? moveGroups('dex', state.dexType, state.dexCategory, state.dexTrait, state.dexModes)
+        ? `<label class="catalog-availability">챔피언스 수록 여부<select id="dex-availability"><option value="">전체</option>${Object.entries(
+            AVAILABILITY_LABELS,
+          )
+            .map(
+              ([value, label]) =>
+                `<option value="${value}"${state.dexAvailability === value ? ' selected' : ''}>${label}</option>`,
+            )
+            .join('')}</select></label>` +
+          (state.dex === 'move'
+            ? moveGroups('dex', state.dexType, state.dexCategory, state.dexTrait, state.dexModes)
+            : '')
         : moveGroups(
             'learnset',
             state.learnType,
@@ -617,8 +678,43 @@ function openFilters(kind) {
   $('filter-dialog').showModal();
 }
 $('ranking-filter').onclick = () => openFilters('ranking');
-$('dex-link').onclick = () =>
-  state.dex ? goToRanking({ top: true }) : openDex(state.dex ?? 'move');
+$('ranking-link').onclick = () => goToRanking({ top: true });
+$('types-link').onclick = () => {
+  if (state.page !== 'types') openTypeChart();
+};
+$('type-chart').addEventListener('click', event => {
+  const mode = event.target.closest('[data-type-chart-mode]');
+  if (mode) {
+    state.typeChartMode = mode.dataset.typeChartMode;
+    history.replaceState({ types: state.typeChartMode }, '', `#types=${state.typeChartMode}`);
+    renderTypeChart();
+    return;
+  }
+  const type = event.target.closest('[data-defense-type]');
+  if (type && !type.disabled) {
+    state.defenseTypes = toggleDefenseType(state.defenseTypes, type.dataset.defenseType);
+    renderTypeChart();
+    document
+      .querySelector(`[data-defense-type="${type.dataset.defenseType}"]`)
+      ?.focus({ preventScroll: true });
+  } else if (event.target.closest('[data-clear-defense]')) {
+    state.defenseTypes = [];
+    renderTypeChart();
+    document.querySelector('[data-defense-type]')?.focus({ preventScroll: true });
+  }
+});
+$('dex-link').onclick = () => {
+  if (!state.dex) openDex('move');
+};
+$('dex-search-mode').onchange = event => {
+  state.dexSearchMode = event.target.value;
+  $('dex-search').placeholder =
+    state.dexSearchMode === 'effect'
+      ? '효과 설명 검색 (예: 스피드, 회복)'
+      : '이름, 초성, 영문 검색';
+  state.dexLimit = 50;
+  renderDex();
+};
 $('dex-filter').onclick = () => openFilters('dex');
 $('dex-search').addEventListener('input', event => {
   state.dexQuery = event.target.value;
@@ -649,6 +745,7 @@ $('filter-fields').addEventListener('click', event => {
   updateGroupSummary(group);
 });
 $('clear-filter').onclick = () => {
+  if ($('dex-availability')) $('dex-availability').value = '';
   $('filter-fields')
     .querySelectorAll('input[type=checkbox]')
     .forEach(input => (input.checked = false));
@@ -671,10 +768,13 @@ $('filter-form').onsubmit = event => {
     state.limit = 30;
     if (!state.loading) renderList();
   } else if (filterKind === 'dex') {
-    state.dexType = values.type;
-    state.dexCategory = values.category;
-    state.dexTrait = values.trait;
-    state.dexModes = modes;
+    state.dexAvailability = $('dex-availability').value;
+    if (state.dex === 'move') {
+      state.dexType = values.type;
+      state.dexCategory = values.category;
+      state.dexTrait = values.trait;
+      state.dexModes = modes;
+    }
     state.dexLimit = 50;
     renderDex();
   } else {
@@ -834,12 +934,16 @@ document.addEventListener(
 );
 window.addEventListener('popstate', () => {
   const params = new URLSearchParams(location.hash.slice(1));
+  if (params.has('types')) {
+    openTypeChart(params.get('types'), { navigate: false });
+    return;
+  }
   const dex = params.get('dex');
   if (dex) {
     openDex(dex, { navigate: false });
     return;
   }
-  closeDex();
+  showPage('ranking');
   const id = params.get('pokemon');
   if (id && state.list.some(p => p.id === id)) selectPokemon(id, { navigate: false });
   else {
@@ -894,3 +998,5 @@ loadReference();
 // Opening a shared #dex link lands on the index rather than the ranking.
 const startupDex = new URLSearchParams(location.hash.slice(1)).get('dex');
 if (startupDex) openDex(startupDex, { navigate: false });
+const startupTypes = new URLSearchParams(location.hash.slice(1)).get('types');
+if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });

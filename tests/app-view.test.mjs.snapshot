@@ -40,12 +40,12 @@ exports[`dexKindSwitch marks the selected category 1`] = `
 `;
 
 exports[`dexList: abilities render without artwork 1`] = `
-<div class="dex-list"><button class="dex-row" data-effect-type="ability" data-effect-id="intimidate" aria-label="위협 효과 보기"><span class="dex-name"><strong>위협</strong><span lang="en">Intimidate</span></span><span class="dex-effect">상대의 공격을
+<div class="dex-list"><button class="dex-row" data-effect-type="ability" data-effect-id="intimidate" aria-label="위협 효과 보기"><span class="dex-name"><strong>위협</strong></span><span class="dex-effect">상대의 공격을
 1단계 떨어뜨린다.</span></button></div>
 `;
 
 exports[`dexList: held items carry artwork and open the effect popup 1`] = `
-<div class="dex-list"><button class="dex-row" data-effect-type="held_item" data-effect-id="lifeorb" aria-label="생명의구슬 효과 보기"><span class="item-art"><img class="item-image" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/life-orb.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span><span class="dex-name"><strong>생명의구슬</strong><span lang="en">Life Orb</span></span><span class="dex-effect">위력이 1.3배가 된다.</span></button><button class="dex-row" data-effect-type="held_item" data-effect-id="noeffect" aria-label="미확인 &lt;도구&gt; 효과 보기"><span class="item-art"><img class="item-image" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystery-item-co.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span><span class="dex-name"><strong>미확인 &lt;도구&gt;</strong><span lang="en">Mystery &quot;Item&quot; &amp; Co</span></span><span class="dex-effect">효과 설명이 제공되지 않습니다.</span></button></div>
+<div class="dex-list"><button class="dex-row" data-effect-type="held_item" data-effect-id="lifeorb" aria-label="생명의구슬 효과 보기"><span class="item-art"><img class="item-image" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/life-orb.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span><span class="dex-name"><strong>생명의구슬</strong></span><span class="dex-effect">위력이 1.3배가 된다.</span></button><button class="dex-row" data-effect-type="held_item" data-effect-id="noeffect" aria-label="미확인 &lt;도구&gt; 효과 보기"><span class="item-art"><img class="item-image" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystery-item-co.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span><span class="dex-name"><strong>미확인 &lt;도구&gt;</strong></span><span class="dex-effect">효과 설명이 제공되지 않습니다.</span></button></div>
 `;
 
 exports[`errorState escapes the reported message 1`] = `

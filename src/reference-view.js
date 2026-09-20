@@ -224,15 +224,25 @@ export function renderEffect(data, locale, kind, key) {
         `<span>우선도 ${record.priority > 0 ? '+' : ''}${record.priority}</span></div>`
       : '';
   const japanese = record.japanese || locale.japanese?.(kind, record.name);
+  const effectVersion =
+    { 'sword-shield': '소드·실드', 'lets-go-pikachu-lets-go-eevee': '레츠고! 피카츄·이브이' }[
+      record.effectVersion
+    ] ?? record.effectVersion;
   const names = `<div class="effect-names"><span lang="en">${esc(record.name)}</span>${japanese ? `<span lang="ja">${esc(japanese)}</span>` : ''}</div>`;
   const traits =
     kind === 'move' && record.traits?.length
       ? `<div class="move-traits" aria-label="기술 성질">${record.traits.map(t => `<span>${esc(MOVE_TRAITS[t] ?? t)}</span>`).join('')}</div>`
       : '';
+  const note = [
+    record.champions === false ? '챔피언스 미수록 항목입니다.' : '',
+    effectVersion ? `(다른 작품의 설명: ${effectVersion})` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   return {
     title: name,
     heading: `${kind === 'held_item' ? `<div class="effect-item-art">${itemArtwork(record.name)}</div>` : ''}<h2 id="effect-title">${esc(name)}</h2>${names}`,
-    html: `${metrics}${traits}<p class="effect-description">${esc(record.effect ?? '현재 챔피언스 자료에 한국어 효과 설명이 없습니다.')}</p>`,
+    html: `${metrics}${traits}<p class="effect-description">${esc(record.effect ?? '한국어 효과 설명을 아직 확보하지 못했습니다.')}</p>${note ? `<p class="category-tip">${esc(note)}</p>` : ''}`,
   };
 }
 export function renderSpreads(rows, mode) {
