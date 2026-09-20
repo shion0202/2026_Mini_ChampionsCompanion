@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { moveTraits } from '../src/move-traits.js';
 import { supplementCatalog } from './reference-catalog.mjs';
-import { supplementZaItems, supplementGigantamax } from './rom-text.mjs';
+import { supplementZaItems, supplementZaCatalog, supplementGigantamax } from './rom-text.mjs';
 const SHOWDOWN = '2ddfa0476f8207e12e204b1c69f7c7683b17633c';
 const CHAMPOUT = '50e7233b78c3b81df29563f9695386c28e77fc95';
 const root = new URL('../', import.meta.url);
@@ -123,6 +123,10 @@ for (const [category, file, description, records] of [
     // Items dropped after generation 2 never returned and have no Korean text in
     // any source, so they are left out rather than shown as empty rows.
     if (category === 'held_item' && record.gen === 2 && record.isNonstandard === 'Past') continue;
+    // Showdown splits Hidden Power into one entry per type; the games have the
+    // single move, which stays. No Ability is Showdown's empty slot, not an ability.
+    if (category === 'move' && /^hiddenpower./.test(key)) continue;
+    if (category === 'ability' && key === 'noability') continue;
     const text = translations[id(record.name)] ?? {};
     result[category][key] = {
       name: record.name,
@@ -229,10 +233,13 @@ for (const [name, value] of Object.entries(chart)) {
 }
 // ROM text first: it is the localised wording from the games these entries are
 // actually from. PokéAPI then fills whatever is still blank.
+const zaCatalog = await supplementZaCatalog(result, get);
 const zaFilled = await supplementZaItems(result, getBuffer);
 const gmaxFilled = await supplementGigantamax(result, getBuffer);
 await supplementCatalog(result, get);
-console.log(`Z-A item names: ${zaFilled} | Gigantamax move names: ${gmaxFilled}`);
+console.log(
+  `Z-A names: ${JSON.stringify(zaCatalog)} | Z-A item fallback: ${zaFilled} | Gigantamax: ${gmaxFilled}`,
+);
 await mkdir(new URL('public/data/', root), { recursive: true });
 await writeFile(new URL('public/data/reference.json', root), JSON.stringify(result));
 await writeFile(

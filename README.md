@@ -90,10 +90,14 @@ node scripts/verify-browser.mjs
 
 부족한 한국어 이름·설명은 아래 순서로 보완합니다. 모두 리비전을 고정하며, 챔피언스 자체 텍스트가 있으면 덮어쓰지 않습니다.
 
-1. `scripts/rom-text.mjs` — Legends Z-A 덤프([za-textport](https://github.com/projectpokemon/za-textport))에서 도구 이름을 가져옵니다. Z-A에서 처음 등장한 메가스톤은 PokéAPI에 항목만 있고 이름이 어느 언어로도 없습니다. 같은 파일에서 소드·실드 덤프([swsh-text](https://github.com/CPokemon/swsh-text))의 거다이맥스 기술 이름과 설명도 가져옵니다. PokéAPI는 다이맥스 기술 19개만 수록하고 거다이맥스 기술은 다루지 않습니다.
-2. `scripts/reference-catalog.mjs` — 남은 항목을 고정 PokéAPI 버전으로 채웁니다. Showdown이 폼별로 나눈 항목(`As One (Glastrier)` 등)은 괄호를 뗀 이름으로 한 번 더 찾습니다.
+1. `scripts/rom-text.mjs` — Legends Z-A 덤프([plza-text](https://github.com/CPokemon/plza-text))에서 기술·도구·특성의 이름과 설명을 가져옵니다. 9세대 항목의 한국어 설명은 PokéAPI에 없어 이 출처가 유일합니다. 같은 파일에서 [za-textport](https://github.com/projectpokemon/za-textport)로 Z-A 메가스톤 이름을 보충하고, 소드·실드 덤프([swsh-text](https://github.com/CPokemon/swsh-text))에서 거다이맥스 기술의 이름과 설명을 가져옵니다. PokéAPI는 다이맥스 기술 19개만 수록하고 거다이맥스는 다루지 않습니다.
+2. `scripts/reference-catalog.mjs` — 남은 항목을 고정 PokéAPI 버전으로 채웁니다.
 
-2세대에서 삭제된 뒤 복귀하지 않은 도구는 어느 출처에도 한국어 텍스트가 없어 목록에서 제외합니다. 9세대 항목의 설명은 PokéAPI의 한국어 텍스트가 소드·실드까지만 있어 여전히 비어 있을 수 있습니다.
+Showdown이 폼별로 나눈 항목(`As One (Glastrier)`, `Embody Aspect (Teal)` 등)은 괄호를 뗀 이름으로 한 번 더 찾습니다. 게임은 해당 특성을 하나로 표기하기 때문입니다.
+
+실제로 존재할 수 없는 항목은 목록에서 제외합니다. 2세대에서 삭제된 뒤 복귀하지 않은 도구, Showdown이 타입별로 나눈 잠재파워(게임의 단일 기술만 남깁니다), 빈 슬롯을 뜻하는 No Ability가 이에 해당합니다.
+
+남은 결손은 스칼렛·바이올렛 전용 항목입니다. Z-A에도 소드·실드에도 없어 한국어 설명을 구할 수 없습니다. 챔피언스 수록 항목에는 결손이 없습니다.
 
 포켓몬 상세 이전 이동은 기본 정보로 초기화하는 기존 정책에 맞춰 스크롤도 맨 위로 이동합니다. 브라우저의 자동 스크롤 복원을 끄고 랭킹 목록 복귀 스크롤만 직접 관리합니다.
 

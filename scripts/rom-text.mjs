@@ -5,8 +5,23 @@
 //   absent from PokéAPI, which lists the ids with no name in any language.
 // swsh-text: Sword and Shield. Supplies the Gigantamax moves, which PokéAPI does
 //   not model at all (it carries the 19 Max moves only).
+// plza-text: Legends Z-A again, with the descriptions za-textport does not carry.
+//   This is the only source of Korean text for generation 9 entries, because
+//   PokéAPI's Korean flavour text stops at Sword and Shield.
 export const ZA_TEXTPORT = '0eb14d75de5282f33b783854e1a5aca8c168d83c';
+export const PLZA_TEXT = '3f149c41285b9fb290ab0b303d578545f569b663';
 export const SWSH_TEXT = '76c6e4d50003403991ee00b282f7b6e77bf84b11';
+
+// Rows are "index, hash, label, text". The games escape line breaks in the text,
+// and entries with no text of their own carry a "[~ 123]" placeholder.
+const table = text =>
+  text
+    .split(/\r?\n/)
+    .map(line => line.split('\t'))
+    .filter(fields => fields.length >= 4)
+    .map(fields => ({ label: fields[2], text: fields.slice(3).join('\t').trim() }));
+const readable = value => value && !/^\[~\s*\d+\]$/.test(value);
+const unescapeBreaks = value => value.replace(/\\n/g, '\n').trim();
 
 const key = text =>
   String(text)
@@ -41,6 +56,63 @@ export async function supplementZaItems(result, getBuffer) {
     }
     record.japanese ||= found.japanese || null;
   }
+  return filled;
+}
+
+// Names and descriptions sit in separate files. Abilities and items pair up by
+// label (TOKUSEI_037 with TOKUSEIINFO_037); moves cannot, because their
+// description labels are hashes, so they pair up by row instead. Cross-checking
+// the move names against PokéAPI matched 862 of 866, which is what fixes the rows.
+export async function supplementZaCatalog(result, getText) {
+  const base = `https://raw.githubusercontent.com/CPokemon/plza-text/${PLZA_TEXT}/`;
+  const load = file =>
+    Promise.all(
+      ['english', 'korean'].map(language =>
+        getText(`${base}${language}/common/${file}`).then(table),
+      ),
+    );
+  const [[abilityEn, abilityKo], [abilityInfo]] = await Promise.all([
+    load('tokusei.txt'),
+    load('tokuseiinfo.txt').then(([, korean]) => [korean]),
+  ]);
+  const [[itemEn, itemKo], [itemInfo]] = await Promise.all([
+    load('itemname.txt'),
+    load('iteminfo.txt').then(([, korean]) => [korean]),
+  ]);
+  const [[moveEn, moveKo], [moveInfo]] = await Promise.all([
+    load('wazaname.txt'),
+    load('wazainfo.txt').then(([, korean]) => [korean]),
+  ]);
+
+  const filled = { ability: 0, held_item: 0, move: 0 };
+  const apply = (kind, english, korean, describe) => {
+    const byName = new Map();
+    english.forEach((row, index) => {
+      if (row.text) byName.set(key(row.text), { index, label: korean[index]?.text });
+    });
+    for (const record of Object.values(result[kind])) {
+      // Showdown splits some entries per form, as in "Embody Aspect (Teal)".
+      const found =
+        byName.get(key(record.name)) ?? byName.get(key(record.name.replace(/\s*\(.*\)\s*$/, '')));
+      if (!found) continue;
+      if (found.label && (!record.label || record.label === record.name)) {
+        record.label = found.label;
+        filled[kind]++;
+      }
+      const effect = describe(found);
+      if (!record.effect && readable(effect)) {
+        record.effect = unescapeBreaks(effect);
+        record.effectVersion = 'legends-za';
+      }
+    }
+  };
+  const suffixed = (rows, prefix) => {
+    const byLabel = new Map(rows.map(row => [row.label, row.text]));
+    return ({ index }) => byLabel.get(`${prefix}_${String(index).padStart(3, '0')}`);
+  };
+  apply('ability', abilityEn, abilityKo, suffixed(abilityInfo, 'TOKUSEIINFO'));
+  apply('held_item', itemEn, itemKo, suffixed(itemInfo, 'ITEMINFO'));
+  apply('move', moveEn, moveKo, ({ index }) => moveInfo[index]?.text);
   return filled;
 }
 
