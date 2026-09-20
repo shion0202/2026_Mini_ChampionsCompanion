@@ -10,11 +10,7 @@ import {
 import { itemArtwork } from './images.js';
 import { MOVE_TRAITS } from './move-traits.js';
 import { matchesFilter, filterSummary } from './filters.js';
-const esc = value =>
-  String(value ?? '').replace(
-    /[&<>"']/g,
-    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-  );
+import { esc } from './html.js';
 const label = (data, locale, kind, key) =>
   data[kind]?.[key]?.label || locale.label(kind, data[kind]?.[key]?.name ?? key);
 const types = values =>

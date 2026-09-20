@@ -1,0 +1,185 @@
+exports[`categoryHeader counts teammates as creatures and the rest as entries 1`] = `
+[
+  "<div class=\\"category-heading\\"><h3>기술</h3><span>상위 3개</span></div>",
+  "<div class=\\"category-heading\\"><h3>같은 팀</h3><span>상위 2마리</span></div>",
+  "<div class=\\"category-heading\\"><h3>특성</h3><span>자료 없음</span></div>",
+  "<div class=\\"empty-state\\"><p>이 자료에는 해당 통계가 제공되지 않습니다.</p></div>"
+]
+`;
+
+exports[`detailShell: previous button hidden, Doubles 1`] = `
+
+    <div class="detail-mobile-nav"><div class="detail-navigation"><button id="previous-pokemon" class="text-button" hidden>← 이전</button><button id="back" class="text-button">랭킹으로</button></div><span>더블배틀 (M-6)</span></div>
+    <div class="pokemon-hero"></div>
+    <div class="detail-tabs" role="tablist" aria-label="통계와 도감 항목"><button role="tab" id="tab-overview" data-category="overview" aria-controls="category-content" aria-selected="true" tabindex="0">기본 정보</button></div>
+    <div id="category-content" class="category-content" role="tabpanel" aria-labelledby="tab-overview" tabindex="0"></div>
+    <div class="detail-source"><span>자료 날짜 <strong>2026.09.18</strong></span><details><summary>자료 시각 자세히</summary><p>자료: M-6 / 더블 / 2026.09.18 (제공처 표기, 시간대 미제공)</p><p>API 생성: 제공되지 않음</p><p>기기 조회: 제공되지 않음</p></details></div>
+`;
+
+exports[`detailShell: previous button shown, Singles 1`] = `
+
+    <div class="detail-mobile-nav"><div class="detail-navigation"><button id="previous-pokemon" class="text-button" >← 이전</button><button id="back" class="text-button">랭킹으로</button></div><span>싱글배틀 (M-6)</span></div>
+    <div class="pokemon-hero"></div>
+    <div class="detail-tabs" role="tablist" aria-label="통계와 도감 항목"><button role="tab" id="tab-overview" data-category="overview" aria-controls="category-content" aria-selected="false" tabindex="-1">기본 정보</button><button role="tab" id="tab-move" data-category="move" aria-controls="category-content" aria-selected="true" tabindex="0">기술</button></div>
+    <div id="category-content" class="category-content" role="tabpanel" aria-labelledby="tab-move" tabindex="0"></div>
+    <div class="detail-source"><span>자료 날짜 <strong>2026.09.18</strong></span><details><summary>자료 시각 자세히</summary><p>자료: M-6 / 싱글 / 2026.09.18 (제공처 표기, 시간대 미제공)</p><p>API 생성: 2026. 09. 18. 18:00 KST</p><p>기기 조회: 2025. 09. 18. 17:00 KST</p></details></div>
+`;
+
+exports[`errorState escapes the reported message 1`] = `
+<div class="empty-state error-state"><span class="empty-symbol">↻</span><h3>통계를 불러오지 못했어요</h3><p>네트워크 연결과 통계 제공처 상태를 확인해 주세요.</p><p class="error-detail">&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; 실패</p><button id="retry" class="primary-button">다시 시도</button></div>
+`;
+
+exports[`filter dialog help and ranking footer 1`] = `
+[
+  "<p class=\\"category-tip filter-help\\">항목을 펼쳐 여러 값을 선택하세요. 항목 안에서는 AND/OR를 선택하고, 서로 다른 항목의 조건은 모두 만족해야 합니다.</p>",
+  "<div class=\\"filter-footer-note\\"><label class=\\"filter-checkbox\\"><input id=\\"filter-favorite\\" type=\\"checkbox\\" name=\\"favorite\\" >즐겨찾기만 보기</label><p class=\\"category-tip\\">세대는 원종이 처음 등장한 세대를 기준으로 합니다.<br>타입은 메가진화 전의 폼을 기준으로 합니다.</p></div>",
+  "<div class=\\"filter-footer-note\\"><label class=\\"filter-checkbox\\"><input id=\\"filter-favorite\\" type=\\"checkbox\\" name=\\"favorite\\" checked>즐겨찾기만 보기</label><p class=\\"category-tip\\">세대는 원종이 처음 등장한 세대를 기준으로 합니다.<br>타입은 메가진화 전의 폼을 기준으로 합니다.</p></div>"
+]
+`;
+
+exports[`filterGroup: a disabled group still reports why 1`] = `
+<details id="gimmick-filter" class="filter-group" data-filter-group="gimmick"><summary><strong>기믹</strong><span data-group-summary>불러오는 중</span></summary><fieldset aria-label="기믹" disabled><div class="filter-mode" role="group" aria-label="기믹 조건 결합"><label><input type="radio" name="gimmick-filter-mode" value="or" checked><span>하나라도 (OR)</span></label><label><input type="radio" name="gimmick-filter-mode" value="and" ><span>모두 (AND)</span></label></div><div class="filter-choices"><label><input type="checkbox" data-choice value="mega" data-label="메가진화" ><span>메가진화</span></label></div><button type="button" class="filter-group-clear" data-clear-group>선택 해제</button></fieldset></details>
+`;
+
+exports[`filterGroup: checked values, selected mode and an escaped label 1`] = `
+<details id="type-filter" class="filter-group" data-filter-group="type"><summary><strong>타입</strong><span data-group-summary>불꽃</span></summary><fieldset aria-label="타입" ><div class="filter-mode" role="group" aria-label="타입 조건 결합"><label><input type="radio" name="type-filter-mode" value="or" ><span>하나라도 (OR)</span></label><label><input type="radio" name="type-filter-mode" value="and" checked><span>모두 (AND)</span></label></div><div class="filter-choices"><label><input type="checkbox" data-choice value="Fire" data-label="불꽃" checked><span>불꽃</span></label><label><input type="checkbox" data-choice value="Water" data-label="물 &amp; &quot;바다&quot;" ><span>물 &amp; &quot;바다&quot;</span></label></div><button type="button" class="filter-group-clear" data-clear-group>선택 해제</button></fieldset></details>
+`;
+
+exports[`fmtTime renders KST and never guesses at a missing time 1`] = `
+[
+  "null -> 제공되지 않음",
+  "undefined -> 제공되지 않음",
+  " -> 제공되지 않음",
+  "not a date -> 제공되지 않음",
+  "2026-09-18T09:00:00Z -> 2026. 09. 18. 18:00 KST",
+  "0 -> 1970. 01. 01. 09:00 KST"
+]
+`;
+
+exports[`groupSummary: loading, failed, chosen values and none 1`] = `
+[
+  "불러오는 중",
+  "정보 불러오기 실패",
+  "1세대 또는 2세대",
+  "1세대 그리고 2세대",
+  "전체"
+]
+`;
+
+exports[`heroMarkup omits the Japanese line and the dex number when absent 1`] = `
+<div class="hero-copy"><span class="rank-pill">#2 <span>사용 순위</span></span><h2 tabindex="-1" id="pokemon-title">라이츄</h2><p class="english-name"><span lang="en">Raichu</span></p><div class="type-list"></div></div><div class="hero-art"><span class="no-portrait" aria-hidden="true">◇</span><span class="hero-image-fallback" hidden>이미지 미제공</span></div><button class="favorite-button hero-favorite" data-favorite="raichu" aria-label="라이츄 즐겨찾기" aria-pressed="false">☆</button>
+`;
+
+exports[`heroMarkup with a Japanese name, a dex number and a favourite 1`] = `
+<div class="hero-copy"><span class="rank-pill">#1 <span>사용 순위</span></span><h2 tabindex="-1" id="pokemon-title">보만다</h2><p class="english-name"><span lang="en">Salamence</span> <span>№ 373</span></p><p class="japanese-name" lang="ja">ボーマンダ</p><div class="type-list"><span class="type-badge type-dragon">드래곤</span><span class="type-badge type-flying">비행</span></div></div><div class="hero-art"><img class="portrait hero-portrait" src="https://example.test/a b&amp;c.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="hero-image-fallback" hidden>이미지 미제공</span></div><button class="favorite-button hero-favorite" data-favorite="salamence" aria-label="보만다 즐겨찾기" aria-pressed="true">★</button>
+`;
+
+exports[`loadingState and the two placeholders 1`] = `
+[
+  "<div class=\\"empty-state\\"><span class=\\"loading-ring\\"></span><p>통계를 불러오는 중</p></div>",
+  "<div class=\\"detail-placeholder\\"><div class=\\"placeholder-mark\\" aria-hidden=\\"true\\">↗</div><p class=\\"eyebrow\\">BATTLE INSIGHTS</p><h2>다음 배틀을 위한 한 수</h2><p>포켓몬을 선택하면 기술과 도구,<br>함께 쓰는 포켓몬을 확인할 수 있어요.</p><div class=\\"placeholder-tags\\"><span>기술</span><span>도구</span><span>같은 팀</span></div></div>",
+  "<div class=\\"detail-placeholder\\"><h2>자료를 기다리고 있어요</h2><p>조회가 완료되면 통계를 확인할 수 있습니다.</p></div>"
+]
+`;
+
+exports[`portrait escapes the sprite url and falls back without one 1`] = `
+[
+  "<img class=\\"portrait \\" src=\\"https://example.test/a b&amp;c.png\\" alt=\\"\\" loading=\\"lazy\\" referrerpolicy=\\"no-referrer\\">",
+  "<img class=\\"portrait hero-portrait\\" src=\\"https://example.test/a b&amp;c.png\\" alt=\\"\\" loading=\\"lazy\\" referrerpolicy=\\"no-referrer\\">",
+  "<span class=\\"no-portrait\\" aria-hidden=\\"true\\">◇</span>"
+]
+`;
+
+exports[`rankingEmpty explains the favourite filter separately from search 1`] = `
+[
+  "<div class=\\"empty-state\\"><span class=\\"empty-symbol\\">⌕</span><h3>조건에 맞는 포켓몬이 없어요</h3><p>검색어와 적용한 필터를 확인해 주세요.</p><button id=\\"reset-filters\\" class=\\"text-button\\">필터 초기화</button></div>",
+  "<div class=\\"empty-state\\"><span class=\\"empty-symbol\\">☆</span><h3>조건에 맞는 포켓몬이 없어요</h3><p>검색어와 적용한 필터를 확인해 주세요.</p><button id=\\"reset-filters\\" class=\\"text-button\\">필터 초기화</button></div>"
+]
+`;
+
+exports[`rankingFilterButton shows a badge only when filters are active 1`] = `
+[
+  "<svg viewBox=\\"0 0 24 24\\" width=\\"20\\" height=\\"20\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"1.8\\" stroke-linecap=\\"round\\" stroke-linejoin=\\"round\\" aria-hidden=\\"true\\"><path d=\\"M3 5h18l-7 8v6l-4 2v-8z\\"/></svg>",
+  "<svg viewBox=\\"0 0 24 24\\" width=\\"20\\" height=\\"20\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"1.8\\" stroke-linecap=\\"round\\" stroke-linejoin=\\"round\\" aria-hidden=\\"true\\"><path d=\\"M3 5h18l-7 8v6l-4 2v-8z\\"/></svg><span class=\\"filter-badge\\">3</span>"
+]
+`;
+
+exports[`rankingRows adds the dex number only when sorting by dex 1`] = `
+<div class="pokemon-row ">
+    <button class="pokemon-select" data-pokemon="salamence" aria-label="보만다 1위 통계 보기" >
+      <span class="rank rank-top" aria-label="사용 순위 1위">01</span>
+      <span class="portrait-wrap"><img class="portrait " src="https://example.test/a b&amp;c.png" alt="" loading="lazy" referrerpolicy="no-referrer"></span><span class="pokemon-info"><span class="dex-number">No.373</span><strong>보만다</strong><span class="type-list"><span class="type-badge type-dragon">드래곤</span><span class="type-badge type-flying">비행</span></span></span>
+    </button>
+    <button class="favorite-button" data-favorite="salamence" aria-label="보만다 즐겨찾기" aria-pressed="false">☆</button>
+  </div><div class="pokemon-row ">
+    <button class="pokemon-select" data-pokemon="raichu" aria-label="라이츄 2위 통계 보기" >
+      <span class="rank rank-top" aria-label="사용 순위 2위">02</span>
+      <span class="portrait-wrap"><span class="no-portrait" aria-hidden="true">◇</span></span><span class="pokemon-info"><span class="dex-number">No.—</span><strong>라이츄</strong><span class="type-list"></span></span>
+    </button>
+    <button class="favorite-button" data-favorite="raichu" aria-label="라이츄 즐겨찾기" aria-pressed="false">☆</button>
+  </div>
+`;
+
+exports[`rankingRows: rank order, selection and favourite state 1`] = `
+<div class="pokemon-row selected">
+    <button class="pokemon-select" data-pokemon="salamence" aria-label="보만다 1위 통계 보기" aria-current="true">
+      <span class="rank rank-top" aria-label="사용 순위 1위">01</span>
+      <span class="portrait-wrap"><img class="portrait " src="https://example.test/a b&amp;c.png" alt="" loading="lazy" referrerpolicy="no-referrer"></span><span class="pokemon-info"><strong>보만다</strong><span class="type-list"><span class="type-badge type-dragon">드래곤</span><span class="type-badge type-flying">비행</span></span></span>
+    </button>
+    <button class="favorite-button" data-favorite="salamence" aria-label="보만다 즐겨찾기" aria-pressed="false">☆</button>
+  </div><div class="pokemon-row ">
+    <button class="pokemon-select" data-pokemon="raichu" aria-label="라이츄 2위 통계 보기" >
+      <span class="rank rank-top" aria-label="사용 순위 2위">02</span>
+      <span class="portrait-wrap"><span class="no-portrait" aria-hidden="true">◇</span></span><span class="pokemon-info"><strong>라이츄</strong><span class="type-list"></span></span>
+    </button>
+    <button class="favorite-button" data-favorite="raichu" aria-label="라이츄 즐겨찾기" aria-pressed="true">★</button>
+  </div>
+`;
+
+exports[`referenceStatus separates loading from a failed load with a retry 1`] = `
+[
+  "<div class=\\"empty-state\\">도감 자료를 불러오는 중입니다.</div>",
+  "<div class=\\"empty-state\\">도감 자료를 불러오지 못했습니다.<br><button class=\\"text-button\\" data-ref-retry>다시 시도</button></div>"
+]
+`;
+
+exports[`seasonOptions marks the newest season and appends known regulations 1`] = `
+<option value="M6">[최신] M-6 (M-C)</option><option value="M5">M-5 (M-B)</option><option value="M99">M-99</option>
+`;
+
+exports[`sourceChip distinguishes fresh from archived data 1`] = `
+[
+  "<button class=\\"source-chip\\" id=\\"source-info\\"><span class=\\"status-dot \\"></span>자료 2026.09.18<span class=\\"source-kind\\"></span><span aria-hidden=\\"true\\">ⓘ</span></button>",
+  "<button class=\\"source-chip\\" id=\\"source-info\\"><span class=\\"status-dot stale\\"></span>자료 2026.09.18<span class=\\"source-kind\\">보관 자료</span><span aria-hidden=\\"true\\">ⓘ</span></button>"
+]
+`;
+
+exports[`sourceTimes keeps the three timestamps separate 1`] = `
+자료 날짜: 2026.09.18
+API 생성: 2026. 09. 18. 18:00 KST
+기기 조회: 제공되지 않음
+`;
+
+exports[`statRows: a teammate outside this season is labelled, not linked 1`] = `
+<div class="stat-rows"><button class="stat-row teammate-row" data-pokemon="garchomp" aria-label="teammate:Garchomp 통계 보기"><span class="stat-rank">1</span><span class="team-portrait"><span class="no-portrait" aria-hidden="true">◇</span></span><span class="stat-name"><strong>teammate:Garchomp</strong></span><span class="row-arrow">↗</span></button><div class="stat-row"><span class="stat-bar" style="width:0%" aria-hidden="true"></span><span class="stat-rank">2</span><span class="stat-name"><strong>teammate:Absent</strong><small>이 시즌 목록에 없음</small></span><span class="row-arrow">—</span></div></div><p class="category-tip">함께 사용한 포켓몬의 채용률 순위입니다.</p>
+`;
+
+exports[`statRows: held items carry artwork 1`] = `
+<div class="stat-rows"><div class="stat-row"><span class="stat-bar" style="width:0%" aria-hidden="true"></span><span class="stat-rank">1</span><span class="item-art"><img class="item-image" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kings-rock.png" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="item-fallback" aria-label="도구 이미지 미제공" hidden>◇</span></span><span class="stat-name"><strong><button class="effect-link" data-effect-type="held_item" data-effect-id="kingsrock" aria-label="held_item:King&#39;s Rock 효과 보기">held_item:King&#39;s Rock</button></strong></span><span class="stat-percent">0.0%</span></div></div><p class="category-tip">제공처가 공개한 상위 도구의 채용률입니다.</p>
+`;
+
+exports[`statRows: move names open the effect popup and use the reference label 1`] = `
+<div class="stat-rows"><div class="stat-row"><span class="stat-bar" style="width:64.1%" aria-hidden="true"></span><span class="stat-rank">1</span><span class="stat-name"><strong><button class="effect-link" data-effect-type="move" data-effect-id="roost" aria-label="로스트 효과 보기">로스트</button></strong></span><span class="stat-percent percentage-prominent">64.1%</span></div><div class="stat-row"><span class="stat-bar" style="width:0%" aria-hidden="true"></span><span class="stat-rank">2</span><span class="stat-name"><strong><button class="effect-link" data-effect-type="move" data-effect-id="unknownmove" aria-label="move:Unknown Move 효과 보기">move:Unknown Move</button></strong></span><span class="stat-percent">정보 없음</span></div></div><p class="category-tip">여러 기술을 동시에 채용하므로 합계가 100%를 넘을 수 있습니다.</p>
+`;
+
+exports[`statRows: stat alignment shows the raised and lowered stat 1`] = `
+<div class="stat-rows"><div class="stat-row"><span class="stat-bar" style="width:50.2%" aria-hidden="true"></span><span class="stat-rank">1</span><span class="stat-name"><strong>stat_alignment:Adamant</strong><small class="stat-adjust"><span class="stat-up">공격 ↑</span><span class="stat-down">특수공격 ↓</span></small></span><span class="stat-percent percentage-prominent">50.2%</span></div><div class="stat-row"><span class="stat-bar" style="width:9.9%" aria-hidden="true"></span><span class="stat-rank">2</span><span class="stat-name"><strong>stat_alignment:Serious</strong><small class="stat-adjust"><span>보정 없음</span></small></span><span class="stat-percent">9.9%</span></div></div><p class="category-tip">능력 보정의 개별 채용률입니다.</p>
+`;
+
+exports[`typeBadges: two types, empty and missing 1`] = `
+[
+  "<span class=\\"type-badge type-dragon\\">드래곤</span><span class=\\"type-badge type-flying\\">비행</span>",
+  "",
+  ""
+]
+`;

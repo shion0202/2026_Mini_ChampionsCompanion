@@ -1,9 +1,11 @@
-const CACHE = 'champions-shell-v12';
+const CACHE = 'champions-shell-v13';
 const APP_FILES = [
   './',
   './index.html',
   './src/styles.css',
   './src/app.js',
+  './src/app-view.js',
+  './src/html.js',
   './src/data.js',
   './src/api.js',
   './src/locale.js',

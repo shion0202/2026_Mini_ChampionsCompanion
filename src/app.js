@@ -1,27 +1,40 @@
 import { ApiClient } from './api.js';
-import {
-  normalizeIndex,
-  formatDate,
-  percentageText,
-  CATEGORY_LABELS,
-  SEASON_REGULATIONS,
-  toId,
-} from './data.js';
-import { createLocale, TYPE_LABELS, STAT_NAMES } from './locale.js';
+import { normalizeIndex, formatDate, CATEGORY_LABELS, SEASON_REGULATIONS } from './data.js';
+import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
 import { filterValues, filterSummary } from './filters.js';
-import { megaSprite, itemArtwork } from './images.js';
+import { megaSprite } from './images.js';
 import {
   renderReference,
   renderLearnsetShell,
   renderLearnsetRows,
   renderEffect,
   renderSpreads,
-  effectButton,
-  FILTER_ICON,
-  percentClass,
 } from './reference-view.js';
+import {
+  esc,
+  seasonOptions,
+  sourceChip,
+  sourceTimes,
+  rankingFilterButton,
+  loadingState,
+  errorState,
+  rankingEmpty,
+  rankingRows,
+  heroMarkup,
+  detailPlaceholder,
+  detailWaiting,
+  detailShell,
+  referenceStatus,
+  categoryHeader,
+  categoryEmpty,
+  statRows,
+  groupSummary,
+  filterGroup,
+  filterHelp,
+  rankingFilterFooter,
+} from './app-view.js';
 const DETAIL_LABELS = { overview: '기본 정보', ...CATEGORY_LABELS, learnset: '배우는 기술' };
 
 const $ = id => document.getElementById(id);
@@ -86,26 +99,6 @@ Object.assign(state, {
   learnTrait: [],
   learnModes: {},
 });
-const esc = value =>
-  String(value ?? '').replace(
-    /[&<>"']/g,
-    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-  );
-const fmtTime = value => {
-  if (value === null || value === undefined || value === '') return '제공되지 않음';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? '제공되지 않음'
-    : new Intl.DateTimeFormat('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }).format(date) + ' KST';
-};
 let toastTimer;
 function toast(text) {
   $('toast').textContent = text;
@@ -119,18 +112,6 @@ function notice(text) {
   $('notice').textContent = text;
   $('notice').hidden = !text;
 }
-const typeBadges = types =>
-  (types ?? [])
-    .map(
-      type =>
-        `<span class="type-badge type-${esc(toId(type))}">${esc(TYPE_LABELS[type] ?? type)}</span>`,
-    )
-    .join('');
-const portrait = (entry, className = '') =>
-  entry.sprite
-    ? `<img class="portrait ${className}" src="${esc(entry.sprite)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-    : '<span class="no-portrait" aria-hidden="true">◇</span>';
-
 function controls() {
   document
     .querySelectorAll('[data-format]')
@@ -138,15 +119,7 @@ function controls() {
       button.setAttribute('aria-pressed', String(button.dataset.format === state.format)),
     );
   if (state.index) {
-    $('season').innerHTML = state.index.seasons
-      .map(
-        s =>
-          `<option value="${s.season}">` +
-          `${s.season === state.index.seasons[0].season ? '[최신] ' : ''}` +
-          `${s.season.replace('M', 'M-')}` +
-          `${SEASON_REGULATIONS[s.season] ? ` (${SEASON_REGULATIONS[s.season]})` : ''}</option>`,
-      )
-      .join('');
+    $('season').innerHTML = seasonOptions(state.index.seasons, SEASON_REGULATIONS);
     $('season').value = state.season;
     $('season').disabled = false;
   }
@@ -160,14 +133,12 @@ function sourceStatus() {
     $('current-source-times').textContent = '';
     return;
   }
-  $('source-status').innerHTML =
-    `<button class="source-chip" id="source-info">` +
-    `<span class="status-dot ${state.stale ? 'stale' : ''}"></span>` +
-    `자료 ${formatDate(state.snapshot.date)}` +
-    `<span class="source-kind">${state.stale ? '보관 자료' : ''}</span>` +
-    `<span aria-hidden="true">ⓘ</span></button>`;
-  $('current-source-times').textContent =
-    `자료 날짜: ${formatDate(state.snapshot.date)}\nAPI 생성: ${fmtTime(state.snapshot.generatedAt)}\n기기 조회: ${fmtTime(state.fetchedAt)}`;
+  $('source-status').innerHTML = sourceChip({ stale: state.stale, date: state.snapshot.date });
+  $('current-source-times').textContent = sourceTimes({
+    date: state.snapshot.date,
+    generatedAt: state.snapshot.generatedAt,
+    fetchedAt: state.fetchedAt,
+  });
   $('source-info').onclick = () => $('about-dialog').showModal();
 }
 
@@ -183,9 +154,7 @@ function renderList() {
     filterSummary(state.gimmick, GIMMICK_LABELS, state.rankModes.gimmick),
     state.favoriteOnly ? '즐겨찾기' : '',
   ].filter(Boolean);
-  $('ranking-filter').innerHTML =
-    FILTER_ICON +
-    (activeFilters.length ? `<span class="filter-badge">${activeFilters.length}</span>` : '');
+  $('ranking-filter').innerHTML = rankingFilterButton(activeFilters.length);
   $('ranking-filter').setAttribute(
     'aria-label',
     `랭킹 필터${activeFilters.length ? ` (${activeFilters.length}개 적용)` : ''}`,
@@ -197,32 +166,14 @@ function renderList() {
   $('favorites-filter').textContent = state.favoriteOnly ? '★ 즐겨찾기' : '☆ 즐겨찾기';
   $('load-more').hidden = visible.length <= state.limit;
   if (!visible.length) {
-    $('ranking').innerHTML =
-      `<div class="empty-state"><span class="empty-symbol">${state.favoriteOnly ? '☆' : '⌕'}</span>` +
-      `<h3>조건에 맞는 포켓몬이 없어요</h3>` +
-      `<p>검색어와 적용한 필터를 확인해 주세요.</p>` +
-      `<button id="reset-filters" class="text-button">필터 초기화</button></div>`;
+    $('ranking').innerHTML = rankingEmpty(state.favoriteOnly);
     return;
   }
-  const dexNumber = p =>
-    state.sort === 'dex'
-      ? `<span class="dex-number">No.${p.dex ? String(p.dex).padStart(3, '0') : '—'}</span>`
-      : '';
-  const pokemonInfo = p =>
-    `<span class="pokemon-info">${dexNumber(p)}<strong>${esc(p.label)}</strong>` +
-    `<span class="type-list">${typeBadges(p.types)}</span></span>`;
-  $('ranking').innerHTML = visible
-    .slice(0, state.limit)
-    .map(
-      p => `<div class="pokemon-row ${state.selected === p.id ? 'selected' : ''}">
-    <button class="pokemon-select" data-pokemon="${p.id}" aria-label="${esc(p.label)} ${p.rank}위 통계 보기" ${state.selected === p.id ? 'aria-current="true"' : ''}>
-      <span class="rank ${p.rank <= 3 ? 'rank-top' : ''}" aria-label="사용 순위 ${p.rank}위">${p.rank.toString().padStart(2, '0')}</span>
-      <span class="portrait-wrap">${portrait(p)}</span>${pokemonInfo(p)}
-    </button>
-    <button class="favorite-button" data-favorite="${p.id}" aria-label="${esc(p.label)} 즐겨찾기" aria-pressed="${favorites.has(p.id)}">${favorites.has(p.id) ? '★' : '☆'}</button>
-  </div>`,
-    )
-    .join('');
+  $('ranking').innerHTML = rankingRows(visible.slice(0, state.limit), {
+    selected: state.selected,
+    sort: state.sort,
+    favorites,
+  });
   $('load-more').textContent =
     `더 보기 (${Math.min(state.limit, visible.length)} / ${visible.length})`;
 }
@@ -245,64 +196,31 @@ function renderHero() {
   const key = `${shown.name}:${favorites.has(p.id)}`;
   if (container.dataset.shown === key) return;
   container.dataset.shown = key;
-  const japanese = state.locale.pokemonJapanese(shown.name);
-  const heroCopy =
-    `<div class="hero-copy"><span class="rank-pill">#${p.rank} <span>사용 순위</span></span>` +
-    `<h2 tabindex="-1" id="pokemon-title">${esc(shown.label)}</h2>` +
-    `<p class="english-name"><span lang="en">${esc(shown.name)}</span>` +
-    `${p.dex ? ` <span>№ ${String(p.dex).padStart(3, '0')}</span>` : ''}</p>` +
-    `${japanese ? `<p class="japanese-name" lang="ja">${esc(japanese)}</p>` : ''}` +
-    `<div class="type-list">${typeBadges(shown.types)}</div></div>`;
-  const heroArt =
-    `<div class="hero-art">${portrait(shown, 'hero-portrait')}` +
-    `<span class="hero-image-fallback" hidden>이미지 미제공</span></div>`;
-  const heroFavorite =
-    `<button class="favorite-button hero-favorite" data-favorite="${p.id}"` +
-    ` aria-label="${esc(p.label)} 즐겨찾기" aria-pressed="${favorites.has(p.id)}">` +
-    `${favorites.has(p.id) ? '★' : '☆'}</button>`;
-  container.innerHTML = heroCopy + heroArt + heroFavorite;
+  container.innerHTML = heroMarkup({
+    entry: p,
+    shown,
+    japanese: state.locale.pokemonJapanese(shown.name),
+    isFavorite: favorites.has(p.id),
+  });
 }
 function renderDetail() {
   const p = selectedEntry();
   if (!p) {
-    $('detail').innerHTML =
-      `<div class="detail-placeholder">` +
-      `<div class="placeholder-mark" aria-hidden="true">↗</div>` +
-      `<p class="eyebrow">BATTLE INSIGHTS</p><h2>다음 배틀을 위한 한 수</h2>` +
-      `<p>포켓몬을 선택하면 기술과 도구,<br>함께 쓰는 포켓몬을 확인할 수 있어요.</p>` +
-      `<div class="placeholder-tags"><span>기술</span><span>도구</span><span>같은 팀</span></div></div>`;
+    $('detail').innerHTML = detailPlaceholder();
     return;
   }
-  const hasPrevious =
-    history.state?.previousPokemon && state.list.some(p => p.id === history.state.previousPokemon);
-  const mobileNav =
-    `<div class="detail-mobile-nav"><div class="detail-navigation">` +
-    `<button id="previous-pokemon" class="text-button" ${hasPrevious ? '' : 'hidden'}>← 이전</button>` +
-    `<button id="back" class="text-button">랭킹으로</button></div>` +
-    `<span>${state.format === 'Singles' ? '싱글배틀' : '더블배틀'}` +
-    ` (${state.season.replace('M', 'M-')})</span></div>`;
-  const tab = ([category, label]) =>
-    `<button role="tab" id="tab-${category}" data-category="${category}"` +
-    ` aria-controls="category-content" aria-selected="${state.category === category}"` +
-    ` tabindex="${state.category === category ? 0 : -1}">${label}</button>`;
-  const detailSource =
-    `<div class="detail-source">` +
-    `<span>자료 날짜 <strong>${formatDate(state.snapshot.date)}</strong></span>` +
-    `<details><summary>자료 시각 자세히</summary>` +
-    `<p>자료: ${state.season.replace('M', 'M-')} / ${state.format === 'Singles' ? '싱글' : '더블'}` +
-    ` / ${formatDate(state.snapshot.date)} (제공처 표기, 시간대 미제공)</p>` +
-    `<p>API 생성: ${fmtTime(state.snapshot.generatedAt)}</p>` +
-    `<p>기기 조회: ${fmtTime(state.fetchedAt)}</p></details></div>`;
-  $('detail').innerHTML = `
-    ${mobileNav}
-    <div class="pokemon-hero"></div>
-    <div class="detail-tabs" role="tablist" aria-label="통계와 도감 항목">${Object.entries(
-      DETAIL_LABELS,
-    )
-      .map(tab)
-      .join('')}</div>
-    <div id="category-content" class="category-content" role="tabpanel" aria-labelledby="tab-${state.category}" tabindex="0"></div>
-    ${detailSource}`;
+  $('detail').innerHTML = detailShell({
+    hasPrevious:
+      history.state?.previousPokemon &&
+      state.list.some(entry => entry.id === history.state.previousPokemon),
+    format: state.format,
+    season: state.season,
+    labels: DETAIL_LABELS,
+    category: state.category,
+    date: state.snapshot.date,
+    generatedAt: state.snapshot.generatedAt,
+    fetchedAt: state.fetchedAt,
+  });
   $('back').onclick = () => goToRanking();
   $('previous-pokemon').onclick = () => history.back();
   renderCategory();
@@ -321,12 +239,7 @@ function renderCategory() {
   $('category-content').setAttribute('aria-labelledby', `tab-${category}`);
   if (category === 'overview' || category === 'learnset') {
     if (!state.reference) {
-      $('category-content').innerHTML = `<div class="empty-state">${
-        state.refError
-          ? '도감 자료를 불러오지 못했습니다.<br>' +
-            '<button class="text-button" data-ref-retry>다시 시도</button>'
-          : '도감 자료를 불러오는 중입니다.'
-      }</div>`;
+      $('category-content').innerHTML = referenceStatus(state.refError);
       return;
     }
     $('category-content').innerHTML =
@@ -348,23 +261,9 @@ function renderCategory() {
     category === 'stat_points'
       ? p.categories[category].filter(r => r.rank <= 20)
       : p.categories[category];
-  const tips = {
-    move: '여러 기술을 동시에 채용하므로 합계가 100%를 넘을 수 있습니다.',
-    held_item: '제공처가 공개한 상위 도구의 채용률입니다.',
-    teammate: '함께 사용한 포켓몬의 채용률 순위입니다.',
-    stat_alignment: '능력 보정의 개별 채용률입니다.',
-    stat_points: 'HP, 공격, 방어, 특수공격, 특수방어, 스피드 순서입니다.',
-    ability: '제공처가 집계한 특성별 채용률입니다.',
-  };
-  const headerCount = rows.length
-    ? `상위 ${rows.length}${category === 'teammate' ? '마리' : '개'}`
-    : '자료 없음';
-  const header =
-    `<div class="category-heading"><h3>${CATEGORY_LABELS[category]}</h3>` +
-    `<span>${headerCount}</span></div>`;
+  const header = categoryHeader(category, rows);
   if (!rows.length) {
-    $('category-content').innerHTML =
-      header + '<div class="empty-state"><p>이 자료에는 해당 통계가 제공되지 않습니다.</p></div>';
+    $('category-content').innerHTML = header + categoryEmpty();
     return;
   }
   if (category === 'stat_points') {
@@ -373,44 +272,12 @@ function renderCategory() {
   }
   $('category-content').innerHTML =
     header +
-    '<div class="stat-rows">' +
-    rows
-      .map(r => {
-        const teammate = category === 'teammate';
-        const target = teammate ? state.list.find(entry => entry.name === r.name) : null;
-        const label =
-          state.reference?.[category]?.[toId(r.name)]?.label ??
-          state.locale.label(category, r.name);
-        const up = r.up
-          ? `<span class="stat-up">${esc(STAT_NAMES[r.up] ?? r.up)} ↑</span>`
-          : '<span>보정 없음</span>';
-        const down = r.down
-          ? `<span class="stat-down">${esc(STAT_NAMES[r.down] ?? r.down)} ↓</span>`
-          : '';
-        const sub =
-          category === 'stat_alignment' ? `<small class="stat-adjust">${up}${down}</small>` : '';
-        const name = ['move', 'held_item', 'ability'].includes(category)
-          ? effectButton(category, toId(r.name), label)
-          : esc(label);
-        const trailing = teammate
-          ? `<span class="row-arrow">${target ? '↗' : '—'}</span>`
-          : `<span class="stat-percent${percentClass(r.percent)}">${percentageText(r.percent)}</span>`;
-        const inner =
-          `<span class="stat-rank">${r.rank}</span>` +
-          `${teammate && target ? `<span class="team-portrait">${portrait(target)}</span>` : ''}` +
-          `${category === 'held_item' ? itemArtwork(r.name) : ''}` +
-          `<span class="stat-name"><strong>${name}</strong>${sub}` +
-          `${teammate && !target ? '<small>이 시즌 목록에 없음</small>' : ''}</span>` +
-          trailing;
-        return target
-          ? `<button class="stat-row teammate-row" data-pokemon="${target.id}"` +
-              ` aria-label="${esc(label)} 통계 보기">${inner}</button>`
-          : `<div class="stat-row">` +
-              `<span class="stat-bar" style="width:${r.percent ?? 0}%" aria-hidden="true"></span>` +
-              `${inner}</div>`;
-      })
-      .join('') +
-    `</div><p class="category-tip">${tips[category]}</p>`;
+    statRows(rows, {
+      category,
+      locale: state.locale,
+      reference: state.reference,
+      list: state.list,
+    });
 }
 
 function updateLearnset() {
@@ -491,12 +358,10 @@ async function load(force = false) {
   controls();
   sourceStatus();
   notice('');
-  $('ranking').innerHTML =
-    '<div class="empty-state"><span class="loading-ring"></span><p>통계를 불러오는 중</p></div>';
+  $('ranking').innerHTML = loadingState('통계를 불러오는 중');
   $('count').textContent = '—';
   $('load-more').hidden = true;
-  $('detail').innerHTML =
-    '<div class="empty-state"><span class="loading-ring"></span><p>선택한 시즌의 자료를 확인하고 있어요.</p></div>';
+  $('detail').innerHTML = loadingState('선택한 시즌의 자료를 확인하고 있어요.');
   try {
     if (!state.locale) {
       const response = await fetch('./public/data/ko.json');
@@ -532,10 +397,20 @@ async function load(force = false) {
     state.limit = 30;
     savePreference('season', state.season);
     savePreference('format', state.format);
+    const messages = [];
     if (state.stale)
-      notice(
-        `새 자료를 확인하지 못해 ${formatDate(state.snapshot.date)}의 이전 통계를 표시합니다. 표시된 날짜와 시각은 해당 이전 자료 기준입니다.`,
+      messages.push(
+        `새 자료를 확인하지 못해 ${formatDate(state.snapshot.date)}의 이전 통계를 표시합니다.` +
+          ` 표시된 날짜와 시각은 해당 이전 자료 기준입니다.`,
       );
+    // A partial read is shown, never silently trimmed.
+    const skipped = state.snapshot.skipped?.length ?? 0;
+    if (skipped)
+      messages.push(
+        `자료 형식을 확인할 수 없는 ${skipped}마리를 목록에서 제외했습니다.` +
+          ` 제외한 항목의 통계는 표시하지 않습니다.`,
+      );
+    notice(messages.join(' '));
     const fromUrl = new URLSearchParams(location.hash.slice(1)).get('pokemon');
     const selected = state.selected ?? fromUrl;
     if (selected && state.list.some(p => p.id === selected))
@@ -557,15 +432,9 @@ async function load(force = false) {
     if (requestId !== state.requestId) return;
     const message =
       error.name === 'TimeoutError' ? '통계 서버의 응답이 늦어지고 있습니다.' : error.message;
-    $('ranking').innerHTML =
-      `<div class="empty-state error-state"><span class="empty-symbol">↻</span>` +
-      `<h3>통계를 불러오지 못했어요</h3>` +
-      `<p>네트워크 연결과 통계 제공처 상태를 확인해 주세요.</p>` +
-      `<p class="error-detail">${esc(message)}</p>` +
-      `<button id="retry" class="primary-button">다시 시도</button></div>`;
+    $('ranking').innerHTML = errorState(message);
     $('retry').onclick = () => load(true);
-    $('detail').innerHTML =
-      '<div class="detail-placeholder"><h2>자료를 기다리고 있어요</h2><p>조회가 완료되면 통계를 확인할 수 있습니다.</p></div>';
+    $('detail').innerHTML = detailWaiting();
     document.body.classList.remove('detail-open');
   } finally {
     if (requestId === state.requestId) {
@@ -612,40 +481,11 @@ const GENERATION_LABELS = Object.fromEntries(
 const GIMMICK_LABELS = { none: '기믹 없음', mega: '메가진화' };
 const MOVE_CATEGORIES = { Physical: '물리', Special: '특수', Status: '변화' };
 let filterKind = 'ranking';
-function filterGroup(id, key, title, options, current, mode = 'or', disabled = false) {
+// Binds the pure markup builder to the current state.
+function group(id, key, title, options, current, mode = 'or', disabled = false) {
   const values = filterValues(current);
-  const summary = disabled
-    ? state.refError
-      ? '정보 불러오기 실패'
-      : '불러오는 중'
-    : filterSummary(values, options, mode) || '전체';
-  const modes = [
-    ['or', '하나라도 (OR)'],
-    ['and', '모두 (AND)'],
-  ]
-    .map(
-      ([value, label]) =>
-        `<label><input type="radio" name="${id}-mode" value="${value}"` +
-        ` ${mode === value ? 'checked' : ''}><span>${label}</span></label>`,
-    )
-    .join('');
-  const choices = Object.entries(options)
-    .map(
-      ([value, label]) =>
-        `<label><input type="checkbox" data-choice value="${value}" data-label="${esc(label)}"` +
-        ` ${values.includes(value) ? 'checked' : ''}><span>${esc(label)}</span></label>`,
-    )
-    .join('');
-  return (
-    `<details id="${id}" class="filter-group" data-filter-group="${key}">` +
-    `<summary><strong>${title}</strong>` +
-    `<span data-group-summary>${esc(summary)}</span></summary>` +
-    `<fieldset aria-label="${title}" ${disabled ? 'disabled' : ''}>` +
-    `<div class="filter-mode" role="group" aria-label="${title} 조건 결합">${modes}</div>` +
-    `<div class="filter-choices">${choices}</div>` +
-    `<button type="button" class="filter-group-clear" data-clear-group>선택 해제</button>` +
-    `</fieldset></details>`
-  );
+  const summary = groupSummary({ disabled, refError: state.refError, values, options, mode });
+  return filterGroup(id, key, title, options, values, mode, disabled, summary);
 }
 function groupValues(group) {
   return [...group.querySelectorAll('[data-choice]:checked')].map(input => input.value);
@@ -657,23 +497,22 @@ function updateGroupSummary(group) {
   const labels = Object.fromEntries(
     [...group.querySelectorAll('[data-choice]')].map(input => [input.value, input.dataset.label]),
   );
-  group.querySelector('[data-group-summary]').textContent = group.querySelector('fieldset').disabled
-    ? state.refError
-      ? '정보 불러오기 실패'
-      : '불러오는 중'
-    : filterSummary(groupValues(group), labels, groupMode(group)) || '전체';
+  group.querySelector('[data-group-summary]').textContent = groupSummary({
+    disabled: group.querySelector('fieldset').disabled,
+    refError: state.refError,
+    values: groupValues(group),
+    options: labels,
+    mode: groupMode(group),
+  });
 }
 function openFilters(kind) {
   filterKind = kind;
   const ranking = kind === 'ranking';
   $('filter-title').textContent = ranking ? '랭킹 필터' : '배우는 기술 필터';
-  const help =
-    '<p class="category-tip filter-help">항목을 펼쳐 여러 값을 선택하세요.' +
-    ' 항목 안에서는 AND/OR를 선택하고, 서로 다른 항목의 조건은 모두 만족해야 합니다.</p>';
   $('filter-fields').innerHTML =
-    help +
+    filterHelp() +
     (ranking
-      ? filterGroup(
+      ? group(
           'generation-filter',
           'generation',
           '세대',
@@ -681,8 +520,8 @@ function openFilters(kind) {
           state.generation,
           state.rankModes.generation,
         ) +
-        filterGroup('type-filter', 'type', '타입', TYPE_LABELS, state.type, state.rankModes.type) +
-        filterGroup(
+        group('type-filter', 'type', '타입', TYPE_LABELS, state.type, state.rankModes.type) +
+        group(
           'gimmick-filter',
           'gimmick',
           '기믹',
@@ -691,12 +530,8 @@ function openFilters(kind) {
           state.rankModes.gimmick,
           !state.reference,
         ) +
-        `<div class="filter-footer-note"><label class="filter-checkbox">` +
-        `<input id="filter-favorite" type="checkbox" name="favorite"` +
-        ` ${state.favoriteOnly ? 'checked' : ''}>즐겨찾기만 보기</label>` +
-        `<p class="category-tip">세대는 원종이 처음 등장한 세대를 기준으로 합니다.<br>` +
-        `타입은 메가진화 전의 폼을 기준으로 합니다.</p></div>`
-      : filterGroup(
+        rankingFilterFooter(state.favoriteOnly)
+      : group(
           'learnset-type',
           'type',
           '타입',
@@ -704,7 +539,7 @@ function openFilters(kind) {
           state.learnType,
           state.learnModes.type,
         ) +
-        filterGroup(
+        group(
           'learnset-category',
           'category',
           '분류',
@@ -712,7 +547,7 @@ function openFilters(kind) {
           state.learnCategory,
           state.learnModes.category,
         ) +
-        filterGroup(
+        group(
           'learnset-trait',
           'trait',
           '기술 성질',
