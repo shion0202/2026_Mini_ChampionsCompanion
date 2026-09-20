@@ -286,3 +286,32 @@ export const looksRelevant = title => {
   // 【M-5:36位】처럼 最終이 없는 표기를 한쪽만 알아보는 일이 생긴다.
   return parseTitle(text).rank !== null || /ポケモン|ポケチャン|構築|포켓몬|구축/.test(text);
 };
+
+// robots.txt가 AI 목적 수집을 금지한 호스트다. 검색 결과에는 섞여 들어오므로
+// 기억에 맡기지 않고 여기서 막는다. 근거는 각 사이트의 robots.txt다.
+//   blog.naver.com / m.blog.naver.com — RAG 목적 수집 금지, ClaudeBot 지정
+//   cafe.naver.com                    — User-agent: * 에 Disallow: /
+//   champs.pokedb.tokyo               — ClaudeBot, Claude-SearchBot 지정
+// 포케DB 목록은 사람이 직접 보고 주소를 넘기는 쪽으로 쓴다.
+const FORBIDDEN_HOSTS = [
+  'blog.naver.com',
+  'm.blog.naver.com',
+  'cafe.naver.com',
+  'champs.pokedb.tokyo',
+];
+
+export const isFetchable = url => {
+  if (!looksLikeArticle(url)) return false;
+  const host = new URL(url).host.replace(/^www\./, '');
+  return !FORBIDDEN_HOSTS.some(blocked => host === blocked || host.endsWith(`.${blocked}`));
+};
+
+export function googleLinks(body) {
+  const payload = JSON.parse(body);
+  if (payload.error) throw Error(`${payload.error.code}: ${payload.error.message}`);
+  return (payload.items ?? []).map(item => ({
+    title: flatten(item.title ?? ''),
+    url: (item.link ?? '').trim(),
+    date: null,
+  }));
+}

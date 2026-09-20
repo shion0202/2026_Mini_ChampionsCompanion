@@ -68,9 +68,48 @@
 블로그 첫 페이지도 걸러낸다. 포켓몬 이름이 잔뜩 있어 후보 수 검사를 통과해
 버리므로 주소의 경로가 비어 있으면 기사가 아닌 것으로 본다.
 
+### 받아오지 않는 곳
+
+`robots.txt`로 AI 목적 수집을 금지한 사이트는 받지 않는다. 검색 결과에 섞여
+들어오므로 기억에 맡기지 않고 `isFetchable`이 코드로 막는다.
+
+| 호스트 | robots.txt |
+| --- | --- |
+| `champs.pokedb.tokyo` | `ClaudeBot`, `Claude-SearchBot`에 `Disallow: /` |
+| `blog.naver.com`, `m.blog.naver.com` | RAG 목적 수집 금지를 명시하고 `ClaudeBot` 지정 |
+| `cafe.naver.com` | `User-agent: *`에 `Disallow: /` |
+
+User-Agent를 바꾸면 기술적으로는 받아진다. 하지 않는다. 사이트가 AI에게 주지
+않겠다고 밝힌 것을 이름만 바꿔 가져오는 것이기 때문이다.
+
+이 때문에 **네이버 검색 오픈 API는 쓰지 않는다.** 검색 API 자체는 열려 있지만
+돌려주는 것은 주소와 두어 줄 요약뿐이고, 여섯 마리를 뽑으려면 본문이 필요한데
+본문 수집이 금지되어 있다. 포케DB 목록도 마찬가지로, 쓰려면 사람이 직접 보고
+주소를 넘기는 수밖에 없다.
+
+`note.com`은 `/search`와 `/api/*`를 모두에게 막는다. 검색은 못 쓰지만 개별
+기사 주소는 받아도 된다. `yakkun.com`은 `ChatGPT-User`를 막는다. Claude를
+지목하지는 않았으나 사용자 요청형 에이전트를 막은 곳이라 쓰지 않는다.
+
 ### 소스
 
-하테나 북마크 검색 RSS 하나로 시작한다.
+두 채널을 쓴다. 한쪽이 죽어도 다른 쪽으로 돈다.
+
+**구글 Custom Search JSON API** — 색인이 북마크 여부와 무관해 재현율이 높다.
+`GOOGLE_API_KEY`와 `GOOGLE_CSE_ID` 환경변수가 있을 때만 돈다. 없으면 이 채널만
+건너뛴다. 무료 한도가 하루 100건이라 쿼리당 두 쪽(20건)까지만 본다.
+
+- 키: Google Cloud Console에서 **Custom Search API**를 켜고 API 키를 만든다
+- 엔진 ID: Programmable Search Engine에서 엔진을 만들고 **전체 웹 검색**을 켠 뒤
+  Search engine ID를 복사한다
+
+```powershell
+$env:GOOGLE_API_KEY = "..."
+$env:GOOGLE_CSE_ID = "..."
+npm run articles -- --season M5 --format singles
+```
+
+**하테나 북마크 검색 RSS** — 키가 필요 없다.
 
 ```
 https://b.hatena.ne.jp/q/<검색어>?mode=rss&target=text&users=1&sort=recent
@@ -80,9 +119,10 @@ https://b.hatena.ne.jp/q/<검색어>?mode=rss&target=text&users=1&sort=recent
 빠진다. 측정에서 40건과 4건으로 갈렸으므로 `users=1`을 반드시 붙인다.
 `/search/text` 경로는 이 주소로 301 이동한다.
 
-X(트위터)는 무료 경로가 없어 제외한다. 하테나가 못 잡는 소스가 확인되면 그때
-어댑터를 `{ name, searchUrl(query), links(body) }` 형태로 추가한다. 지금 미리
-만들지 않는다.
+누군가 북마크한 글만 들어 있어 재현율이 낮다. M-5 실측에서 목록에 300건이 있는데
+21건만 보였다. 구글 채널이 이것을 메운다.
+
+X(트위터)는 무료 경로가 없어 제외한다.
 
 ### 요청 규칙
 

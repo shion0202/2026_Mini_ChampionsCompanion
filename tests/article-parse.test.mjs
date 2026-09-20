@@ -5,6 +5,8 @@ import { readFile } from 'node:fs/promises';
 import {
   buildIndex,
   digest,
+  googleLinks,
+  isFetchable,
   normalize,
   parseTitle,
   readPage,
@@ -328,4 +330,43 @@ test('a rating is never mistaken for a rank', () => {
   // レート나 점수는 네 자리다. 最終 없이 숫자만 있을 때는 세 자리까지만 받는다.
   assert.equal(parseTitle('M-5:2538/2515 お願いサザングロス').rank, null);
   assert.equal(parseTitle('【M-5】レート2579 力戦奮闘').rank, null);
+});
+
+test('hosts that forbid AI fetching are never queued', () => {
+  // 셋 다 robots.txt에 근거가 있다. 네이버는 RAG 목적 수집을 금지하며 ClaudeBot을
+  // 이름으로 적었고, 카페는 User-agent: *에 Disallow: /다. 포케DB도 ClaudeBot과
+  // Claude-SearchBot을 막는다. 검색 결과에 섞여 들어오므로 코드로 거른다.
+  assert.equal(isFetchable('https://blog.naver.com/someone/223456789'), false);
+  assert.equal(isFetchable('https://m.blog.naver.com/someone/223456789'), false);
+  assert.equal(isFetchable('https://cafe.naver.com/pokemon/12345'), false);
+  assert.equal(isFetchable('https://champs.pokedb.tokyo/article/search'), false);
+
+  assert.equal(isFetchable('https://reboiona.hatenablog.com/entry/2026/09/10/174818'), true);
+  assert.equal(isFetchable('https://note.com/sazanami_373/n/nf8906dd66238'), true);
+  assert.equal(isFetchable('https://pokesol.app/u/x/articles/abc'), true);
+  assert.equal(isFetchable('내용 없음'), false);
+});
+
+test('googleLinks reads the custom search payload', () => {
+  const payload = JSON.stringify({
+    items: [
+      {
+        title: '【M-5】神速ルカリザスタン【最終2位】 - 人生詰みサイクル',
+        link: 'https://reboiona.hatenablog.com/entry/2026/09/10/174818',
+        snippet: 'どうも、reboです。',
+      },
+      { title: '무제', link: 'https://example.com/a' },
+    ],
+  });
+  const links = googleLinks(payload);
+  assert.equal(links.length, 2);
+  assert.equal(links[0].url, 'https://reboiona.hatenablog.com/entry/2026/09/10/174818');
+  assert.equal(links[0].title, '【M-5】神速ルカリザスタン【最終2位】 - 人生詰みサイクル');
+  assert.equal(links[0].date, null);
+  assert.deepEqual(googleLinks(JSON.stringify({})), [], '결과 없음은 오류가 아니다');
+});
+
+test('googleLinks surfaces the quota error instead of returning nothing', () => {
+  const payload = JSON.stringify({ error: { code: 429, message: 'Quota exceeded' } });
+  assert.throws(() => googleLinks(payload), /Quota exceeded/);
 });

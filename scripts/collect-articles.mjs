@@ -7,10 +7,11 @@ import {
   readPage,
   digest,
   parseTitle,
-  looksLikeArticle,
+  isFetchable,
   looksRelevant,
   searchQueries,
   rssLinks,
+  googleLinks,
 } from './article-parse.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -34,9 +35,18 @@ const format = argument('format');
 const wanted = format ? (format.toLowerCase().startsWith('d') ? 'Doubles' : 'Singles') : null;
 
 // 하테나 북마크는 note, pokesol, fc2, 개인 도메인 기사를 모두 색인한다. users 기본값이
-// 3이라 그대로 두면 북마크가 적은 개인 구축기사가 거의 전부 빠진다.
+// 3이라 그대로 두면 북마크가 적은 개인 구축기사가 거의 전부 빠진다. 다만 누군가
+// 북마크한 글만 들어 있어 재현율이 낮다. M-5 실측에서 300건 중 21건만 보였다.
 const feedUrl = query =>
   `https://b.hatena.ne.jp/q/${encodeURIComponent(query)}?mode=rss&target=text&users=1&sort=recent`;
+
+// 구글 색인은 북마크 여부와 무관해 재현율이 훨씬 높다. 키가 없으면 이 채널만
+// 건너뛰고 하테나로 계속 돈다.
+const GOOGLE_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_CSE = process.env.GOOGLE_CSE_ID;
+const googleUrl = (query, start) =>
+  `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_KEY}&cx=${GOOGLE_CSE}` +
+  `&q=${encodeURIComponent(query)}&num=10&start=${start}`;
 
 async function fetchText(url) {
   const response = await fetch(url, {
@@ -72,24 +82,55 @@ const index = buildIndex(reference, ko);
 const known = new Set(existing.articles.map(article => article.url));
 
 const found = new Map();
+let forbidden = 0;
+const take = link => {
+  if (!link.url || known.has(link.url) || found.has(link.url)) return;
+  if (!isFetchable(link.url)) {
+    forbidden++;
+    return;
+  }
+  if (looksRelevant(link.title)) found.set(link.url, link);
+};
+
+const queries = searchQueries({ season });
+const channels = [];
+
+if (GOOGLE_KEY && GOOGLE_CSE) {
+  let hits = 0;
+  for (const query of queries) {
+    // 무료 한도가 하루 100건이라 쿼리당 두 쪽(20건)까지만 본다.
+    for (const start of [1, 11]) {
+      try {
+        const links = googleLinks(await fetchText(googleUrl(query, start)));
+        links.forEach(take);
+        hits += links.length;
+        if (links.length < 10) break;
+      } catch (error) {
+        console.error(`구글 검색 실패 (${query}): ${error.message}`);
+        break;
+      }
+      await wait(PAUSE);
+    }
+  }
+  channels.push(`구글 ${queries.length}쿼리 ${hits}건`);
+} else {
+  channels.push('구글 건너뜀 (GOOGLE_API_KEY, GOOGLE_CSE_ID 없음)');
+}
+
 let feeds = 0;
-for (const query of searchQueries({ season })) {
+for (const query of queries) {
   try {
-    for (const link of rssLinks(await fetchText(feedUrl(query))))
-      if (
-        looksLikeArticle(link.url) &&
-        looksRelevant(link.title) &&
-        !known.has(link.url) &&
-        !found.has(link.url)
-      )
-        found.set(link.url, link);
+    rssLinks(await fetchText(feedUrl(query))).forEach(take);
     feeds++;
   } catch (error) {
-    console.error(`검색 실패 (${query}): ${error.message}`);
+    console.error(`하테나 검색 실패 (${query}): ${error.message}`);
   }
   await wait(FEED_PAUSE);
 }
-console.log(`검색 ${feeds}회로 후보 ${found.size}건`);
+channels.push(`하테나 ${feeds}쿼리`);
+
+console.log(channels.join(' | '));
+console.log(`후보 ${found.size}건` + (forbidden ? `, 수집 금지 호스트 ${forbidden}건 제외` : ''));
 
 const slug = value =>
   (value ?? '')
