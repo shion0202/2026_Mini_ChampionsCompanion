@@ -256,3 +256,28 @@ test('shared size and color form learnsets are resolved from Champions personal 
     assert.equal(data.species[id].learnsetSource, 'champout');
   }
 });
+
+test('mega stones name the form they produce, in both directions', () => {
+  assert.equal(data.held_item.gengarite.megaStone, 'gengarmega');
+  assert.equal(data.held_item.charizarditex.megaStone, 'charizardmegax');
+  assert.equal(data.held_item.charizarditey.megaStone, 'charizardmegay');
+  // 설명문이 폼을 밝히지 않는 짝이라 이 필드가 필요하다.
+  assert.equal(data.held_item.mewtwonitex.megaStone, 'mewtwomegax');
+  assert.equal(data.held_item.mewtwonitey.megaStone, 'mewtwomegay');
+  // 챔피언스가 더한 Z 메가도 같은 경로로 잡힌다.
+  assert.equal(data.held_item.garchompitez.megaStone, 'garchompmegaz');
+
+  const stones = Object.entries(data.held_item).filter(([, v]) => v.megaStone);
+  assert.ok(stones.length > 80, `메가스톤이 ${stones.length}개뿐`);
+  for (const [key, value] of stones) {
+    const form = data.species[value.megaStone];
+    assert.ok(form, `${key} -> ${value.megaStone} 종족이 없음`);
+    // 대부분 Mega, Mega-X 꼴이지만 폼이 나뉜 종족은 M-Mega, Curly-Mega처럼 앞에 붙는다.
+    assert.ok(/Mega/.test(form.forme), `${key} -> ${value.megaStone}가 메가 폼이 아님`);
+  }
+  // 폼이 나뉜 종족도 스톤 하나로 잡힌다. 니야오닉스는 챔피언스 등장 종족이다.
+  assert.equal(data.held_item.meowsticite.megaStone, 'meowsticmmega');
+  // 폼에서 스톤으로 되짚을 때 겹치지 않아야 한다.
+  const forms = stones.map(([, v]) => v.megaStone);
+  assert.equal(new Set(forms).size, forms.length, '두 스톤이 같은 폼을 가리킴');
+});

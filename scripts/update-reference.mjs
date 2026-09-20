@@ -157,6 +157,10 @@ for (const [category, file, description, records] of [
             ? abilityNumbers.has(record.num)
             : itemNumbers.has(record.num) && id(en[record.num] ?? '') === id(record.name),
     };
+    // Showdown은 메가스톤을 { "Gengar": "Gengar-Mega" } 한 칸짜리 맵으로 준다.
+    // 한국어 설명문은 뮤츠나이트X/Y처럼 폼을 밝히지 않는 짝이 있어 대신할 수 없다.
+    if (category === 'held_item' && record.megaStone)
+      result[category][key].megaStone = id(Object.values(record.megaStone)[0]);
     if (category === 'move')
       Object.assign(result[category][key], {
         type: record.type,

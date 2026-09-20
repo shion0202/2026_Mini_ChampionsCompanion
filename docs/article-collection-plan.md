@@ -125,7 +125,7 @@ process.exit(a === b ? 0 : 1);
 node .cache/check-mega.mjs
 ```
 
-기대: `megaStone 외에는 동일` 과 `megaStone이 붙은 도구: 93`. 다르게 나오면 상류가 움직였다는 뜻이므로 `git checkout public/data/reference.json`으로 되돌리고 원인을 먼저 확인한다.
+기대: `megaStone 외에는 동일` 과 `megaStone이 붙은 도구: 92`. Showdown 원본에는 93개가 있지만 `crucibellite`는 CAP(가상 포켓몬) 도구라 `reference.json`에 들어오지 않는다. 다르게 나오면 상류가 움직였다는 뜻이므로 `git checkout public/data/reference.json`으로 되돌리고 원인을 먼저 확인한다.
 
 - [ ] **Step 7: 테스트가 통과하는지 확인한다**
 
