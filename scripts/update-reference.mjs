@@ -5,9 +5,10 @@ import { moveTraits } from '../src/move-traits.js';
 import { supplementCatalog } from './reference-catalog.mjs';
 import {
   supplementZaItems,
+  loadSvCorpus,
   loadZaCatalog,
-  applyZaNames,
-  applyZaEffects,
+  applyNames,
+  applyEffects,
   supplementGigantamax,
 } from './rom-text.mjs';
 const SHOWDOWN = '2ddfa0476f8207e12e204b1c69f7c7683b17633c';
@@ -239,16 +240,21 @@ for (const [name, value] of Object.entries(chart)) {
 }
 // ROM text first: it is the localised wording from the games these entries are
 // actually from. PokéAPI then fills whatever is still blank.
-const catalog = await loadZaCatalog(get);
-const zaNames = applyZaNames(result, catalog);
+const [sv, za] = await Promise.all([loadSvCorpus(get), loadZaCatalog(get)]);
+const svNames = applyNames(result, sv);
+const zaNames = applyNames(result, za);
 const zaFilled = await supplementZaItems(result, getBuffer);
 const gmaxFilled = await supplementGigantamax(result, getBuffer);
-// PokéAPI carries the main-series wording, which describes turn-based battles the
-// way Champions does. Z-A only fills what no main-series game has: generation 9.
+// Descriptions run newest turn-based first. Scarlet and Violet is the main-series
+// wording Champions follows; PokéAPI stops at Sword and Shield; Z-A comes last
+// because it rewrote descriptions for its own real-time battles.
+const svEffects = applyEffects(result, sv, 'scarlet-violet');
 await supplementCatalog(result, get);
-const zaEffects = applyZaEffects(result, catalog);
+const zaEffects = applyEffects(result, za, 'legends-za');
 console.log(
-  `Z-A names: ${JSON.stringify(zaNames)} | Z-A effects: ${JSON.stringify(zaEffects)} | Z-A item fallback: ${zaFilled} | Gigantamax: ${gmaxFilled}`,
+  `names SV ${JSON.stringify(svNames)} Z-A ${JSON.stringify(zaNames)} | ` +
+    `effects SV ${JSON.stringify(svEffects)} Z-A ${JSON.stringify(zaEffects)} | ` +
+    `Z-A item fallback ${zaFilled} | Gigantamax ${gmaxFilled}`,
 );
 await mkdir(new URL('public/data/', root), { recursive: true });
 await writeFile(new URL('public/data/reference.json', root), JSON.stringify(result));

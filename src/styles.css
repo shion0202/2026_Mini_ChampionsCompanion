@@ -2606,11 +2606,18 @@ select optgroup {
 }
 
 /* Standalone move, item and ability index. */
+/* The ranking sits under the toolbar's rule; these views hide the toolbar, so they
+   draw the same line to keep the separation from the intro. */
+.dex-panel,
+.type-chart-panel {
+  border-top: 1px solid var(--line);
+  padding-top: 17px;
+}
 .dex-panel {
   display: grid;
   gap: 12px;
   align-content: start;
-  padding: 16px 0 24px;
+  padding: 17px 0 24px;
 }
 .dex-panel #dex-kinds .segmented {
   width: 100%;
@@ -2709,7 +2716,7 @@ select optgroup {
   border-radius: 10px;
 }
 .type-chart-panel {
-  padding: 16px 0 24px;
+  padding: 17px 0 24px;
   min-width: 0;
 }
 .type-chart-switch {

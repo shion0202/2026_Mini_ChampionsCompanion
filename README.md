@@ -90,11 +90,13 @@ node scripts/verify-browser.mjs
 
 부족한 한국어 이름·설명은 아래 순서로 보완합니다. 모두 리비전을 고정하며, 챔피언스 자체 텍스트가 있으면 덮어쓰지 않습니다.
 
-이름과 설명은 우선순위가 다릅니다. 이름은 가장 최근의 공식 한국어 표기를, 설명은 턴제 배틀을 기준으로 쓴 본가 문구를 먼저 씁니다.
+스칼렛·바이올렛을 먼저 씁니다. 챔피언스와 같은 턴제 배틀을 다루는 가장 최근 본가 작품이기 때문입니다. 순서는 다음과 같으며, 모두 리비전을 고정합니다.
 
-1. 이름 — Legends Z-A 덤프([plza-text](https://github.com/CPokemon/plza-text))를 먼저 씁니다. 여기에 없는 Z-A 메가스톤은 [za-textport](https://github.com/projectpokemon/za-textport)로 보충하고, 거다이맥스 기술은 소드·실드 덤프([swsh-text](https://github.com/CPokemon/swsh-text))에서 가져옵니다. PokéAPI는 다이맥스 기술 19개만 수록하고 거다이맥스는 다루지 않습니다.
-2. 설명 — 고정 PokéAPI 버전(`scripts/reference-catalog.mjs`)을 먼저 씁니다. Z-A는 실시간 배틀에 맞춰 설명을 고쳐 써서, 예컨대 칼춤을 `한동안 자신의 공격을 올린다`로 적습니다. 턴제인 챔피언스에는 본가의 `공격을 2단계 올린다` 쪽이 맞습니다.
-3. 그래도 비어 있으면 Z-A 설명을 씁니다. 스칼렛·바이올렛 텍스트 덤프는 공개된 것이 없어, 9세대 항목의 한국어 설명은 Z-A가 유일한 출처입니다.
+1. [poke-corpus](https://github.com/abcboy101/poke-corpus)의 스칼렛·바이올렛 텍스트. 언어별 파일 옆에 식별자 열이 있어 `sv.tokusei.TOKUSEI_281`과 `sv.tokuseiinfo.TOKUSEIINFO_281`처럼 항목 자체의 ID로 연결합니다. 줄 순서에 기대지 않습니다.
+2. 고정 PokéAPI 버전(`scripts/reference-catalog.mjs`). 한국어 텍스트가 소드·실드까지 있습니다.
+3. Legends Z-A 덤프([plza-text](https://github.com/CPokemon/plza-text)). Z-A는 실시간 배틀에 맞춰 설명을 고쳐 써서 칼춤을 `한동안 자신의 공격을 올린다`로 적습니다. 턴제에는 `공격을 2단계 올린다` 쪽이 맞으므로 마지막에 둡니다.
+
+세 출처에 없는 항목은 따로 채웁니다. 거다이맥스 기술은 소드·실드 덤프([swsh-text](https://github.com/CPokemon/swsh-text))에서 가져오며, PokéAPI는 다이맥스 기술 19개만 수록하고 거다이맥스는 다루지 않습니다. Z-A에서 처음 등장한 메가스톤 중 일부는 [za-textport](https://github.com/projectpokemon/za-textport)에만 이름이 있습니다.
 
 챔피언스 자체 텍스트가 있으면 어느 단계에서도 덮어쓰지 않습니다. 화면에서는 다른 작품에서 가져온 설명에 출처를 함께 표시합니다.
 
@@ -102,7 +104,7 @@ Showdown이 폼별로 나눈 항목(`As One (Glastrier)`, `Embody Aspect (Teal)`
 
 실제로 존재할 수 없는 항목은 목록에서 제외합니다. 2세대에서 삭제된 뒤 복귀하지 않은 도구, Showdown이 타입별로 나눈 잠재파워(게임의 단일 기술만 남깁니다), 빈 슬롯을 뜻하는 No Ability가 이에 해당합니다.
 
-남은 결손은 스칼렛·바이올렛 전용 항목입니다. Z-A에도 소드·실드에도 없어 한국어 설명을 구할 수 없습니다. 챔피언스 수록 항목에는 결손이 없습니다.
+남은 결손은 기술 1개와 도구 5개입니다. 도구 5개는 Z-A에서 처음 나온 메가스톤이라 스칼렛·바이올렛에 설명이 없습니다. 챔피언스 수록 항목에는 결손이 없습니다.
 
 포켓몬 상세 이전 이동은 기본 정보로 초기화하는 기존 정책에 맞춰 스크롤도 맨 위로 이동합니다. 브라우저의 자동 스크롤 복원을 끄고 랭킹 목록 복귀 스크롤만 직접 관리합니다.
 

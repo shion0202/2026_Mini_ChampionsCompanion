@@ -8,6 +8,9 @@
 // plza-text: Legends Z-A again, with the descriptions za-textport does not carry.
 //   This is the only source of Korean text for generation 9 entries, because
 //   PokéAPI's Korean flavour text stops at Sword and Shield.
+// poke-corpus: Scarlet and Violet. The turn-based main-series wording Champions
+//   follows, so it goes first for descriptions.
+export const SV_CORPUS = 'cda9f773d1a35650f74ae4f7a02c0f67ce7c624b';
 export const ZA_TEXTPORT = '0eb14d75de5282f33b783854e1a5aca8c168d83c';
 export const PLZA_TEXT = '3f149c41285b9fb290ab0b303d578545f569b663';
 export const SWSH_TEXT = '76c6e4d50003403991ee00b282f7b6e77bf84b11';
@@ -20,7 +23,10 @@ const table = text =>
     .map(line => line.split('\t'))
     .filter(fields => fields.length >= 4)
     .map(fields => ({ label: fields[2], text: fields.slice(3).join('\t').trim() }));
-const readable = value => value && !/^\[~\s*\d+\]$/.test(value);
+// "[~ 123]" marks an entry with no text of its own; "[VAR ...]" and friends are
+// control codes the game fills in at runtime, which cannot be shown as prose.
+const readable = value =>
+  value && !/^\[~\s*\d+\]$/.test(value) && !/\[(VAR|WAIT|SFX)\b/.test(value);
 const unescapeBreaks = value => value.replace(/\\n/g, '\n').trim();
 
 const key = text =>
@@ -108,8 +114,8 @@ export async function loadZaCatalog(getText) {
 const lookup = (byName, name) =>
   byName.get(key(name)) ?? byName.get(key(name.replace(/\s*\(.*\)\s*$/, '')));
 
-// Names come from Z-A because it is the most recent official Korean wording.
-export function applyZaNames(result, catalog) {
+// Both catalogues are keyed the same way, so one pair of appliers serves both.
+export function applyNames(result, catalog) {
   const filled = { ability: 0, held_item: 0, move: 0 };
   for (const kind of Object.keys(catalog))
     for (const record of Object.values(result[kind])) {
@@ -121,10 +127,7 @@ export function applyZaNames(result, catalog) {
   return filled;
 }
 
-// Descriptions are a last resort: Z-A rewrote them for its own battle system, so
-// "한동안 자신의 공격을 올린다" replaces the turn-based "공격을 2단계 올린다".
-// This runs after PokéAPI so only entries no main-series game describes use them.
-export function applyZaEffects(result, catalog) {
+export function applyEffects(result, catalog, version) {
   const filled = { ability: 0, held_item: 0, move: 0 };
   for (const kind of Object.keys(catalog))
     for (const record of Object.values(result[kind])) {
@@ -132,10 +135,49 @@ export function applyZaEffects(result, catalog) {
       const found = lookup(catalog[kind], record.name);
       if (!readable(found?.effect)) continue;
       record.effect = unescapeBreaks(found.effect);
-      record.effectVersion = 'legends-za';
+      record.effectVersion = version;
       filled[kind]++;
     }
   return filled;
+}
+
+// poke-corpus keeps a query-id column beside the languages, so entries join by
+// their own identifier instead of by position: sv.tokusei.TOKUSEI_281 pairs with
+// sv.tokuseiinfo.TOKUSEIINFO_281.
+const SV_SECTIONS = [
+  ['ability', 'tokusei', 'tokuseiinfo'],
+  ['held_item', 'itemname', 'iteminfo'],
+  ['move', 'wazaname', 'wazainfo'],
+];
+
+export async function loadSvCorpus(getText) {
+  const base = `https://raw.githubusercontent.com/abcboy101/poke-corpus/${SV_CORPUS}/corpus/ScarletViolet/`;
+  const [english, korean, ids] = await Promise.all(
+    ['en_common.txt', 'ko_common.txt', 'qid_common.txt'].map(file =>
+      getText(base + file).then(text => text.split('\n')),
+    ),
+  );
+  if (english.length !== korean.length || english.length !== ids.length)
+    throw Error('poke-corpus columns are not aligned');
+  const rowById = new Map();
+  ids.forEach((id, row) => rowById.set(id.trim(), row));
+  const corpus = {};
+  for (const [kind, nameSection, infoSection] of SV_SECTIONS) {
+    const byName = new Map();
+    for (const [id, row] of rowById) {
+      if (!id.startsWith(`sv.${nameSection}.`)) continue;
+      const name = english[row]?.trim();
+      if (!name) continue;
+      const number = id.slice(id.lastIndexOf('_') + 1);
+      const infoRow = rowById.get(`sv.${infoSection}.${infoSection.toUpperCase()}_${number}`);
+      byName.set(key(name), {
+        label: korean[row]?.trim(),
+        effect: infoRow === undefined ? null : korean[infoRow]?.trim(),
+      });
+    }
+    corpus[kind] = byName;
+  }
+  return corpus;
 }
 
 // The dump concatenates the game's text files, each behind a "Text File : <name>"
