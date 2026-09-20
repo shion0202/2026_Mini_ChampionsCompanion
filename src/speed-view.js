@@ -20,8 +20,9 @@ export function renderSpeedRows(rows, { mode = 'base' } = {}) {
       .join('')}</div>`;
   // 네 열은 모두 같은 종족값에서 나오므로 어느 열을 기준으로 정렬해도 순서가
   // 같다. 그래서 기준 열을 고르는 장치를 두지 않는다.
+  // 표 위의 ‘N개 항목 표시’가 이미 무엇을 보고 있는지 알려주므로 설명을 더 두지
+  // 않는다. 표 자체는 화면의 제목과 모드 버튼으로 맥락이 잡힌다.
   return `<div class="speed-table-wrap"><table class="speed-table">
-    <caption>스피드 실수치 비교</caption>
     <thead><tr><th scope="col">포켓몬</th>${SPEED_PRESETS.map(
       p => `<th scope="col">${p.label}</th>`,
     ).join('')}</tr></thead>

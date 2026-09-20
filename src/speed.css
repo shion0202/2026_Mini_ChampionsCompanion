@@ -115,12 +115,6 @@
   font-weight: 400;
   color: var(--muted);
 }
-.speed-table caption {
-  text-align: left;
-  color: var(--muted);
-  font-size: 12px;
-  padding-bottom: 8px;
-}
 @media (max-width: 600px) {
   .speed-tier {
     grid-template-columns: 62px minmax(0, 1fr);
@@ -165,7 +159,7 @@
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 28px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
