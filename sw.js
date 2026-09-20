@@ -1,4 +1,4 @@
-const CACHE = 'champions-shell-v17';
+const CACHE = 'champions-shell-v21';
 const APP_FILES = [
   './',
   './index.html',
@@ -6,6 +6,8 @@ const APP_FILES = [
   './src/app.js',
   './src/app-view.js',
   './src/app-state.js',
+  './src/articles.js',
+  './src/articles-view.js',
   './src/html.js',
   './src/data.js',
   './src/api.js',
@@ -20,6 +22,7 @@ const APP_FILES = [
   './src/move-traits.js',
   './public/data/ko.json',
   './public/data/reference.json',
+  './public/data/articles.json',
   './public/icons/icon.svg',
   './public/icons/icon-192.png',
   './public/icons/icon-512.png',

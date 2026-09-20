@@ -91,7 +91,7 @@ export function rankingRows(visible, { selected, sort, favorites }) {
     .map(
       p => `<div class="pokemon-row ${selected === p.id ? 'selected' : ''}">
     <button class="pokemon-select" data-pokemon="${p.id}" aria-label="${esc(p.label)} ${p.rank}위 통계 보기" ${selected === p.id ? 'aria-current="true"' : ''}>
-      <span class="rank ${p.rank <= 3 ? 'rank-top' : ''}" aria-label="사용 순위 ${p.rank}위">${p.rank.toString().padStart(2, '0')}</span>
+      <span class="rank ${p.rank <= 6 ? 'rank-top' : ''}" aria-label="사용 순위 ${p.rank}위">${p.rank.toString().padStart(2, '0')}</span>
       <span class="portrait-wrap">${portrait(p)}</span>${pokemonInfo(p)}
     </button>
     <button class="favorite-button" data-favorite="${p.id}" aria-label="${esc(p.label)} 즐겨찾기" aria-pressed="${favorites.has(p.id)}">${favorites.has(p.id) ? '★' : '☆'}</button>

@@ -5,6 +5,8 @@ import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
 import { filterValues, filterSummary } from './filters.js';
 import { megaSprite } from './images.js';
+import { reviewedArticles, selectArticles } from './articles.js';
+import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
 import {
   renderReference,
@@ -53,7 +55,12 @@ import {
   sortLabel,
   activeFilters,
 } from './app-state.js';
-const DETAIL_LABELS = { overview: '기본 정보', ...CATEGORY_LABELS, learnset: '배우는 기술' };
+const DETAIL_LABELS = {
+  overview: '기본 정보',
+  ...CATEGORY_LABELS,
+  learnset: '배우는 기술',
+  articles: '구축기사',
+};
 
 const $ = id => document.getElementById(id);
 history.scrollRestoration = 'manual';
@@ -75,6 +82,9 @@ const saved = preferences(storage);
 const favorites = saved.favorites;
 const state = {
   page: 'ranking',
+  articleData: null,
+  articleError: false,
+  articleFilters: { season: null, format: 'Singles', query: '', pokemon: '' },
   typeChartMode: 'defense',
   defenseTypes: [],
   format: saved.format,
@@ -246,6 +256,35 @@ function renderDetail() {
   renderCategory();
 }
 
+// Tabs hold content of very different heights, so after a swap the page can sit
+// anywhere against the new panel: a short tab leaves the reader below it, a tall
+// one above. Pull the tab strip back under the header when it has drifted out of
+// reach, and leave the view alone when it is already in place so reading from the
+// top of the detail does not jump.
+const detailTabOffset = () => {
+  const tabs = document.querySelector('.detail-tabs');
+  const header = document.querySelector('.header');
+  if (!tabs || !header) return null;
+  return tabs.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+};
+// Whether the reader has scrolled past the top of the detail. Asked before the
+// swap, because afterwards the new content's height has already moved everything.
+// Measured on the panel rather than the tab strip: once the strip is pinned its
+// own offset is zero, and a test against that would skip every later switch.
+const readingDetail = () => {
+  const panel = $('detail');
+  const header = document.querySelector('.header');
+  if (!panel || !header) return false;
+  return panel.getBoundingClientRect().top < header.getBoundingClientRect().bottom;
+};
+// Put the tab strip back under the header. A short tab may not leave enough page
+// to scroll that far, and the browser clamps; the result is still the same place
+// every time, which is what makes the tabs usable one after another.
+function pinDetailTabs() {
+  const offset = detailTabOffset();
+  if (offset !== null) window.scrollTo(0, Math.max(0, window.scrollY + offset));
+}
+
 function renderCategory() {
   const p = selectedEntry();
   if (!p) return;
@@ -257,6 +296,15 @@ function renderCategory() {
     button.tabIndex = selected ? 0 : -1;
   });
   $('category-content').setAttribute('aria-labelledby', `tab-${category}`);
+  if (category === 'articles') {
+    const filters = { season: state.season, format: state.format, pokemon: p.id };
+    $('category-content').innerHTML =
+      `<div class="category-heading"><h3>구축기사</h3></div>
+      <p class="category-tip">${esc(articleSeasonLabel(state.season))} / ${state.format === 'Singles' ? '싱글배틀' : '더블배틀'} 기준입니다.</p>` +
+      articleContent(filters) +
+      `<button class="load-more" data-article-pokemon="${esc(p.id)}">이 포켓몬의 다른 시즌 기사 보기</button>`;
+    return;
+  }
   if (category === 'overview' || category === 'learnset') {
     if (!state.reference) {
       $('category-content').innerHTML = referenceStatus(state.refError);
@@ -386,6 +434,7 @@ function showPage(page) {
     ranking: 'workspace',
     dex: 'dex',
     types: 'type-chart',
+    articles: 'articles',
   })) {
     $(panel).hidden = page !== key;
     $(`${key}-link`).setAttribute('aria-pressed', String(page === key));
@@ -393,6 +442,67 @@ function showPage(page) {
   $('toolbar').hidden = page !== 'ranking';
   $('notice').hidden = page !== 'ranking' || !$('notice').textContent;
 }
+
+function articleContent(filters) {
+  if (state.articleError)
+    return '<div class="empty-state"><p>구축기사를 불러오지 못했습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
+  if (!state.articleData) return loadingState('구축기사를 불러오는 중');
+  if (!state.reference) return referenceStatus(state.refError);
+  if (!state.locale)
+    return '<div class="empty-state"><p>한국어 명칭을 준비하고 있습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
+  const rows = selectArticles(
+    reviewedArticles(state.articleData, state.reference),
+    filters,
+    state.reference,
+    state.locale,
+  );
+  return (
+    `<p class="article-count" role="status">${rows.length}건${filters.season ? ' (최종 순위순)' : ' (최근 시즌부터, 최종 순위순)'}</p>` +
+    renderArticleCards(rows, state.reference, state.locale, filters.pokemon)
+  );
+}
+
+function renderArticles() {
+  if (state.page !== 'articles') return;
+  const filters = state.articleFilters;
+  $('article-controls').innerHTML = articleControls(state.articleData?.articles ?? [], filters);
+  const species = state.reference?.species[filters.pokemon];
+  $('article-pokemon-filter').innerHTML = species
+    ? `<span>${esc(state.locale?.pokemon(species.name).label ?? species.name)} 채용 파티</span><button class="text-button" id="clear-article-pokemon">선택 해제</button>`
+    : '';
+  $('article-pokemon-filter').hidden = !species;
+  $('article-rows').innerHTML = articleContent(filters);
+}
+
+function openArticles({ navigate = true } = {}) {
+  showPage('articles');
+  if (navigate) history.pushState({ articles: true }, '', '#articles');
+  renderArticles();
+  window.scrollTo(0, 0);
+}
+
+async function loadArticles() {
+  state.articleError = false;
+  try {
+    const response = await fetch('./public/data/articles.json');
+    if (!response.ok) throw Error('Articles unavailable');
+    const data = await response.json();
+    if (!Array.isArray(data.articles)) throw Error('Invalid articles');
+    state.articleData = data;
+    if (state.articleFilters.season === null) {
+      state.articleFilters.season =
+        data.articles
+          .filter(a => a.review?.status === 'reviewed')
+          .map(a => a.season)
+          .sort((a, b) => Number(b.slice(1)) - Number(a.slice(1)))[0] ?? '';
+    }
+  } catch {
+    state.articleError = true;
+  }
+  renderArticles();
+  if (state.category === 'articles' && selectedEntry()) renderCategory();
+}
+
 function renderTypeChart() {
   if (state.page !== 'types') return;
   document
@@ -444,6 +554,7 @@ async function loadReference() {
     updateGroupSummary($('gimmick-filter'));
   }
   if (state.dex) renderDex();
+  renderArticles();
   renderTypeChart();
   if (selectedEntry()) renderCategory();
 }
@@ -497,6 +608,7 @@ async function load(force = false) {
       if (!response.ok) throw Error('한국어 명칭을 불러오지 못했습니다.');
       state.locale = createLocale(await response.json());
       if (state.dex) renderDex();
+      renderArticles();
     }
     let indexResult;
     try {
@@ -533,7 +645,7 @@ async function load(force = false) {
       selectPokemon(selected, { navigate: false, preserveCategory: true });
     else {
       clearSelection();
-      if (selected) {
+      if (selected && state.page === 'ranking') {
         history.replaceState(null, '', location.pathname + location.search);
         notice('선택한 포켓몬은 이 시즌의 통계 목록에 없습니다.');
       }
@@ -679,6 +791,40 @@ function openFilters(kind) {
 }
 $('ranking-filter').onclick = () => openFilters('ranking');
 $('ranking-link').onclick = () => goToRanking({ top: true });
+$('articles-link').onclick = () => {
+  if (state.page !== 'articles') openArticles();
+};
+$('articles').addEventListener('change', event => {
+  if (event.target.id === 'article-season') state.articleFilters.season = event.target.value;
+  if (event.target.id === 'article-format') state.articleFilters.format = event.target.value;
+  $('article-rows').innerHTML = articleContent(state.articleFilters);
+});
+$('articles').addEventListener('input', event => {
+  if (event.target.id !== 'article-search') return;
+  state.articleFilters.query = event.target.value;
+  $('article-rows').innerHTML = articleContent(state.articleFilters);
+});
+document.addEventListener('click', event => {
+  if (event.target.closest('[data-retry-articles]')) {
+    loadArticles();
+    if (!state.locale) load();
+    return;
+  }
+  const button = event.target.closest('[data-article-pokemon]');
+  if (button) {
+    state.articleFilters = {
+      season: '',
+      format: state.format,
+      query: '',
+      pokemon: button.dataset.articlePokemon,
+    };
+    openArticles();
+  }
+  if (event.target.closest('#clear-article-pokemon')) {
+    state.articleFilters.pokemon = '';
+    renderArticles();
+  }
+});
 $('types-link').onclick = () => {
   if (state.page !== 'types') openTypeChart();
 };
@@ -886,8 +1032,10 @@ document.addEventListener('click', event => {
   }
   const category = event.target.closest('[data-category]');
   if (category) {
+    const pin = readingDetail();
     state.category = category.dataset.category;
     renderCategory();
+    if (pin) pinDetailTabs();
   }
 });
 document.addEventListener('keydown', event => {
@@ -910,8 +1058,10 @@ document.addEventListener('keydown', event => {
         : event.key === 'End'
           ? keys.length - 1
           : (i + (event.key === 'ArrowRight' ? 1 : -1) + keys.length) % keys.length;
+    const pin = readingDetail();
     state.category = keys[next];
     renderCategory();
+    if (pin) pinDetailTabs();
     $(`tab-${state.category}`).focus();
   }
 });
@@ -920,6 +1070,10 @@ document.addEventListener(
   event => {
     const img = event.target;
     if (!(img instanceof HTMLImageElement)) return;
+    if (img.classList.contains('article-pokemon-image')) {
+      img.hidden = true;
+      img.parentElement.querySelector('.article-image-fallback').hidden = false;
+    }
     if (img.classList.contains('portrait')) {
       img.classList.add('image-missing');
       const fallback = img.parentElement.querySelector('.hero-image-fallback');
@@ -934,6 +1088,10 @@ document.addEventListener(
 );
 window.addEventListener('popstate', () => {
   const params = new URLSearchParams(location.hash.slice(1));
+  if (params.has('articles')) {
+    openArticles({ navigate: false });
+    return;
+  }
   if (params.has('types')) {
     openTypeChart(params.get('types'), { navigate: false });
     return;
@@ -995,8 +1153,10 @@ if ('serviceWorker' in navigator && window.isSecureContext)
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 load();
 loadReference();
+loadArticles();
 // Opening a shared #dex link lands on the index rather than the ranking.
 const startupDex = new URLSearchParams(location.hash.slice(1)).get('dex');
 if (startupDex) openDex(startupDex, { navigate: false });
 const startupTypes = new URLSearchParams(location.hash.slice(1)).get('types');
 if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });
+if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ navigate: false });

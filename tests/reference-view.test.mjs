@@ -13,6 +13,7 @@ import {
   renderLearnsetShell,
   renderLearnsetRows,
   renderEffect,
+  GAME_LABELS,
   renderSpreads,
   effectButton,
   percentClass,
@@ -98,12 +99,19 @@ test('renderEffect: held item renders its artwork in the heading', t => {
 test('renderEffect: ability', t => {
   t.assert.snapshot(renderEffect(data, locale, 'ability', 'intimidate'));
 });
-// One entry per source so the game names stay readable rather than falling back
-// to the version identifiers the build records.
+// One entry per source in use, so the game names stay readable rather than
+// falling back to the version identifiers the build records.
 test('renderEffect: a borrowed description names the game it came from', t => {
   t.assert.snapshot(
-    ['absorb', 'gmaxwildfire', 'nihillight']
-      .map(key => renderEffect(data, locale, 'move', key).html)
+    ['absorb', 'nihillight'].map(key => renderEffect(data, locale, 'move', key).html).join('\n'),
+  );
+});
+// The rest of the table is not reachable from the current data, so it is pinned
+// here rather than left to drift if the source order changes.
+test('every recorded game has a Korean name', t => {
+  t.assert.snapshot(
+    Object.entries(GAME_LABELS)
+      .map(([id, name]) => `${id} -> ${name}`)
       .join('\n'),
   );
 });

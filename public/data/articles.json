@@ -1,0 +1,55 @@
+{
+  "updatedAt": "2026-09-20",
+  "articles": [
+    {
+      "id": "m5-singles-sigma",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 1,
+      "author": "シグマ",
+      "title": "【S5最終1位】臥薪嘗胆アーマーガア",
+      "url": "https://pokesol.app/u/sigma573/articles/bbe27ed18e7cccb3",
+      "publishedAt": "2026-09-13",
+      "team": [
+        { "pokemon": "garchomp", "item": "sitrusberry" },
+        { "pokemon": "gengarmega", "item": "gengarite" },
+        { "pokemon": "corviknight", "item": "leftovers" },
+        { "pokemon": "meowscarada", "item": "focussash" },
+        { "pokemon": "primarina", "item": "chestoberry" },
+        { "pokemon": "pyroarmega", "item": "pyroarite" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-20",
+        "teamImage": "https://pokesol.app/api/images/uploads/articles/2eabef96-03ca-4d5e-b3f1-eeb0f90c5b87.png",
+        "teamEvidence": "작성자명 シグマ가 표시된 팀 이미지의 여섯 포켓몬과 도구를 구성 경위 및 개별 해설과 대조. 메가마폭시·메가헬가는 검토 후 제외한 후보이며 최종 구성에 포함하지 않음.",
+        "rankEvidence": "제목, M-5·싱글 태그와 도입부의 시즌 5 싱글 최종 1위 달성 서술. 순위는 작성자 공개 내용 기준."
+      }
+    },
+    {
+      "id": "m5-singles-rebo",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 2,
+      "author": "rebo®",
+      "title": "【M-5】神速ルカリザスタン【最終2位】",
+      "url": "https://reboiona.hatenablog.com/entry/2026/09/10/174818",
+      "publishedAt": "2026-09-10",
+      "team": [
+        { "pokemon": "lucariomega", "item": "lucarionite" },
+        { "pokemon": "primarina", "item": "sitrusberry" },
+        { "pokemon": "garchomp", "item": "choicescarf" },
+        { "pokemon": "charizardmegay", "item": "charizarditey" },
+        { "pokemon": "mimikyu", "item": "lifeorb" },
+        { "pokemon": "scizor", "item": "leftovers" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-20",
+        "teamImage": "https://cdn-ak.f.st-hatena.com/images/fotolife/r/reboioNa/20260910/20260910143307.jpg",
+        "teamEvidence": "rebo®의 MyHERO 팀 이미지와 여섯 개별 해설을 대조. 첫 트레이너 카드의 다른 포켓몬들은 제외. 아머까오는 핫삼으로 교체되었고, 한카리아스의 초기 기합의띠는 최종 구애스카프로 변경된 점을 확인. 이미지의 별명은 종 이름으로 정규화.",
+        "rankEvidence": "제목의 M-5 최종 2위 및 마무리의 시즌 최종일 경쟁 서술. 싱글 선출과 환경을 설명하는 본문 기준. 순위는 작성자 공개 내용 기준."
+      }
+    }
+  ]
+}

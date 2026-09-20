@@ -134,6 +134,16 @@ for (const [category, file, description, records] of [
     // single move, which stays. No Ability is Showdown's empty slot, not an ability.
     if (category === 'move' && /^hiddenpower./.test(key)) continue;
     if (category === 'ability' && key === 'noability') continue;
+    // Gimmick moves belong to battle systems Champions does not have. Their
+    // descriptions come from games that had already removed them, so they read as
+    // deleted moves rather than as the gimmick. Add them back if Champions does.
+    if (category === 'move' && (record.isZ || record.isMax)) continue;
+    // Let's Go partner moves were exclusive to that pair and have not returned.
+    if (category === 'move' && record.isNonstandard === 'LGPE') continue;
+    // Items with no effect while held: recorded moves and balls are unambiguous.
+    // Broader guesses are not, because items like 빛의점토 have their effect
+    // implemented in the weather it extends rather than on the item itself.
+    if (category === 'held_item' && (/^tr\d+$/.test(key) || record.isPokeball)) continue;
     const text = translations[id(record.name)] ?? {};
     result[category][key] = {
       name: record.name,

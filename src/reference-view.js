@@ -238,7 +238,7 @@ export function renderEffect(data, locale, kind, key) {
       ? `<div class="effect-metrics">${types([record.type])}` +
         `<span>${CATEGORY_NAMES[record.category]}</span>` +
         `<span>위력 ${record.power || '—'}</span>` +
-        `<span>명중 ${record.accuracy === true ? '필중/검사 없음' : record.accuracy + '%'}</span>` +
+        `<span>명중 ${record.accuracy === true ? '필중' : record.accuracy + '%'}</span>` +
         `<span>PP ${record.pp}</span>` +
         `<span>우선도 ${record.priority > 0 ? '+' : ''}${record.priority}</span></div>`
       : '';
