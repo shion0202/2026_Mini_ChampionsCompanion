@@ -8,6 +8,8 @@ import { megaSprite } from './images.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
+import { speedRows, battleSpeedRows } from './speed.js';
+import { renderSpeedRows, renderSpeedLines } from './speed-view.js';
 import {
   renderReference,
   renderLearnsetShell,
@@ -82,6 +84,8 @@ const saved = preferences(storage);
 const favorites = saved.favorites;
 const state = {
   page: 'ranking',
+  speed: { mode: 'base', preset: 0, query: '', type: '', includeMega: true, ascending: false },
+  speedLimit: 80,
   articleData: null,
   articleError: false,
   articleFilters: { season: null, format: 'Singles', query: '', pokemon: '' },
@@ -411,6 +415,7 @@ function showPage(page) {
     dex: 'dex',
     types: 'type-chart',
     articles: 'articles',
+    speed: 'speed',
   })) {
     $(panel).hidden = page !== key;
     $(`${key}-link`).setAttribute('aria-pressed', String(page === key));
@@ -479,6 +484,61 @@ async function loadArticles() {
   if (state.category === 'articles' && selectedEntry()) renderCategory();
 }
 
+function renderSpeed() {
+  if (state.page !== 'speed') return;
+  document
+    .querySelectorAll('[data-speed-mode]')
+    .forEach(button =>
+      button.setAttribute('aria-pressed', String(button.dataset.speedMode === state.speed.mode)),
+    );
+  const battle = state.speed.mode === 'battle';
+  $('speed-preset-field').hidden = state.speed.mode !== 'actual';
+  $('speed-actual-help').hidden = state.speed.mode !== 'actual';
+  $('speed-battle-help').hidden = !battle;
+  $('speed-more').hidden = true;
+  if (!state.reference || !state.locale) {
+    $('speed-count').textContent = '';
+    $('speed-rows').innerHTML = !state.reference
+      ? referenceStatus(state.refError)
+      : '<div class="empty-state"><p>한국어 명칭을 불러오는 중입니다.</p><button class="text-button" data-speed-retry>다시 시도</button></div>';
+    return;
+  }
+  // 실전 라인만 통계가 필요하다. 종족값별과 실수치 비교는 도감만으로 그려진다.
+  if (battle && !state.snapshot) {
+    $('speed-count').textContent = '';
+    $('speed-rows').innerHTML =
+      '<div class="empty-state"><p>실전 스피드 라인은 사용률 통계가 필요합니다.</p>' +
+      '<button class="text-button" data-speed-retry>다시 시도</button></div>';
+    return;
+  }
+  const rows = battle
+    ? battleSpeedRows(
+        state.reference,
+        state.locale,
+        state.snapshot.pokemon,
+        state.speed,
+        state.index,
+      )
+    : speedRows(state.reference, state.locale, state.speed, state.index);
+  $('speed-count').textContent =
+    `${rows.length}개 항목 중 ${Math.min(rows.length, state.speedLimit)}개 표시`;
+  const shown = rows.slice(0, state.speedLimit);
+  $('speed-rows').innerHTML = battle
+    ? renderSpeedLines(shown)
+    : renderSpeedRows(shown, state.speed);
+  $('speed-more').hidden = rows.length <= state.speedLimit;
+}
+
+const SPEED_MODES = ['base', 'actual', 'battle'];
+
+function openSpeed(mode = 'base', { navigate = true } = {}) {
+  state.speed.mode = SPEED_MODES.includes(mode) ? mode : 'base';
+  showPage('speed');
+  if (navigate) history.pushState({ speed: state.speed.mode }, '', `#speed=${state.speed.mode}`);
+  renderSpeed();
+  window.scrollTo(0, 0);
+}
+
 function renderTypeChart() {
   if (state.page !== 'types') return;
   document
@@ -533,6 +593,7 @@ async function loadReference() {
   renderArticles();
   renderTypeChart();
   if (selectedEntry()) renderCategory();
+  renderSpeed();
 }
 
 function selectPokemon(id, { navigate = true, preserveCategory = false } = {}) {
@@ -585,6 +646,7 @@ async function load(force = false) {
       state.locale = createLocale(await response.json());
       if (state.dex) renderDex();
       renderArticles();
+      renderSpeed();
     }
     let indexResult;
     try {
@@ -767,6 +829,37 @@ function openFilters(kind) {
 }
 $('ranking-filter').onclick = () => openFilters('ranking');
 $('ranking-link').onclick = () => goToRanking({ top: true });
+$('speed-link').onclick = () => {
+  if (state.page !== 'speed') openSpeed(state.speed.mode);
+};
+$('speed-type').innerHTML += Object.entries(TYPE_LABELS)
+  .map(([type, label]) => `<option value="${type}">${label}</option>`)
+  .join('');
+$('speed').addEventListener('click', event => {
+  const mode = event.target.closest('[data-speed-mode]');
+  if (mode) {
+    state.speed.mode = mode.dataset.speedMode;
+    state.speedLimit = 80;
+    history.replaceState({ speed: state.speed.mode }, '', `#speed=${state.speed.mode}`);
+    renderSpeed();
+  }
+  if (event.target.closest('[data-speed-retry]')) load();
+});
+$('speed-controls').addEventListener('input', () => {
+  Object.assign(state.speed, {
+    query: $('speed-search').value,
+    type: $('speed-type').value,
+    preset: Number($('speed-preset').value),
+    includeMega: $('speed-mega').checked,
+    ascending: $('speed-order').value === 'asc',
+  });
+  state.speedLimit = 80;
+  renderSpeed();
+});
+$('speed-more').onclick = () => {
+  state.speedLimit += 80;
+  renderSpeed();
+};
 $('articles-link').onclick = () => {
   if (state.page !== 'articles') openArticles();
 };
@@ -1060,6 +1153,10 @@ document.addEventListener(
 );
 window.addEventListener('popstate', () => {
   const params = new URLSearchParams(location.hash.slice(1));
+  if (params.has('speed')) {
+    openSpeed(params.get('speed'), { navigate: false });
+    return;
+  }
   if (params.has('articles')) {
     openArticles({ navigate: false });
     return;
@@ -1132,3 +1229,5 @@ if (startupDex) openDex(startupDex, { navigate: false });
 const startupTypes = new URLSearchParams(location.hash.slice(1)).get('types');
 if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });
 if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ navigate: false });
+const startupSpeed = new URLSearchParams(location.hash.slice(1)).get('speed');
+if (startupSpeed !== null) openSpeed(startupSpeed, { navigate: false });

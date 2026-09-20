@@ -28,6 +28,12 @@ export const STAT_NAMES = {
   Speed: '스피드',
 };
 const FORM_LABELS = {
+  Sunny: '태양의 모습',
+  Rainy: '빗방울의 모습',
+  Snowy: '설운의 모습',
+  Blue: '블루 페더',
+  White: '화이트 페더',
+  Blade: '블레이드폼',
   Alola: '알로라',
   Hisui: '히스이',
   Galar: '가라르',
@@ -100,6 +106,15 @@ const JAPANESE_DEFAULT_FORMS = {
 
 export function createLocale(dictionary) {
   function pokemon(name) {
+    const genderMega = name.match(/^(.*)-([FM])-Mega$/);
+    if (genderMega) {
+      const record = dictionary.pokemon[toId(genderMega[1])];
+      if (record)
+        return {
+          label: `메가${record.ko} (${genderMega[2] === 'F' ? '암컷' : '수컷'})`,
+          dex: record.dex,
+        };
+    }
     const mega = name.match(/^(.*)-Mega(?:-([XYZ]))?$/);
     if (mega) {
       const record = dictionary.pokemon[toId(mega[1])];

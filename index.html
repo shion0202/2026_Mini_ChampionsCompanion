@@ -9,6 +9,7 @@
   <link rel="icon" href="./public/icons/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./src/styles.css">
+  <link rel="stylesheet" href="./src/speed.css">
   <title>챔피언스 컴패니언 · 배틀 통계</title>
 </head>
 <body>
@@ -30,6 +31,7 @@
       <button id="ranking-link" aria-pressed="true">랭킹</button>
       <button id="dex-link" aria-pressed="false">도감</button>
       <button id="types-link" aria-pressed="false">상성표</button>
+      <button id="speed-link" aria-pressed="false">스피드 랭킹</button>
       <button id="articles-link" aria-pressed="false">구축기사</button>
     </nav>
   </header>
@@ -86,6 +88,27 @@
       </div>
       <p class="type-chart-note">두 타입을 선택하면 각 타입의 배율을 곱해 복합 타입으로 계산합니다. 특성과 도구의 효과는 포함하지 않습니다.</p>
       <div id="type-chart-content"></div>
+    </section>
+    <section id="speed" class="speed-panel" aria-labelledby="speed-title" hidden>
+      <div class="list-heading"><h2 id="speed-title">스피드 랭킹</h2></div>
+      <div class="segmented" role="group" aria-label="스피드 표시 방식">
+        <button data-speed-mode="base" aria-pressed="true">종족값별</button>
+        <button data-speed-mode="actual" aria-pressed="false">실수치 비교</button>
+        <button data-speed-mode="battle" aria-pressed="false">실전 라인</button>
+      </div>
+      <div id="speed-controls" class="speed-controls">
+        <label class="speed-search">포켓몬 검색<input id="speed-search" type="search" placeholder="이름, 초성, 도감 번호" autocomplete="off"></label>
+        <label>타입<select id="speed-type"><option value="">전체</option></select></label>
+        <label id="speed-preset-field" hidden>정렬 기준<select id="speed-preset"><option value="0">최속 (+32, 상승 보정)</option><option value="1">준속 (+32, 무보정)</option><option value="2">무투자 (+0, 무보정)</option><option value="3">최저 (+0, 하락 보정)</option></select></label>
+        <label>순서<select id="speed-order"><option value="desc">빠른 순</option><option value="asc">느린 순</option></select></label>
+        <label class="speed-mega"><input id="speed-mega" type="checkbox" checked>메가진화 포함</label>
+      </div>
+      <p class="speed-help">앱에 수록된 챔피언스 도감 기준이며, 시즌별 출전 가능 여부와는 다릅니다. 타입은 표시된 폼을 기준으로 합니다.</p>
+      <p id="speed-actual-help" class="speed-help" hidden>Lv.50 기준. 최속은 +32와 상승 보정, 준속은 +32와 무보정, 무투자는 +0과 무보정, 최저는 +0과 하락 보정을 적용합니다.<br>도구, 특성, 랭크 변화와 상태이상은 반영하지 않습니다.</p>
+      <p id="speed-battle-help" class="speed-help" hidden>사용률 100위까지의 포켓몬을 대상으로, 채용률 10% 이상인 기술·특성·도구의 효과를 반영한 실수치를 함께 표시합니다.<br>상위 15위이면서 스피드 종족값이 70 이상인 줄은 환경의 주요 기준선으로 색을 달리합니다. 효과는 각각 따로 적용한 경우이며 서로 겹쳐 계산하지 않습니다.</p>
+      <p id="speed-count" class="speed-count" role="status"></p>
+      <div id="speed-rows"></div>
+      <button id="speed-more" class="load-more" hidden>더 보기</button>
     </section>
     <section id="articles" class="articles-panel" aria-labelledby="articles-title" hidden>
       <div class="list-heading"><h2 id="articles-title">구축기사</h2></div>

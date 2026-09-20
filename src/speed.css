@@ -1,0 +1,228 @@
+.speed-panel {
+  border-top: 1px solid var(--line);
+  padding: 17px 0 24px;
+  min-width: 0;
+}
+.speed-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 20px 0;
+}
+.speed-controls label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.speed-controls select,
+.speed-controls input[type='search'] {
+  min-height: 44px;
+  width: 100%;
+  max-width: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: var(--ink);
+  background: var(--white);
+  font-size: 14px;
+}
+.speed-search {
+  flex: 1 1 230px;
+}
+.speed-controls label:not(.speed-search):not(.speed-mega) {
+  flex: 1 1 130px;
+}
+.speed-controls .speed-mega {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+.speed-mega input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--teal);
+}
+.speed-help,
+.speed-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+.speed-tier {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.speed-tier h3 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--teal);
+  font-variant-numeric: tabular-nums;
+}
+.speed-tier h3 span {
+  margin-left: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.speed-tier ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.speed-tier li {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  padding: 7px 11px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.speed-table-wrap {
+  overflow-x: auto;
+}
+.speed-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.speed-table th,
+.speed-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 10px;
+  text-align: center;
+}
+.speed-table th:first-child {
+  text-align: left;
+  width: 40%;
+}
+.speed-table tbody th {
+  font-weight: 600;
+}
+.speed-table th small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.speed-table caption {
+  text-align: left;
+  color: var(--muted);
+  font-size: 12px;
+  padding-bottom: 8px;
+}
+.speed-table .speed-selected {
+  color: var(--teal);
+  background: var(--teal-soft);
+  font-weight: 700;
+}
+@media (max-width: 600px) {
+  .speed-tier {
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 8px;
+  }
+  .speed-table {
+    font-size: 12px;
+  }
+  .speed-table th,
+  .speed-table td {
+    padding: 10px 4px;
+  }
+}
+
+/* 이름 옆의 작은 이미지. 랭킹의 .portrait보다 작게 두어 줄 높이를 지킨다. */
+.speed-mon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.speed-portrait {
+  width: 32px;
+  height: 32px;
+}
+.speed-mon .no-portrait {
+  width: 32px;
+  text-align: center;
+  color: var(--muted);
+}
+.speed-table .speed-mon {
+  gap: 8px;
+}
+
+/* 실전 스피드 라인 */
+.speed-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.speed-line {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.speed-value {
+  font-size: 22px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* 상위 15위, 종족값 70 이상. 환경의 주요 기준선이라 눈에 띄게 둔다.
+   팔레트에 경고색이 없고 teal은 효과 표시가 이미 쓰므로 여기서만 정의한다. */
+.speed-prominent .speed-value {
+  color: #c0392b;
+}
+:root[data-theme='dark'] .speed-prominent .speed-value {
+  color: #ff9382;
+}
+.speed-line-body {
+  min-width: 0;
+}
+.speed-line-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.speed-preset {
+  background: var(--teal-soft);
+  color: var(--ink);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.speed-base {
+  font-variant-numeric: tabular-nums;
+}
+.speed-effect {
+  color: var(--teal);
+  font-weight: 600;
+}
+.speed-effect.speed-plain {
+  color: var(--muted);
+  font-weight: 400;
+}
+.speed-via {
+  color: var(--muted);
+  font-size: 12px;
+}
+.speed-percent {
+  font-variant-numeric: tabular-nums;
+}
