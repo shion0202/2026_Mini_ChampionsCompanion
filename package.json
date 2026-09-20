@@ -11,6 +11,7 @@
     "dev": "node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
+    "test:snapshots": "node --test --test-update-snapshots tests/*.test.mjs",
     "locales": "node scripts/update-locales.mjs",
     "reference": "node scripts/update-reference.mjs",
     "format": "prettier --write \"src/**/*.{js,css}\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" sw.js",

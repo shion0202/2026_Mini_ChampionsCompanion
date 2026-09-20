@@ -50,6 +50,10 @@ node scripts/serve.mjs --dist --port 4174
 
 `dist/`에 정적 배포 파일을 생성합니다. HTTPS 정적 호스팅에 올릴 수 있지만 이 작업에서는 외부 공개/배포를 하지 않았습니다. 사용자 데이터 서버는 없습니다.
 
+`tests/reference-view.test.mjs`는 상세 화면의 렌더 결과를 스냅샷으로 비교합니다. 마크업을 의도적으로 바꾼 뒤에는 `node --test --test-update-snapshots tests/*.test.mjs`로 갱신하고 `tests/reference-view.test.mjs.snapshot`의 차이를 확인합니다. `src/app.js`는 불러올 때 DOM을 사용하므로 이 방식으로 검증할 수 없으며 `scripts/verify-*-browser.mjs`가 해당 범위를 담당합니다.
+
+코드 서식은 Prettier로 통일합니다. `npm run format`으로 적용하고 `npm run format:check`로 확인합니다. 대상은 `src`, `tests`, `scripts`, `sw.js`이며 `index.html`은 인라인 요소 사이의 공백이 렌더 결과에 영향을 줄 수 있어 제외합니다.
+
 브라우저 검증 스크립트는 선택 사항입니다. Playwright와 Chromium 계열 브라우저가 있으면 개발 서버 실행 후 다음과 같이 사용합니다. 런타임 의존성은 아닙니다.
 
 ```powershell
