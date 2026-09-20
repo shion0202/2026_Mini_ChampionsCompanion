@@ -94,6 +94,12 @@ export async function loadZaCatalog(getText) {
     const byLabel = new Map(rows.map(row => [row.label, row.text]));
     return index => byLabel.get(`${prefix}_${String(index).padStart(3, '0')}`);
   };
+  // Move descriptions carry hashes for labels except for a few hundred rows, and
+  // the file holds one row more than the name file, so the tail drifts. Reading the
+  // label first and the row second covers both; where both resolve they agree on
+  // all 189 entries, so neither view contradicts the other.
+  const moveInfoByLabel = new Map(moveInfo.map(row => [row.label, row.text]));
+  const describeMove = index => moveInfoByLabel.get(`WAZAINFO_${index}`) ?? moveInfo[index]?.text;
   const collect = (english, korean, describe) => {
     const byName = new Map();
     english.forEach((row, index) => {
@@ -105,7 +111,7 @@ export async function loadZaCatalog(getText) {
   return {
     ability: collect(abilityEn, abilityKo, suffixed(abilityInfo, 'TOKUSEIINFO')),
     held_item: collect(itemEn, itemKo, suffixed(itemInfo, 'ITEMINFO')),
-    move: collect(moveEn, moveKo, index => moveInfo[index]?.text),
+    move: collect(moveEn, moveKo, describeMove),
   };
 }
 
