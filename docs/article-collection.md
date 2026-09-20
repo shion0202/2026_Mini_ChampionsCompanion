@@ -13,12 +13,14 @@
 | --- | --- | --- |
 | 1 수집 | `scripts/collect-articles.mjs` | `.cache/articles/<sha1>.html`, 이미지 |
 | 2 추출 | `scripts/article-parse.mjs` | `.cache/article-queue.json` (기사당 약 1.5KB) |
-| 3 판정 | Claude Code 세션 | 최종 6마리, `teamEvidence`, `rankEvidence` |
-| 4 반영 | 사람 | `articles.json`의 `pending` → `reviewed` 승격 |
+| 3 판정 | Claude Code 세션 | 최종 6마리와 근거문을 `pending`으로 기록 |
+| 4 승격 | 사람 | `articles.json`의 `pending` → `reviewed` 승격 |
 
 ## 1단계 · 수집
 
 `npm run articles -- --season M5 --format singles`
+
+`--season`은 필수다. `--format`을 생략하면 싱글과 더블을 모두 찾는다.
 
 ### 검색어
 
@@ -81,10 +83,20 @@ HTML을 의존성 없이 텍스트로 벗긴 뒤, 인덱스에 걸린 이름마�
 5. `learnset`이 없는 종족은 강등 — 챔피언스 등장 371종 밖은 과거작 잡담일 확률이 높다
 6. 메가스톤이 잡히면 메가 폼을 확정한다
 
-제목에서는 `最終(\d+)位`, `M-?\d+`, `シングル` / `ダブル`를 뽑는다.
+### 메타
 
-본문 이미지는 상위 세 장을 캐시한다. OCR은 하지 않는다. 3단계에서 AI가 직접
-본다.
+`articles.json`의 필수 항목을 함께 뽑는다.
+
+- 제목 — `<title>` 또는 `og:title`. 여기서 최종 순위, 시즌, 싱글/더블 표기를
+  읽는다.
+- 작성자 — 소스 어댑터가 검색 결과에서 준 값을 우선하고, 없으면 `og:site_name`
+  이나 본문 서명에서 찾는다. 못 찾으면 비워 두고 `flags`에 남긴다.
+- 게시일 — `article:published_time`, RSS의 날짜, pokesol JSON 순으로 본다.
+- `id` — 기존 기록처럼 `<시즌 소문자>-<형식 소문자>-<작성자 슬러그>` 형태로
+  제안한다. 충돌하면 끝에 숫자를 붙인다. 최종 확정은 3단계에서 한다.
+
+본문 영역의 `<img>`를 등장 순서대로 최대 세 장 캐시한다. OCR은 하지 않는다.
+3단계에서 AI가 직접 본다.
 
 ### 큐
 
