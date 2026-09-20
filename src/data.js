@@ -135,29 +135,43 @@ function row(category, tuple) {
   return { name: tuple[0], percent: percent(tuple[1]), rank: rank(tuple[2]) };
 }
 
+function pokemonEntry(name, entry) {
+  assert(isObject(entry), '포켓몬');
+  const categories = {};
+  for (const category of Object.keys(CATEGORY_LABELS)) {
+    const tuples = entry[category] ?? [];
+    assert(Array.isArray(tuples), category);
+    categories[category] = tuples.map(t => row(category, t)).sort((a, b) => a.rank - b.rank);
+  }
+  return { name, id: toId(name), rank: rank(entry.position), categories };
+}
+
 export function normalizeSnapshot(raw, context) {
   assert(isObject(raw) && isObject(raw.pokemon), '스냅샷');
   for (const field of ['season', 'format', 'date'])
     assert(raw[field] === context[field], `${field} 불일치`);
   dateKey(raw.date);
-  const pokemon = Object.entries(raw.pokemon)
-    .map(([name, entry]) => {
-      assert(isObject(entry), '포켓몬');
-      const categories = {};
-      for (const category of Object.keys(CATEGORY_LABELS)) {
-        const tuples = entry[category] ?? [];
-        assert(Array.isArray(tuples), category);
-        categories[category] = tuples.map(t => row(category, t)).sort((a, b) => a.rank - b.rank);
-      }
-      return { name, id: toId(name), rank: rank(entry.position), categories };
-    })
-    .sort((a, b) => a.rank - b.rank);
+  // One malformed record must not hide the rest of the ranking. Skipped names are
+  // reported so the gap is shown rather than quietly swallowed; if nothing can be
+  // read the snapshot still fails, because an empty ranking is not a result.
+  const pokemon = [];
+  const skipped = [];
+  for (const [name, entry] of Object.entries(raw.pokemon)) {
+    try {
+      pokemon.push(pokemonEntry(name, entry));
+    } catch {
+      skipped.push(name);
+    }
+  }
+  assert(pokemon.length > 0, '읽을 수 있는 포켓몬 항목');
+  pokemon.sort((a, b) => a.rank - b.rank);
   return {
     season: raw.season,
     date: raw.date,
     format: raw.format,
     generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : null,
     pokemon,
+    skipped,
   };
 }
 

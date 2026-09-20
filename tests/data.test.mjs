@@ -106,18 +106,33 @@ test('six stat investments preserve zero and source order', () => {
   assert.deepEqual(row.points, [1, 32, 1, 0, 0, 32]);
   assert.equal(row.percent, 13.5);
 });
-test('incomplete stat spread cannot silently turn into zero investment', () => {
+test('incomplete stat spread drops the record instead of inventing zero investment', () => {
   const raw = snapshot();
   raw.pokemon.Salamence.stat_points = [[13.5, 1, 32, 1, null, 0, 32, 1]];
-  assert.throws(() => normalizeSnapshot(raw, context));
+  const result = normalizeSnapshot(raw, context);
+  assert.deepEqual(result.skipped, ['Salamence']);
+  assert.deepEqual(
+    result.pokemon.map(p => p.name),
+    ['Raichu', 'Raichu-Alola'],
+  );
 });
 test('source category ranks, not incoming order, determine display order', () => {
   const rows = normalizeSnapshot(snapshot(), context).pokemon[0].categories.move;
   assert.equal(rows[0].name, 'Double-Edge');
 });
-test('invalid percent refuses payload instead of displaying misleading bars', () => {
+test('invalid percent drops the record instead of displaying misleading bars', () => {
   const raw = snapshot();
   raw.pokemon.Salamence.move[0][1] = 640;
+  const result = normalizeSnapshot(raw, context);
+  assert.deepEqual(result.skipped, ['Salamence']);
+  assert.ok(!result.pokemon.some(p => p.name === 'Salamence'));
+});
+test('a fully readable snapshot reports nothing skipped', () => {
+  assert.deepEqual(normalizeSnapshot(snapshot(), context).skipped, []);
+});
+test('a snapshot with no readable record still fails visibly', () => {
+  const raw = snapshot();
+  for (const name of Object.keys(raw.pokemon)) raw.pokemon[name] = { position: 'not a rank' };
   assert.throws(() => normalizeSnapshot(raw, context));
 });
 test('empty category is retained without invented statistics', () => {

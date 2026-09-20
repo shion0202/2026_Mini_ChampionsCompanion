@@ -27,6 +27,7 @@ node scripts/serve.mjs --host --port 4174
 - 한국어 이름·초성·영문·도감 번호 검색 및 즐겨찾기
 - 자료 날짜, API 생성 시각, 기기 조회 시각을 구분한 표시
 - 1시간 조회 캐시, 실패 시 같은 시즌·배틀 형식의 최근 정상 자료 사용과 이전 날짜·시각 안내
+- 자료 형식을 확인할 수 없는 포켓몬은 목록에서 제외하고 제외한 수를 안내. 읽을 수 있는 항목이 하나도 없으면 조회 실패로 처리
 - 모바일 상세 화면 및 PC 목록/상세 병렬 화면
 - PWA 설치 정보와 정적 앱 파일 오프라인 지원
 - 시스템/라이트/다크 테마, 선택 저장
@@ -50,7 +51,9 @@ node scripts/serve.mjs --dist --port 4174
 
 `dist/`에 정적 배포 파일을 생성합니다. HTTPS 정적 호스팅에 올릴 수 있지만 이 작업에서는 외부 공개/배포를 하지 않았습니다. 사용자 데이터 서버는 없습니다.
 
-`tests/reference-view.test.mjs`는 상세 화면의 렌더 결과를 스냅샷으로 비교합니다. 마크업을 의도적으로 바꾼 뒤에는 `node --test --test-update-snapshots tests/*.test.mjs`로 갱신하고 `tests/reference-view.test.mjs.snapshot`의 차이를 확인합니다. `src/app.js`는 불러올 때 DOM을 사용하므로 이 방식으로 검증할 수 없으며 `scripts/verify-*-browser.mjs`가 해당 범위를 담당합니다.
+렌더 결과는 스냅샷으로 비교합니다. 상세 화면의 도감·기술·효과는 `tests/reference-view.test.mjs`가, 랭킹 목록과 상세 화면 틀·필터는 `tests/app-view.test.mjs`가 담당합니다. 마크업을 의도적으로 바꾼 뒤에는 `node --test --test-update-snapshots tests/*.test.mjs`로 갱신하고 함께 저장된 `.snapshot` 파일의 차이를 확인합니다.
+
+`src/app.js`에는 상태와 DOM 조작, 이벤트 연결만 남기고 마크업 생성은 `src/app-view.js`와 `src/reference-view.js`로 분리했습니다. 두 모듈은 인자만 받아 문자열을 돌려주므로 브라우저 없이 검증할 수 있습니다. `src/app.js` 자체는 불러올 때 DOM을 사용하므로 `scripts/verify-*-browser.mjs`가 해당 범위를 담당합니다.
 
 코드 서식은 Prettier로 통일합니다. `npm run format`으로 적용하고 `npm run format:check`로 확인합니다. 대상은 `src`, `tests`, `scripts`, `sw.js`이며 `index.html`은 인라인 요소 사이의 공백이 렌더 결과에 영향을 줄 수 있어 제외합니다.
 
