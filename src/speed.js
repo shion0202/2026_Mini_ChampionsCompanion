@@ -95,8 +95,8 @@ const ABILITY_STAGES = {
   steadfast: [1, '풀죽음 후'],
   weakarmor: [2, '물리 기술 피격 후'],
 };
-// 스피드 하락 성격의 채용률 합이 이 값을 넘어야 최저속 줄을 만든다.
-const SLOW_NATURE = 10;
+// 채용률이 이 값 이상인 것만 그 포켓몬의 배치로 본다. 기술·도구·특성과 같은 기준이다.
+const ADOPTED = 10;
 
 export function battleSpeedRows(reference, locale, ranking, options = {}, index = null) {
   const all = new Map(
@@ -109,14 +109,26 @@ export function battleSpeedRows(reference, locale, ranking, options = {}, index 
     const base = reference.species[pokemon.id];
     if (!base) continue;
     const adopted = kind =>
-      (pokemon.categories[kind] ?? []).filter(r => r.percent !== null && r.percent >= 10);
-    // 최속·준속·무보정은 어느 포켓몬에나 쓰이지만 최저속은 그렇지 않다. 스피드를
-    // 내리는 성격을 실제로 쓰는 포켓몬에만 그 줄을 만든다. 통계가 능력 보정마다
-    // 어느 능력이 내려가는지 알려주므로 추측하지 않는다.
-    const slowNature = (pokemon.categories.stat_alignment ?? [])
-      .filter(r => r.down === 'Speed' && r.percent !== null)
-      .reduce((sum, r) => sum + r.percent, 0);
-    const presets = slowNature > SLOW_NATURE ? [0, 1, 2, 3] : [0, 1, 2];
+      (pokemon.categories[kind] ?? []).filter(r => r.percent !== null && r.percent >= ADOPTED);
+    // 네 프리셋은 성격과 능력 포인트 두 축으로 갈린다. 최속은 상승 성격에 투자,
+    // 준속은 무보정에 투자, 무보정은 무보정에 미투자, 최저는 하락 성격에 미투자다.
+    // 통계는 두 축을 따로 주므로 각 축이 기준을 넘는지만 본다. 둘을 곱해 '이 조합이
+    // 몇 %'라고 말하지 않는다. 그 값은 통계에 없다.
+    const share = (kind, pick) =>
+      (pokemon.categories[kind] ?? [])
+        .filter(r => r.percent !== null && pick(r))
+        .reduce((sum, r) => sum + r.percent, 0) >= ADOPTED;
+    const raises = share('stat_alignment', r => r.up === 'Speed');
+    const lowers = share('stat_alignment', r => r.down === 'Speed');
+    const neutral = share('stat_alignment', r => r.up !== 'Speed' && r.down !== 'Speed');
+    const invests = share('stat_points', r => r.points[5] > 0);
+    const bare = share('stat_points', r => r.points[5] === 0);
+    const wanted = [raises && invests, neutral && invests, neutral && bare, lowers && bare]
+      .map((keep, preset) => (keep ? preset : -1))
+      .filter(preset => preset >= 0);
+    // 어느 축도 기준에 닿지 않으면 배치가 흩어져 있다는 뜻이지 쓰지 않는다는 뜻이
+    // 아니다. 통계가 없는 포켓몬도 마찬가지다. 그럴 때는 네 줄을 모두 남긴다.
+    const presets = wanted.length ? wanted : [0, 1, 2, 3];
     const forms = [{ id: pokemon.id, megaItem: null }];
     if (options.includeMega !== false) {
       for (const item of adopted('held_item')) {

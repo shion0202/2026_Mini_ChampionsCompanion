@@ -87,7 +87,15 @@ test('views label tiers, every preset column, empty results and escape names', (
 
 // 채용률 10% 미만은 무시하고, 효과는 서로 곱하지 않는다. 사용률 상위를 대상으로
 // 실제로 나올 수 있는 스피드 라인만 만든다.
+const nature = (name, percent, up, down, rank) => ({ name, percent, up, down, rank });
+const spread = (percent, spe, rank) => ({
+  rank,
+  name: '',
+  percent,
+  points: [0, 32, 0, 0, 4, spe],
+});
 const usage = [
+  // 빠른 어태커. 상승 성격과 스피드 투자를 쓰므로 최속과 준속만 나온다.
   {
     name: 'Meowscarada',
     id: 'meowscarada',
@@ -99,6 +107,11 @@ const usage = [
       ],
       held_item: [{ name: 'Choice Scarf', rank: 1, percent: 31 }],
       ability: [{ name: 'Protean', rank: 1, percent: 88 }],
+      stat_alignment: [
+        nature('Jolly', 70.2, 'Speed', 'Sp. Atk', 1),
+        nature('Adamant', 24.1, 'Attack', 'Sp. Atk', 2),
+      ],
+      stat_points: [spread(80.5, 32, 1), spread(14.2, 32, 2)],
     },
   },
   {
@@ -109,10 +122,12 @@ const usage = [
       move: [],
       held_item: [{ name: 'Venusaurite', rank: 1, percent: 64 }],
       ability: [{ name: 'Overgrow', rank: 1, percent: 12 }],
+      stat_alignment: [nature('Modest', 61.3, 'Sp. Atk', 'Attack', 1)],
+      stat_points: [spread(58.4, 32, 1)],
     },
   },
   // 스피드 종족값 30에 상위 15위. 느려도 기준선으로 잡혀야 한다. 스피드를 내리는
-  // 성격(냉정·무사태평)을 합쳐 45.2%라 최저속 줄도 만들어진다.
+  // 성격 45.2%에 미투자 배치 84.6%라 무보정과 최저만 나온다.
   {
     name: 'Snorlax',
     id: 'snorlax',
@@ -122,10 +137,11 @@ const usage = [
       held_item: [{ name: 'Leftovers', rank: 1, percent: 55 }],
       ability: [{ name: 'Thick Fat', rank: 1, percent: 80 }],
       stat_alignment: [
-        { name: 'Adamant', percent: 40.1, up: 'Attack', down: 'Sp. Atk', rank: 1 },
-        { name: 'Quiet', percent: 30.4, up: 'Sp. Atk', down: 'Speed', rank: 2 },
-        { name: 'Relaxed', percent: 14.8, up: 'Defense', down: 'Speed', rank: 3 },
+        nature('Adamant', 40.1, 'Attack', 'Sp. Atk', 1),
+        nature('Quiet', 30.4, 'Sp. Atk', 'Speed', 2),
+        nature('Relaxed', 14.8, 'Defense', 'Speed', 3),
       ],
+      stat_points: [spread(84.6, 0, 1), spread(9.2, 32, 2)],
     },
   },
 ];
@@ -185,31 +201,45 @@ test('the environment marker follows rank alone, slow Pokemon included', () => {
   );
 });
 
-test('the slowest preset appears only where a speed-lowering nature is actually used', () => {
+test('presets follow the nature and the point spread the Pokemon actually uses', () => {
   const lines = battleSpeedRows(reference, locale, usage, {});
   const presetsOf = id => new Set(lines.filter(line => line.id === id).map(line => line.preset));
-  // 냉정 30.4% + 무사태평 14.8% = 45.2%
-  assert.ok(presetsOf('snorlax').has('최저'), '스피드 하락 성격을 쓰는데 최저가 없다');
-  // 마스카나의 픽스처에는 능력 보정 통계가 아예 없다.
-  assert.ok(!presetsOf('meowscarada').has('최저'), '근거 없이 최저를 만들면 안 된다');
-  for (const id of ['snorlax', 'meowscarada'])
-    for (const label of ['최속', '준속', '무보정'])
-      assert.ok(presetsOf(id).has(label), `${id}에 ${label}이 없다`);
+  // 겁쟁이 70.2%에 투자 배치 94.7%. 하락 성격도 미투자 배치도 기준에 못 미친다.
+  assert.deepEqual([...presetsOf('meowscarada')].sort(), ['준속', '최속']);
+  // 냉정 30.4% + 무사태평 14.8% = 45.2%, 미투자 배치 84.6%.
+  assert.deepEqual([...presetsOf('snorlax')].sort(), ['무보정', '최저']);
 });
 
-test('a speed-lowering nature below the threshold does not create the slowest line', () => {
+test('the threshold is inclusive, matching the move and item filter', () => {
   const [meowscarada] = usage;
-  const barely = [
+  // 무보정 성격과 미투자 배치를 충분히 두어 무보정 줄이 남게 한다. 그래야 최저만
+  // 임계값을 오가고, 아무 축도 닿지 않아 네 줄을 모두 남기는 폴백과 섞이지 않는다.
+  const at = percent => [
     {
       ...meowscarada,
       categories: {
         ...meowscarada.categories,
-        stat_alignment: [{ name: 'Quiet', percent: 10, up: 'Sp. Atk', down: 'Speed', rank: 1 }],
+        stat_alignment: [
+          nature('Adamant', 62.4, 'Attack', 'Sp. Atk', 1),
+          nature('Quiet', percent, 'Sp. Atk', 'Speed', 2),
+        ],
+        stat_points: [spread(90, 0, 1)],
       },
     },
   ];
-  const presets = new Set(battleSpeedRows(reference, locale, barely, {}).map(line => line.preset));
-  assert.ok(!presets.has('최저'), '정확히 10%는 넘은 것이 아니다');
+  const presets = value =>
+    new Set(battleSpeedRows(reference, locale, at(value), {}).map(line => line.preset));
+  assert.ok(presets(10).has('최저'), '정확히 10%도 채용으로 본다');
+  assert.ok(!presets(9.9).has('최저'), '10% 미만은 쓰지 않는다');
+});
+
+test('a Pokemon with no spread statistics keeps every preset', () => {
+  const bare = [
+    { ...usage[0], categories: { ...usage[0].categories, stat_alignment: [], stat_points: [] } },
+  ];
+  const presets = new Set(battleSpeedRows(reference, locale, bare, {}).map(line => line.preset));
+  // 근거가 없다는 것은 쓰지 않는다는 뜻이 아니다. 조용히 지우지 않는다.
+  assert.deepEqual([...presets].sort(), ['무보정', '준속', '최속', '최저']);
 });
 
 test('battle lines render the value, the badge, the sprite and the effect source', () => {
