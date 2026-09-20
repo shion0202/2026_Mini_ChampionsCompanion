@@ -137,3 +137,93 @@ export function readPage(html) {
     excerpt: text.slice(0, 300),
   };
 }
+
+// 후보를 지우는 근거가 아니라 낮추는 근거다. 본문이 검토 과정을 길게 쓰는 만큼
+// 여기 걸렸다고 버리면 실제 채용을 놓친다.
+const NEGATIVE = ['見送り', '不採用', '候補', '相手', '過去', '没'];
+const NEAR = 40;
+// 텍스트만으로는 실제 멤버와 본문에 자주 나오는 상대를 가를 수 없다. 점수를
+// 손보는 대신 그물을 넓혀 멤버를 떨어뜨리지 않는 쪽을 택한다.
+const LIMIT = 16;
+const EXCERPT = 50;
+
+// 긴 이름부터 찾고 찾은 자리를 덮어 メガリザードンY가 リザードン으로 두 번 세지
+// 않게 한다. 자리를 지우지 않고 같은 길이로 덮어 위치를 유지한다.
+function scan(text, names) {
+  let rest = text;
+  const found = [];
+  for (const name of names) {
+    const at = [];
+    for (;;) {
+      const index = rest.indexOf(name);
+      if (index < 0) break;
+      at.push(index);
+      rest = rest.slice(0, index) + '\u0001'.repeat(name.length) + rest.slice(index + name.length);
+    }
+    if (at.length) found.push({ name, at });
+  }
+  return found;
+}
+
+export function digest(page, index) {
+  const text = normalize(page.text);
+  const items = scan(text, [...index.item.keys()]).map(hit => ({
+    key: index.item.get(hit.name),
+    at: hit.at,
+  }));
+  const mons = scan(text, [...index.pokemon.keys()]);
+
+  const merged = new Map();
+  for (const hit of mons) {
+    const key = index.pokemon.get(hit.name);
+    const base = index.baseOf.get(key) ?? key;
+    const entry = merged.get(base) ?? {
+      base,
+      forms: [],
+      items: [],
+      hits: 0,
+      firstIndex: text.length,
+      negative: 0,
+      champions: index.champions.has(base),
+      excerpts: [],
+    };
+    if (key !== base && !entry.forms.includes(key)) entry.forms.push(key);
+    entry.hits += hit.at.length;
+    entry.firstIndex = Math.min(entry.firstIndex, hit.at[0]);
+    for (const at of hit.at) {
+      for (const item of items)
+        if (item.at.some(other => Math.abs(other - at) <= NEAR) && !entry.items.includes(item.key))
+          entry.items.push(item.key);
+      const window = text.slice(Math.max(0, at - EXCERPT), at + hit.name.length + EXCERPT);
+      if (NEGATIVE.some(word => window.includes(word))) entry.negative++;
+      if (entry.excerpts.length < 1) entry.excerpts.push(window);
+    }
+    merged.set(base, entry);
+  }
+
+  for (const entry of merged.values()) {
+    // 점수는 본문에서 실제로 찾은 도구로만 매긴다. 아래에서 채우는 메가스톤은
+    // 폼에서 되짚은 파생값이라 근거가 아니고, 이것까지 세면 구축 경위에 환경
+    // 상위 메가로 이름만 오른 포켓몬이 실제 멤버를 밀어낸다.
+    entry.score =
+      entry.hits * 2 +
+      entry.items.length * 6 +
+      entry.forms.length * 3 -
+      entry.negative * 5 -
+      (entry.champions ? 0 : 40);
+    // 본문이 メガルカリオ라고만 쓰고 ルカリオナイト를 안 써도 도구가 확정된다.
+    for (const form of entry.forms) {
+      const stone = index.formStone.get(form);
+      if (stone && !entry.items.includes(stone)) entry.items.push(stone);
+    }
+  }
+
+  const candidates = [...merged.values()]
+    .sort((a, b) => b.score - a.score || a.firstIndex - b.firstIndex)
+    .slice(0, LIMIT);
+  const flags = [];
+  if (candidates.filter(c => c.champions).length < 6) flags.push('few-candidates');
+  if (!page.images?.length) flags.push('no-image');
+  if (candidates.filter(c => c.items.length).length < 6) flags.push('items-incomplete');
+  return { candidates, flags };
+}

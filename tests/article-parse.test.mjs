@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildIndex, normalize, parseTitle, readPage } from '../scripts/article-parse.mjs';
+import { buildIndex, digest, normalize, parseTitle, readPage } from '../scripts/article-parse.mjs';
 
 const read = name =>
   readFile(new URL(`../public/data/${name}.json`, import.meta.url)).then(JSON.parse);
@@ -139,4 +139,73 @@ test('readPage drops the blog icon and keeps at most three content images', () =
   assert.equal(page.images.length, 3);
   assert.ok(!page.images.some(url => url.includes('custom_blog_icon')));
   assert.ok(page.images[0].endsWith('20260910143307.jpg'));
+});
+
+// 실제 기사의 문장 구조를 줄여 옮긴 픽스처다. 원문 전재가 아니다.
+const article = {
+  text: normalize(
+    '構築経緯 1枠目に好きなポケモンであるメガルカリオを決定。' +
+      'メタグロス、スターミーが環境上位だと思っていた。' +
+      '一般ポケモンだとミミッキュ、ガブリアス、アシレーヌを採用。' +
+      'ガブリアス こだわりスカーフ 最速。アシレーヌ オボンのみ。' +
+      'メガリザードンY は特殊エース。ハッサム タスキ で締める。' +
+      'アーマーガアは見送り。相手のカバルドンが重かった。',
+  ),
+  images: [],
+  excerpt: '',
+};
+
+test('digest keeps every final member as a candidate', () => {
+  const { candidates } = digest(article, index);
+  const found = candidates.map(c => c.base);
+  for (const key of ['lucario', 'garchomp', 'primarina', 'charizard', 'scizor', 'mimikyu'])
+    assert.ok(found.includes(key), `${key}가 후보에서 빠졌다`);
+});
+
+test('digest folds a mega into its base species and records the form', () => {
+  const { candidates } = digest(article, index);
+  const charizard = candidates.find(c => c.base === 'charizard');
+  assert.deepEqual(charizard.forms, ['charizardmegay']);
+  // 본문에 リザードナイトY가 없어도 폼에서 스톤을 되짚어 도구가 채워진다.
+  assert.ok(charizard.items.includes('charizarditey'));
+  const lucario = candidates.find(c => c.base === 'lucario');
+  assert.ok(lucario.items.includes('lucarionite'));
+});
+
+test('digest pairs the item written next to the name, abbreviations included', () => {
+  const { candidates } = digest(article, index);
+  assert.ok(candidates.find(c => c.base === 'garchomp').items.includes('choicescarf'));
+  assert.ok(candidates.find(c => c.base === 'primarina').items.includes('sitrusberry'));
+  assert.ok(candidates.find(c => c.base === 'scizor').items.includes('focussash'));
+});
+
+test('a name next to a rejection word is demoted, not dropped', () => {
+  const { candidates } = digest(article, index);
+  const corviknight = candidates.find(c => c.base === 'corviknight');
+  assert.ok(corviknight, '見送り는 강등이지 삭제가 아니다');
+  assert.ok(corviknight.negative > 0);
+  const garchomp = candidates.find(c => c.base === 'garchomp');
+  assert.ok(garchomp.score > corviknight.score);
+});
+
+test('digest carries a short excerpt per candidate so the reasoning is checkable', () => {
+  const { candidates } = digest(article, index);
+  const garchomp = candidates.find(c => c.base === 'garchomp');
+  assert.ok(garchomp.excerpts.length >= 1);
+  assert.ok(garchomp.excerpts.length <= 2);
+  for (const excerpt of garchomp.excerpts) assert.ok(excerpt.length <= 130);
+  assert.ok(garchomp.excerpts.some(e => e.includes('ガブリアス')));
+});
+
+test('a mega is never counted twice as its own base', () => {
+  const { candidates } = digest({ ...article, text: normalize('メガリザードンY') }, index);
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].base, 'charizard');
+  assert.equal(candidates[0].hits, 1);
+});
+
+test('digest flags what it could not settle', () => {
+  const { flags } = digest({ text: 'ガブリアス', images: [], excerpt: '' }, index);
+  assert.ok(flags.includes('few-candidates'));
+  assert.ok(flags.includes('no-image'));
 });
