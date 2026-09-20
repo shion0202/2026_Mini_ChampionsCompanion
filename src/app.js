@@ -261,30 +261,6 @@ function renderDetail() {
 // one above. Pull the tab strip back under the header when it has drifted out of
 // reach, and leave the view alone when it is already in place so reading from the
 // top of the detail does not jump.
-const detailTabOffset = () => {
-  const tabs = document.querySelector('.detail-tabs');
-  const header = document.querySelector('.header');
-  if (!tabs || !header) return null;
-  return tabs.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
-};
-// Whether the reader has scrolled past the top of the detail. Asked before the
-// swap, because afterwards the new content's height has already moved everything.
-// Measured on the panel rather than the tab strip: once the strip is pinned its
-// own offset is zero, and a test against that would skip every later switch.
-const readingDetail = () => {
-  const panel = $('detail');
-  const header = document.querySelector('.header');
-  if (!panel || !header) return false;
-  return panel.getBoundingClientRect().top < header.getBoundingClientRect().bottom;
-};
-// Put the tab strip back under the header. A short tab may not leave enough page
-// to scroll that far, and the browser clamps; the result is still the same place
-// every time, which is what makes the tabs usable one after another.
-function pinDetailTabs() {
-  const offset = detailTabOffset();
-  if (offset !== null) window.scrollTo(0, Math.max(0, window.scrollY + offset));
-}
-
 function renderCategory() {
   const p = selectedEntry();
   if (!p) return;
@@ -1032,10 +1008,8 @@ document.addEventListener('click', event => {
   }
   const category = event.target.closest('[data-category]');
   if (category) {
-    const pin = readingDetail();
     state.category = category.dataset.category;
     renderCategory();
-    if (pin) pinDetailTabs();
   }
 });
 document.addEventListener('keydown', event => {
@@ -1058,10 +1032,8 @@ document.addEventListener('keydown', event => {
         : event.key === 'End'
           ? keys.length - 1
           : (i + (event.key === 'ArrowRight' ? 1 : -1) + keys.length) % keys.length;
-    const pin = readingDetail();
     state.category = keys[next];
     renderCategory();
-    if (pin) pinDetailTabs();
     $(`tab-${state.category}`).focus();
   }
 });
