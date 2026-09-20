@@ -111,6 +111,23 @@ const usage = [
       ability: [{ name: 'Overgrow', rank: 1, percent: 12 }],
     },
   },
+  // 스피드 종족값 30에 상위 15위. 느려도 기준선으로 잡혀야 한다. 스피드를 내리는
+  // 성격(냉정·무사태평)을 합쳐 45.2%라 최저속 줄도 만들어진다.
+  {
+    name: 'Snorlax',
+    id: 'snorlax',
+    rank: 9,
+    categories: {
+      move: [],
+      held_item: [{ name: 'Leftovers', rank: 1, percent: 55 }],
+      ability: [{ name: 'Thick Fat', rank: 1, percent: 80 }],
+      stat_alignment: [
+        { name: 'Adamant', percent: 40.1, up: 'Attack', down: 'Sp. Atk', rank: 1 },
+        { name: 'Quiet', percent: 30.4, up: 'Sp. Atk', down: 'Speed', rank: 2 },
+        { name: 'Relaxed', percent: 14.8, up: 'Defense', down: 'Speed', rank: 3 },
+      ],
+    },
+  },
 ];
 
 test('battle lines apply adopted effects only, never multiplying them together', () => {
@@ -148,16 +165,51 @@ test('a mega stone adopted above the threshold produces the mega form with its o
   if (mega) assert.ok(mega.evidence, '메가 특성 줄은 근거를 남겨야 한다');
 });
 
-test('the environment marker follows rank and base speed together', () => {
+test('the environment marker follows rank alone, slow Pokemon included', () => {
   const lines = battleSpeedRows(reference, locale, usage, {});
   assert.ok(
-    lines.some(line => line.rank === 1 && line.prominent),
-    '1위 고속 포켓몬은 표시된다',
+    lines.filter(line => line.rank === 1).every(line => line.prominent),
+    '1위는 표시된다',
+  );
+  // 느려도 상위권이면 그 자체가 환경의 기준선이다.
+  const slow = lines.filter(line => line.id === 'snorlax');
+  assert.ok(slow.length, '잠만보 줄이 없다');
+  assert.ok(slow[0].base < 70, '픽스처가 저속이 아니다');
+  assert.ok(
+    slow.every(line => line.prominent),
+    '15위 안이면 스피드가 느려도 표시한다',
   );
   assert.ok(
     lines.filter(line => line.rank === 40).every(line => !line.prominent),
     '15위 밖은 표시하지 않는다',
   );
+});
+
+test('the slowest preset appears only where a speed-lowering nature is actually used', () => {
+  const lines = battleSpeedRows(reference, locale, usage, {});
+  const presetsOf = id => new Set(lines.filter(line => line.id === id).map(line => line.preset));
+  // 냉정 30.4% + 무사태평 14.8% = 45.2%
+  assert.ok(presetsOf('snorlax').has('최저'), '스피드 하락 성격을 쓰는데 최저가 없다');
+  // 마스카나의 픽스처에는 능력 보정 통계가 아예 없다.
+  assert.ok(!presetsOf('meowscarada').has('최저'), '근거 없이 최저를 만들면 안 된다');
+  for (const id of ['snorlax', 'meowscarada'])
+    for (const label of ['최속', '준속', '무보정'])
+      assert.ok(presetsOf(id).has(label), `${id}에 ${label}이 없다`);
+});
+
+test('a speed-lowering nature below the threshold does not create the slowest line', () => {
+  const [meowscarada] = usage;
+  const barely = [
+    {
+      ...meowscarada,
+      categories: {
+        ...meowscarada.categories,
+        stat_alignment: [{ name: 'Quiet', percent: 10, up: 'Sp. Atk', down: 'Speed', rank: 1 }],
+      },
+    },
+  ];
+  const presets = new Set(battleSpeedRows(reference, locale, barely, {}).map(line => line.preset));
+  assert.ok(!presets.has('최저'), '정확히 10%는 넘은 것이 아니다');
 });
 
 test('battle lines render the value, the badge, the sprite and the effect source', () => {

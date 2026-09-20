@@ -95,6 +95,8 @@ const ABILITY_STAGES = {
   steadfast: [1, '풀죽음 후'],
   weakarmor: [2, '물리 기술 피격 후'],
 };
+// 스피드 하락 성격의 채용률 합이 이 값을 넘어야 최저속 줄을 만든다.
+const SLOW_NATURE = 10;
 
 export function battleSpeedRows(reference, locale, ranking, options = {}, index = null) {
   const all = new Map(
@@ -108,6 +110,13 @@ export function battleSpeedRows(reference, locale, ranking, options = {}, index 
     if (!base) continue;
     const adopted = kind =>
       (pokemon.categories[kind] ?? []).filter(r => r.percent !== null && r.percent >= 10);
+    // 최속·준속·무보정은 어느 포켓몬에나 쓰이지만 최저속은 그렇지 않다. 스피드를
+    // 내리는 성격을 실제로 쓰는 포켓몬에만 그 줄을 만든다. 통계가 능력 보정마다
+    // 어느 능력이 내려가는지 알려주므로 추측하지 않는다.
+    const slowNature = (pokemon.categories.stat_alignment ?? [])
+      .filter(r => r.down === 'Speed' && r.percent !== null)
+      .reduce((sum, r) => sum + r.percent, 0);
+    const presets = slowNature > SLOW_NATURE ? [0, 1, 2, 3] : [0, 1, 2];
     const forms = [{ id: pokemon.id, megaItem: null }];
     if (options.includeMega !== false) {
       for (const item of adopted('held_item')) {
@@ -203,12 +212,12 @@ export function battleSpeedRows(reference, locale, ranking, options = {}, index 
       }
       // Do not multiply independent marginal usage percentages or stack unrelated
       // effects into invented common sets. Every effect is a separate scenario.
-      for (let preset = 0; preset < 4; preset++) {
+      for (const preset of presets) {
         const common = {
           ...row,
           preset: SPEED_PRESETS[preset].label,
           rank: pokemon.rank,
-          prominent: pokemon.rank <= 15 && row.base >= 70,
+          prominent: pokemon.rank <= 15,
         };
         lines.push({
           ...common,
