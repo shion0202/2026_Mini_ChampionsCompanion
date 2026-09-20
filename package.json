@@ -1,0 +1,22 @@
+{
+  "name": "champions-companion",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Android-first Korean Pokémon Champions statistics viewer",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "locales": "node scripts/update-locales.mjs",
+    "reference": "node scripts/update-reference.mjs",
+    "format": "prettier --write \"src/**/*.{js,css}\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" sw.js",
+    "format:check": "prettier --check \"src/**/*.{js,css}\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" sw.js"
+  },
+  "devDependencies": {
+    "prettier": "3.9.8"
+  }
+}

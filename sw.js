@@ -1,0 +1,66 @@
+const CACHE = 'champions-shell-v12';
+const APP_FILES = [
+  './',
+  './index.html',
+  './src/styles.css',
+  './src/app.js',
+  './src/data.js',
+  './src/api.js',
+  './src/locale.js',
+  './src/theme.js',
+  './src/reference.js',
+  './src/filters.js',
+  './src/reference-view.js',
+  './src/images.js',
+  './src/artwork-data.js',
+  './src/move-traits.js',
+  './public/data/ko.json',
+  './public/data/reference.json',
+  './public/icons/icon.svg',
+  './public/icons/icon-192.png',
+  './public/icons/icon-512.png',
+  './manifest.webmanifest',
+];
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then(cache => cache.addAll(APP_FILES))
+      .then(() => self.skipWaiting()),
+  );
+});
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then(keys =>
+        Promise.all(
+          keys
+            .filter(key => key.startsWith('champions-shell-') && key !== CACHE)
+            .map(key => caches.delete(key)),
+        ),
+      )
+      .then(() => self.clients.claim()),
+  );
+});
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return; // No API or sprite archive.
+  // A selected Pokémon lives in the fragment; it is still the same app shell.
+  url.hash = '';
+  url.search = '';
+  const allowed = APP_FILES.map(path => new URL(path, self.registration.scope).href);
+  if (!allowed.includes(url.href)) return;
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+          event.waitUntil(caches.open(CACHE).then(cache => cache.put(url.href, copy)));
+        }
+        return response;
+      })
+      .catch(() => caches.match(url.href)),
+  );
+});
