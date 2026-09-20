@@ -50,6 +50,8 @@ node scripts/build.mjs
 node scripts/serve.mjs --dist --port 4174
 ```
 
+`npm run articles -- --season M3 --format singles`는 구축기사 후보를 검색해 `.cache/article-queue.json`에 쌓습니다. 원문과 이미지는 `.cache/`에만 남고 커밋되지 않으며, 수집 결과는 `pending` 상태로만 등록되어 사람이 확인해야 공개됩니다. 자세한 동작은 [docs/article-collection.md](docs/article-collection.md)에 있습니다.
+
 `dist/`에 정적 배포 파일을 생성합니다. HTTPS 정적 호스팅에 올릴 수 있지만 이 작업에서는 외부 공개/배포를 하지 않았습니다. 사용자 데이터 서버는 없습니다.
 
 렌더 결과는 스냅샷으로 비교합니다. 상세 화면의 도감·기술·효과는 `tests/reference-view.test.mjs`가, 랭킹 목록과 상세 화면 틀·필터는 `tests/app-view.test.mjs`가 담당합니다. 마크업을 의도적으로 바꾼 뒤에는 `node --test --test-update-snapshots tests/*.test.mjs`로 갱신하고 함께 저장된 `.snapshot` 파일의 차이를 확인합니다.

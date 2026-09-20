@@ -10,8 +10,28 @@ const read = name =>
 const [data, reference, ko] = await Promise.all(['articles', 'reference', 'ko'].map(read));
 const locale = createLocale(ko);
 
+// pending 기록이 파일에 있어도 된다. 형식은 공개 기록과 같아야 하고 다른 것은
+// status 하나뿐이어야 한다. 수집 자동화가 넣는 기록이 이 모양이다.
+test('every record is well formed, whether or not it is published yet', () => {
+  const forced = data.articles.map(article => ({
+    ...article,
+    review: { ...article.review, status: 'reviewed' },
+  }));
+  assert.equal(reviewedArticles({ articles: forced }, reference).length, data.articles.length);
+});
+
+test('a pending record stays out of the list but does not break the file', () => {
+  const pending = {
+    ...data.articles[0],
+    id: 'pending-sample',
+    review: { ...data.articles[0].review, status: 'pending' },
+  };
+  const published = reviewedArticles({ articles: [...data.articles, pending] }, reference);
+  assert.ok(!published.some(article => article.id === 'pending-sample'));
+  assert.equal(published.length, data.articles.length);
+});
+
 test('published teams have six valid members, item records and review evidence', () => {
-  assert.equal(reviewedArticles(data, reference).length, data.articles.length);
   assert.equal(new Set(data.articles.map(a => a.id)).size, data.articles.length);
   for (const article of data.articles) {
     assert.ok(article.review.teamImage.startsWith('https://'));
