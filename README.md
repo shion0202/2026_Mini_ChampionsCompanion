@@ -53,7 +53,7 @@ node scripts/serve.mjs --dist --port 4174
 
 렌더 결과는 스냅샷으로 비교합니다. 상세 화면의 도감·기술·효과는 `tests/reference-view.test.mjs`가, 랭킹 목록과 상세 화면 틀·필터는 `tests/app-view.test.mjs`가 담당합니다. 마크업을 의도적으로 바꾼 뒤에는 `node --test --test-update-snapshots tests/*.test.mjs`로 갱신하고 함께 저장된 `.snapshot` 파일의 차이를 확인합니다.
 
-`src/app.js`에는 상태와 DOM 조작, 이벤트 연결만 남기고 마크업 생성은 `src/app-view.js`와 `src/reference-view.js`로 분리했습니다. 두 모듈은 인자만 받아 문자열을 돌려주므로 브라우저 없이 검증할 수 있습니다. `src/app.js` 자체는 불러올 때 DOM을 사용하므로 `scripts/verify-*-browser.mjs`가 해당 범위를 담당합니다.
+`src/app.js`에는 상태 보관과 DOM 조작, 이벤트 연결만 남겼습니다. 마크업 생성은 `src/app-view.js`와 `src/reference-view.js`가, 저장된 설정 읽기·시즌과 형식 확인·목록 구성·안내 문구 같은 판단은 `src/app-state.js`가 맡습니다. 세 모듈 모두 인자만 받아 값을 돌려주므로 브라우저 없이 검증할 수 있고 `tests/app-view.test.mjs`, `tests/app-state.test.mjs`, `tests/reference-view.test.mjs`가 이를 덮습니다. `src/app.js` 자체는 불러올 때 DOM을 사용하므로 `scripts/verify-*-browser.mjs`가 해당 범위를 담당합니다.
 
 코드 서식은 Prettier로 통일합니다. `npm run format`으로 적용하고 `npm run format:check`로 확인합니다. 대상은 `src`, `tests`, `scripts`, `sw.js`이며 `index.html`은 인라인 요소 사이의 공백이 렌더 결과에 영향을 줄 수 있어 제외합니다.
 

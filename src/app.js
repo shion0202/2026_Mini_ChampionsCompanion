@@ -3,7 +3,7 @@ import { normalizeIndex, formatDate, CATEGORY_LABELS, SEASON_REGULATIONS } from 
 import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
-import { filterValues, filterSummary } from './filters.js';
+import { filterValues } from './filters.js';
 import { megaSprite } from './images.js';
 import {
   renderReference,
@@ -35,6 +35,16 @@ import {
   filterHelp,
   rankingFilterFooter,
 } from './app-view.js';
+import {
+  preferences,
+  resolveSeason,
+  resolveContext,
+  buildList,
+  loadMessages,
+  selectionReset,
+  sortLabel,
+  activeFilters,
+} from './app-state.js';
 const DETAIL_LABELS = { overview: '기본 정보', ...CATEGORY_LABELS, learnset: '배우는 기술' };
 
 const $ = id => document.getElementById(id);
@@ -44,13 +54,6 @@ try {
 } catch {
   storage = null;
 }
-const readPreference = (key, fallback) => {
-  try {
-    return JSON.parse(storage?.getItem(`champions:${key}`)) ?? fallback;
-  } catch {
-    return fallback;
-  }
-};
 const savePreference = (key, value) => {
   try {
     storage?.setItem(`champions:${key}`, JSON.stringify(value));
@@ -59,13 +62,11 @@ const savePreference = (key, value) => {
   }
 };
 const client = new ApiClient({ storage });
-const storedFavorites = readPreference('favorites', []);
-const favorites = new Set(
-  Array.isArray(storedFavorites) ? storedFavorites.filter(x => typeof x === 'string') : [],
-);
+const saved = preferences(storage);
+const favorites = saved.favorites;
 const state = {
-  format: readPreference('format', 'Singles') === 'Doubles' ? 'Doubles' : 'Singles',
-  season: readPreference('season', ''),
+  format: saved.format,
+  season: saved.season,
   index: null,
   snapshot: null,
   locale: null,
@@ -92,7 +93,7 @@ Object.assign(state, {
   refError: false,
   form: null,
   statMode: 'base',
-  spreadMode: readPreference('spreadMode', 'grouped'),
+  spreadMode: saved.spreadMode,
   learnQuery: '',
   learnType: [],
   learnCategory: [],
@@ -146,21 +147,19 @@ function renderList() {
   const visible = selectRanking(state.list, { ...state, favorites });
   $('reverse-sort').setAttribute('aria-pressed', String(state.reverse));
   $('reverse-sort').textContent = state.reverse ? '↓ 내림차순' : '↑ 오름차순';
-  document.querySelector('.list-filter>span').textContent =
-    `${{ rank: '사용 순위', name: '이름', dex: '도감 번호' }[state.sort]} (${state.reverse ? '내림차순' : '오름차순'})`;
-  const activeFilters = [
-    filterSummary(state.generation, GENERATION_LABELS, state.rankModes.generation),
-    filterSummary(state.type, TYPE_LABELS, state.rankModes.type),
-    filterSummary(state.gimmick, GIMMICK_LABELS, state.rankModes.gimmick),
-    state.favoriteOnly ? '즐겨찾기' : '',
-  ].filter(Boolean);
-  $('ranking-filter').innerHTML = rankingFilterButton(activeFilters.length);
+  document.querySelector('.list-filter>span').textContent = sortLabel(state.sort, state.reverse);
+  const summaries = activeFilters(state, {
+    generation: GENERATION_LABELS,
+    type: TYPE_LABELS,
+    gimmick: GIMMICK_LABELS,
+  });
+  $('ranking-filter').innerHTML = rankingFilterButton(summaries.length);
   $('ranking-filter').setAttribute(
     'aria-label',
-    `랭킹 필터${activeFilters.length ? ` (${activeFilters.length}개 적용)` : ''}`,
+    `랭킹 필터${summaries.length ? ` (${summaries.length}개 적용)` : ''}`,
   );
-  $('ranking-filter-summary').textContent = activeFilters.join(' / ');
-  $('ranking-filter-summary').hidden = !activeFilters.length;
+  $('ranking-filter-summary').textContent = summaries.join(' / ');
+  $('ranking-filter-summary').hidden = !summaries.length;
   $('count').textContent = `${visible.length}마리`;
   $('favorites-filter').setAttribute('aria-pressed', String(state.favoriteOnly));
   $('favorites-filter').textContent = state.favoriteOnly ? '★ 즐겨찾기' : '☆ 즐겨찾기';
@@ -318,15 +317,7 @@ function selectPokemon(id, { navigate = true, preserveCategory = false } = {}) {
   if (!document.body.classList.contains('detail-open')) state.listScroll = window.scrollY;
   const previousPokemon = state.selected;
   state.selected = id;
-  if (!preserveCategory) {
-    state.category = 'overview';
-    state.form = null;
-    state.learnQuery = '';
-    state.learnType = [];
-    state.learnCategory = [];
-    state.learnTrait = [];
-    state.learnModes = {};
-  }
+  if (!preserveCategory) Object.assign(state, selectionReset());
   if (navigate && previousPokemon !== id)
     history.pushState({ pokemon: id, previousPokemon }, '', `#pokemon=${id}`);
   document.body.classList.add('detail-open');
@@ -378,39 +369,25 @@ async function load(force = false) {
     }
     if (requestId !== state.requestId) return;
     state.index = indexResult.data;
-    if (!state.index.seasons.some(s => s.season === state.season))
-      state.season = state.index.seasons[0].season;
-    const season = state.index.seasons.find(s => s.season === state.season);
-    if (!season.formats.includes(state.format))
-      throw Error('선택한 시즌의 배틀 형식 자료가 제공되지 않습니다.');
-    const context = { season: state.season, date: season.dates[0], format: state.format };
+    state.season = resolveSeason(state.index, state.season);
+    const context = resolveContext(state.index, state);
     const result = await client.getSnapshot(context, { force });
     if (requestId !== state.requestId) return;
     state.snapshot = result.data;
     state.stale = result.stale || indexResult.stale || !navigator.onLine;
     state.fetchedAt = result.fetchedAt;
-    state.list = state.snapshot.pokemon.map(p => ({
-      ...state.index.pokemon[p.name],
-      ...p,
-      ...state.locale.pokemon(p.name),
-    }));
+    state.list = buildList(state.index, state.snapshot, state.locale);
     state.limit = 30;
     savePreference('season', state.season);
     savePreference('format', state.format);
-    const messages = [];
-    if (state.stale)
-      messages.push(
-        `새 자료를 확인하지 못해 ${formatDate(state.snapshot.date)}의 이전 통계를 표시합니다.` +
-          ` 표시된 날짜와 시각은 해당 이전 자료 기준입니다.`,
-      );
-    // A partial read is shown, never silently trimmed.
-    const skipped = state.snapshot.skipped?.length ?? 0;
-    if (skipped)
-      messages.push(
-        `자료 형식을 확인할 수 없는 ${skipped}마리를 목록에서 제외했습니다.` +
-          ` 제외한 항목의 통계는 표시하지 않습니다.`,
-      );
-    notice(messages.join(' '));
+    // A stale read and a partial read can both apply; neither is trimmed silently.
+    notice(
+      loadMessages({
+        stale: state.stale,
+        date: state.snapshot.date,
+        skipped: state.snapshot.skipped?.length ?? 0,
+      }),
+    );
     const fromUrl = new URLSearchParams(location.hash.slice(1)).get('pokemon');
     const selected = state.selected ?? fromUrl;
     if (selected && state.list.some(p => p.id === selected))
