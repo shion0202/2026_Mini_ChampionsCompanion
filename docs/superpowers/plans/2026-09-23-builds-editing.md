@@ -749,7 +749,7 @@ function dropDraft(kind, id) {
 
 function renderBuildsEditor() {
   const editing = state.buildsEditing;
-  if (!editing || state.page !== 'builds' || !state.locale) return;
+  if (!editing || state.page !== 'builds' || !state.locale || !state.reference) return;
   const shared = {
     locale: state.locale,
     existing: editing.id !== null,
@@ -793,6 +793,8 @@ function closeBuildsEditor({ navigate = true } = {}) {
 
 `renderBuilds()`에 편집 중이면 편집기를 그리는 분기를 더한다. **`state.locale` 가드보다 뒤에 넣는다.** 편집기는 특성·성격·도구 이름을 한국어로 그리므로 locale이 없으면 터진다. 주소로 편집 화면에 바로 들어오면 locale이 아직 도착하지 않은 상태가 실제로 일어난다.
 
+`state.reference`도 같이 확인한다. `abilityOptions`와 `moveOptions`, `speciesOptions`가 `reference.species`를 옵셔널 체이닝 없이 참조하므로 도감 자료가 없으면 던진다. 편집기는 도감 없이는 포켓몬도 특성도 고를 수 없으니 도착할 때까지 ‘불러오는 중’을 보여주는 것이 맞다. 목록 화면은 자료가 없어도 저장된 id를 보여줄 수 있지만 편집기는 할 수 있는 일이 없다.
+
 ```js
   if (!state.locale) {
     $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중입니다.');
@@ -807,7 +809,7 @@ function closeBuildsEditor({ navigate = true } = {}) {
 ```js
 function renderBuildsEditor() {
   const editing = state.buildsEditing;
-  if (!editing || state.page !== 'builds' || !state.locale) return;
+  if (!editing || state.page !== 'builds' || !state.locale || !state.reference) return;
 ```
 
 - [ ] **Step 3: 이벤트를 잇는다**
