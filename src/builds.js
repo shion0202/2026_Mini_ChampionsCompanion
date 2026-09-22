@@ -97,3 +97,33 @@ export function validateParty(party, samples) {
     errors.push('목록에 없는 샘플을 가리킵니다.');
   return errors;
 }
+
+// 채용 기술 한 칸을 바꾼다. 새 기술이 이미 후보에 있으면 그 자리에 원래 기술이
+// 들어간다. 교체는 후보를 소비하는 것이 아니라 뒤바꾸는 것이라 후보 개수와 순서가
+// 그대로 남는다. 후보에 없는 기술로 바꿀 때는 맞바꾸지 않는다. 고르는 기술마다
+// 후보가 자동으로 늘어나면 목록이 의도와 무관하게 불어난다.
+export function setMove(sample, slot, move) {
+  const previous = sample.moves[slot] ?? null;
+  const moves = sample.moves.map((m, i) => (i === slot ? move : m));
+  const at = move === null ? -1 : sample.altMoves.indexOf(move);
+  const altMoves =
+    at === -1
+      ? sample.altMoves
+      : // 빈 칸을 채운 경우 previous가 null이라 그 자리가 사라진다.
+        sample.altMoves.map((m, i) => (i === at ? previous : m)).filter(m => m !== null);
+  return { ...sample, moves, altMoves };
+}
+
+export const partiesUsing = (doc, id) => doc.parties.filter(p => p.members.includes(id));
+
+// 파티가 샘플을 참조하므로 지운 샘플의 자리를 빈 자리로 되돌린다. 파티 자체는
+// 남는다. 여섯 자리를 다 채우지 않은 파티도 정상이기 때문이다.
+export function deleteSample(doc, id) {
+  return {
+    ...doc,
+    samples: doc.samples.filter(s => s.id !== id),
+    parties: doc.parties.map(p =>
+      p.members.includes(id) ? { ...p, members: p.members.map(m => (m === id ? null : m)) } : p,
+    ),
+  };
+}

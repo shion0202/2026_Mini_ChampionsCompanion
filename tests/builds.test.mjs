@@ -9,6 +9,9 @@ import {
   emptyParty,
   validateSample,
   validateParty,
+  setMove,
+  partiesUsing,
+  deleteSample,
 } from '../src/builds.js';
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
@@ -136,4 +139,98 @@ test('없는 샘플을 가리키는 파티는 알린다', () => {
 
 test('빈 자리만 있는 파티도 이름만 있으면 저장된다', () => {
   assert.deepEqual(validateParty({ ...emptyParty(), name: '구상 중' }, []), []);
+});
+
+const built = () => ({
+  ...emptySample(),
+  name: '물리형',
+  pokemon: 'Salamence',
+  moves: ['A', 'B', 'C', 'D'],
+  altMoves: ['E', 'F', 'G'],
+});
+
+test('후보에 있는 기술로 바꾸면 자리를 맞바꾼다', () => {
+  const next = setMove(built(), 3, 'E');
+  assert.deepEqual(next.moves, ['A', 'B', 'C', 'E']);
+  assert.deepEqual(next.altMoves, ['D', 'F', 'G']);
+});
+
+test('맞바꿔도 후보 개수와 순서가 유지된다', () => {
+  const next = setMove(built(), 0, 'F');
+  assert.deepEqual(next.moves, ['F', 'B', 'C', 'D']);
+  assert.deepEqual(next.altMoves, ['E', 'A', 'G']);
+});
+
+test('후보에 없는 기술로 바꾸면 원래 기술은 그냥 빠진다', () => {
+  const next = setMove(built(), 3, 'Z');
+  assert.deepEqual(next.moves, ['A', 'B', 'C', 'Z']);
+  assert.deepEqual(next.altMoves, ['E', 'F', 'G']);
+});
+
+test('빈 칸에 후보를 넣으면 후보에서 빠지고 되돌아오는 기술은 없다', () => {
+  const next = setMove({ ...built(), moves: ['A', 'B', 'C', null] }, 3, 'E');
+  assert.deepEqual(next.moves, ['A', 'B', 'C', 'E']);
+  assert.deepEqual(next.altMoves, ['F', 'G']);
+});
+
+test('기술을 비우면 후보는 그대로다', () => {
+  const next = setMove(built(), 3, null);
+  assert.deepEqual(next.moves, ['A', 'B', 'C', null]);
+  assert.deepEqual(next.altMoves, ['E', 'F', 'G']);
+});
+
+test('맞바꿈은 원본을 고치지 않는다', () => {
+  const sample = built();
+  setMove(sample, 3, 'E');
+  assert.deepEqual(sample.moves, ['A', 'B', 'C', 'D']);
+  assert.deepEqual(sample.altMoves, ['E', 'F', 'G']);
+});
+
+const docWith = () => {
+  const one = { ...emptySample(), id: 'one1one1one1one1', name: '하나' };
+  const two = { ...emptySample(), id: 'two2two2two2two2', name: '둘' };
+  return {
+    samples: [one, two],
+    parties: [
+      {
+        ...emptyParty(),
+        id: 'p1p1p1p1p1p1p1p1',
+        name: '첫 구축',
+        members: ['one1one1one1one1', 'two2two2two2two2', null, null, null, null],
+      },
+      {
+        ...emptyParty(),
+        id: 'p2p2p2p2p2p2p2p2',
+        name: '둘째 구축',
+        members: ['two2two2two2two2', null, null, null, null, null],
+      },
+    ],
+    version: 0,
+  };
+};
+
+test('샘플을 쓰는 파티를 센다', () => {
+  const doc = docWith();
+  assert.deepEqual(
+    partiesUsing(doc, 'two2two2two2two2').map(p => p.id),
+    ['p1p1p1p1p1p1p1p1', 'p2p2p2p2p2p2p2p2'],
+  );
+  assert.deepEqual(partiesUsing(doc, 'none').length, 0);
+});
+
+test('샘플을 지우면 그 자리가 빈 자리로 돌아간다', () => {
+  const next = deleteSample(docWith(), 'two2two2two2two2');
+  assert.deepEqual(
+    next.samples.map(s => s.id),
+    ['one1one1one1one1'],
+  );
+  assert.deepEqual(next.parties[0].members, ['one1one1one1one1', null, null, null, null, null]);
+  assert.deepEqual(next.parties[1].members, [null, null, null, null, null, null]);
+});
+
+test('삭제는 원본을 고치지 않는다', () => {
+  const doc = docWith();
+  deleteSample(doc, 'two2two2two2two2');
+  assert.equal(doc.samples.length, 2);
+  assert.equal(doc.parties[0].members[1], 'two2two2two2two2');
 });
