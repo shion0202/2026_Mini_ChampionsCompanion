@@ -10,7 +10,15 @@ import { articleControls, articleSeasonLabel, renderArticleCards } from './artic
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
 import { speedRows, battleSpeedRows } from './speed.js';
 import { renderSpeedRows, renderSpeedLines } from './speed-view.js';
-import { readDoc, writeDoc, toJson, fromJson, mergeDocs } from './builds.js';
+import {
+  readDoc,
+  writeDoc,
+  toJson,
+  fromJson,
+  mergeDocs,
+  searchSamples,
+  searchParties,
+} from './builds.js';
 import { sampleList, partyList } from './builds-view.js';
 import {
   renderReference,
@@ -567,17 +575,15 @@ function renderBuilds() {
     $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중입니다.');
     return;
   }
-  const query = state.buildsQuery.trim().toLowerCase();
   const { samples, parties } = state.builds;
-  if (state.buildsTab === 'sample') {
-    const shown = query
-      ? samples.filter(s => `${s.name} ${s.pokemon ?? ''}`.toLowerCase().includes(query))
-      : samples;
-    $('builds-rows').innerHTML = sampleList(shown, state.locale, state.reference);
-  } else {
-    const shown = query ? parties.filter(p => p.name.toLowerCase().includes(query)) : parties;
-    $('builds-rows').innerHTML = partyList(shown, samples, state.locale);
-  }
+  $('builds-rows').innerHTML =
+    state.buildsTab === 'sample'
+      ? sampleList(
+          searchSamples(samples, state.buildsQuery, state.reference, state.locale),
+          state.locale,
+          state.reference,
+        )
+      : partyList(searchParties(parties, state.buildsQuery), samples, state.locale);
 }
 
 function openBuilds(tab = 'sample', { navigate = true } = {}) {

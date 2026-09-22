@@ -264,3 +264,26 @@ export const itemOptions = reference =>
     .filter(item => item.champions)
     .map(item => item.name)
     .sort();
+
+// 목록 검색. 다른 화면과 같은 matchesQuery를 써서 한국어 이름, 초성, 도감 번호가
+// 모두 같은 방식으로 걸린다. 사용자가 화면에서 보는 것은 한국어 이름이므로
+// 저장된 키만 비교하면 보이는 대로 찾을 수 없다.
+export function searchSamples(samples, query, reference, locale) {
+  const needle = String(query ?? '').trim();
+  if (!needle) return samples;
+  return samples.filter(s => {
+    if (matchesQuery({ name: s.name, label: s.name }, needle)) return true;
+    const species = reference?.species?.[s.pokemon];
+    const label = species && locale ? locale.pokemon(species.name).label : '';
+    return matchesQuery(
+      { name: species?.name ?? s.pokemon ?? '', label, dex: species?.dex },
+      needle,
+    );
+  });
+}
+
+export function searchParties(parties, query) {
+  const needle = String(query ?? '').trim();
+  if (!needle) return parties;
+  return parties.filter(p => matchesQuery({ name: p.name, label: p.name }, needle));
+}

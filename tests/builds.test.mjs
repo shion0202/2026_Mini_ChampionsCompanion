@@ -21,6 +21,8 @@ import {
   abilityOptions,
   moveOptions,
   itemOptions,
+  searchSamples,
+  searchParties,
 } from '../src/builds.js';
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
@@ -417,4 +419,52 @@ test('도구 목록은 챔피언스 수록 도구만 준다', () => {
 test('도구 목록에 중복이 없다', () => {
   const items = itemOptions(reference);
   assert.equal(new Set(items).size, items.length);
+});
+
+const charizard = () => ({
+  ...emptySample(),
+  id: 'char000000000000',
+  name: '물리형',
+  pokemon: 'charizard',
+});
+
+test('샘플 이름에 없어도 포켓몬 한국어 이름으로 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], '리자몽', reference, locale), [s]);
+});
+
+test('초성과 영문 이름과 도감 번호로도 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], 'ㄹㅈㅁ', reference, locale), [s]);
+  assert.deepEqual(searchSamples([s], 'charizard', reference, locale), [s]);
+  assert.deepEqual(searchSamples([s], '6', reference, locale), [s]);
+});
+
+test('샘플 자신의 이름으로도 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], '물리', reference, locale), [s]);
+});
+
+test('맞지 않는 검색어는 걸러낸다', () => {
+  assert.deepEqual(searchSamples([charizard()], '보만다', reference, locale), []);
+});
+
+test('빈 검색어는 전부 준다', () => {
+  const list = [charizard()];
+  assert.deepEqual(searchSamples(list, '', reference, locale), list);
+  assert.deepEqual(searchSamples(list, '   ', reference, locale), list);
+});
+
+test('도감 자료가 없으면 저장된 키로만 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], 'chari', null, null), [s]);
+  assert.deepEqual(searchSamples([s], '리자몽', null, null), []);
+});
+
+test('파티는 이름으로 찾는다', () => {
+  const p = { ...emptyParty(), id: 'party00000000000', name: '스카프 선공 구축' };
+  assert.deepEqual(searchParties([p], '스카프', ''), [p]);
+  assert.deepEqual(searchParties([p], 'ㅅㅋㅍ', ''), [p]);
+  assert.deepEqual(searchParties([p], '없는것', ''), []);
+  assert.deepEqual(searchParties([p], ''), [p]);
 });
