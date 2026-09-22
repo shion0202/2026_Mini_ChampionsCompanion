@@ -35,6 +35,8 @@
 | `src/app.js` (수정) | 상태, `showPage` 항목, 해시 경로, 이벤트 연결 |
 | `src/styles.css` (수정) | 새 패널 스타일 |
 | `sw.js` (수정) | 새 모듈 캐시 목록, 캐시 이름 |
+| `scripts/verify-builds-browser.mjs` (신규) | 브라우저 회귀 검증 |
+| `docs/verification.md` (수정) | 검증 기록 |
 
 `src/sync.js`와 `functions/`는 3단계에서 만든다. 이 계획에 없다.
 
@@ -1401,9 +1403,224 @@ git commit -m "내 샘플 화면을 앱에 연결한다"
 
 ---
 
+---
+
+### Task 8: 브라우저 회귀 검증 스크립트
+
+목록·저장·JSON 입출력은 DOM과 파일 API를 거치므로 `node --test`가 닿지 않는다. 이 저장소는 그 범위를 `scripts/verify-*-browser.mjs`로 덮는다. 같은 관례를 따른다.
+
+**Files:**
+- Create: `scripts/verify-builds-browser.mjs`
+- Modify: `docs/verification.md` (끝에 절 추가)
+
+**Interfaces:**
+- Consumes: Task 7이 만든 화면. 새 export는 쓰지 않는다.
+- Produces: 없다. 실행 가능한 검증 스크립트가 결과물이다.
+
+기존 스크립트와 같은 방식으로 돈다. Playwright는 **의존성으로 추가하지 않고** 환경변수로 받는다.
+
+```bash
+node scripts/serve.mjs --port 4173   # 다른 터미널에서 먼저 띄운다
+PLAYWRIGHT_MODULE=<playwright 모듈 경로> BROWSER_EXECUTABLE=<브라우저 실행 파일> \
+  node scripts/verify-builds-browser.mjs
+```
+
+- [ ] **Step 1: 스크립트를 쓴다**
+
+`scripts/verify-navigation-browser.mjs`의 앞부분(모듈 로드, 브라우저 실행, `pageerror` 수집, `context.route`로 API 가로채기)을 그대로 따른다. **새 방식을 만들지 않는다.**
+
+```js
+import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
+const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.BROWSER_EXECUTABLE,
+});
+const context = await browser.newContext({
+  viewport: { width: 390, height: 844 },
+  serviceWorkers: 'block',
+});
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', e => errors.push(e.message));
+// 이 화면은 통계를 쓰지 않는다. 외부 연결을 모두 막아 통계 장애와 무관하게
+// 저장 기능만 검증한다.
+await context.route('https://**/*', route => route.abort());
+
+try {
+  // 1. 빈 목록
+  await page.goto('http://localhost:4173/#builds=sample');
+  await page.locator('#builds .empty-state').waitFor({ state: 'visible' });
+
+  // 2. 저장한 것이 새로고침 후에도 남는다
+  await page.evaluate(() => {
+    const doc = {
+      samples: [
+        {
+          id: 'aaaaaaaaaaaaaaaa',
+          name: '물리형 보만다',
+          note: '스카프로 선공을 잡는다.',
+          pokemon: 'salamence',
+          form: null,
+          ability: 'Intimidate',
+          nature: 'adamant',
+          points: [0, 32, 0, 0, 2, 32],
+          moves: ['Dragon Claw', 'Earthquake', 'Dragon Dance', 'Roost'],
+          altMoves: ['Fire Fang'],
+          updatedAt: 0,
+        },
+      ],
+      parties: [
+        {
+          id: 'p1p1p1p1p1p1p1p1',
+          name: '스카프 선공 구축',
+          note: '',
+          members: ['aaaaaaaaaaaaaaaa', null, null, null, null, null],
+          updatedAt: 0,
+        },
+      ],
+      version: 1,
+    };
+    localStorage.setItem('champions:builds', JSON.stringify(doc));
+  });
+  await page.reload();
+  await page.locator('#builds-rows').getByText('물리형 보만다').waitFor({ state: 'visible' });
+
+  // 3. 검색
+  await page.locator('#builds-search').fill('없는이름');
+  await page.locator('#builds .empty-state').waitFor({ state: 'visible' });
+  await page.locator('#builds-search').fill('');
+
+  // 4. 파티 탭과 채운 자리 수
+  await page.locator('[data-builds-tab="party"]').click();
+  await page.locator('#builds-rows').getByText('스카프 선공 구축').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#builds-rows .builds-sub').first().innerText(), /1\/6/);
+
+  // 5. 뒤로 가기가 이전 탭으로 돌아간다
+  await page.goBack();
+  assert.equal(
+    await page.locator('[data-builds-tab="sample"]').getAttribute('aria-pressed'),
+    'true',
+  );
+
+  // 6. 내보내기가 파일을 준다
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#builds-export').click(),
+  ]);
+  assert.match(download.suggestedFilename(), /^champions-builds-\d{4}-\d{2}-\d{2}\.json$/);
+
+  // 7. 가져오기는 덮어쓰지 않고 합친다
+  await page.locator('#builds-import').setInputFiles({
+    name: 'builds.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        samples: [
+          {
+            id: 'bbbbbbbbbbbbbbbb',
+            name: '가져온 샘플',
+            note: '',
+            pokemon: 'salamence',
+            form: null,
+            ability: null,
+            nature: null,
+            points: [0, 0, 0, 0, 0, 0],
+            moves: [null, null, null, null],
+            altMoves: [],
+            updatedAt: 0,
+          },
+        ],
+        parties: [],
+        version: 0,
+      }),
+    ),
+  });
+  await page.locator('#builds-status').waitFor({ state: 'visible' });
+  // 원래 있던 것이 지워지지 않았다.
+  await page.locator('#builds-rows').getByText('물리형 보만다').waitFor({ state: 'visible' });
+  await page.locator('#builds-rows').getByText('가져온 샘플').waitFor({ state: 'visible' });
+
+  // 8. 형식이 아닌 파일은 안내만 내고 목록을 비우지 않는다
+  await page.locator('#builds-import').setInputFiles({
+    name: 'not-json.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('이것은 JSON이 아니다'),
+  });
+  assert.match(await page.locator('#builds-status').innerText(), /읽을 수 없습니다/);
+  await page.locator('#builds-rows').getByText('물리형 보만다').waitFor({ state: 'visible' });
+
+  await page.screenshot({ path: 'test-results/builds-mobile.png' });
+
+  // 9. PC 폭과 다크 테마
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: 'test-results/builds-desktop-dark.png' });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+    true,
+  );
+
+  assert.deepEqual(errors, []);
+  console.log('Builds list, storage and JSON exchange passed.');
+} finally {
+  await browser.close();
+}
+```
+
+- [ ] **Step 2: 서버를 띄우고 실행한다**
+
+```bash
+node scripts/serve.mjs --port 4173
+```
+
+다른 터미널에서:
+
+```bash
+PLAYWRIGHT_MODULE=<경로> BROWSER_EXECUTABLE=<경로> node scripts/verify-builds-browser.mjs
+```
+
+Expected: `Builds list, storage and JSON exchange passed.`
+
+실패하면 스크립트가 아니라 **앱을 고친다.** 스크립트의 기댓값을 앱에 맞춰 낮추지 않는다. 단, 선택자(`#builds-rows`, `.builds-sub` 등)가 Task 7이 실제로 만든 마크업과 다르면 그때는 선택자를 맞춘다.
+
+- [ ] **Step 3: 스크린샷을 눈으로 본다**
+
+`test-results/builds-mobile.png`와 `test-results/builds-desktop-dark.png`를 **열어서 본다.** 확인할 것: 다크 테마에서 목록 항목이 배경에 묻히지 않는지, 390px에서 조작 버튼들이 줄바꿈되어도 겹치지 않는지, 포켓몬 이름이 한국어로 나오는지.
+
+`test-results/`는 `.prettierignore`와 Git에서 제외된다. 커밋하지 않는다.
+
+- [ ] **Step 4: 검증 기록을 남긴다**
+
+`docs/verification.md` 끝에 절을 더한다. 기존 절들과 같은 톤으로, **실제로 실행한 결과만** 적는다. 통과하지 않은 것을 통과했다고 적지 않는다.
+
+```markdown
+## 샘플과 파티 로컬 저장 검증 — 2026-09-22
+
+`scripts/verify-builds-browser.mjs`: 빈 목록 안내, 저장한 샘플과 파티의 새로고침 후 유지,
+이름 검색, 파티의 채운 자리 수, 탭 전환과 뒤로 가기, JSON 내보내기 파일 이름,
+가져오기가 기존 항목을 지우지 않고 합치는 것, 형식이 아닌 파일의 안내와 목록 보존,
+390px과 1280px 가로 넘침 없음, 다크 테마를 확인했습니다. 런타임 오류 0개.
+
+이 화면은 통계 API를 쓰지 않으므로 외부 연결을 모두 차단한 상태로 검증했습니다.
+```
+
+- [ ] **Step 5: 커밋한다**
+
+```bash
+node --test tests/*.test.mjs
+npm run format
+git add scripts/verify-builds-browser.mjs docs/verification.md
+git commit -m "내 샘플 화면의 브라우저 회귀 검증을 더한다"
+```
+
+
 ## 남은 것
 
-이 계획은 **목록과 저장까지**다. 편집 화면(`sampleEditor`, `partyEditor`)의 마크업은 Task 6에서 만들지만 Task 7은 그것을 화면에 띄우는 이벤트를 잇지 않는다. 다음 계획에서 이어간다.
+이 계획은 **목록과 저장까지**다. 편집 화면(`sampleEditor`, `partyEditor`)의 마크업은 Task 6에서 만들지만 Task 7은 그것을 화면에 띄우는 이벤트를 잇지 않는다. 사용자가 별도 계획으로 하기로 정했다.
 
 - 샘플·파티 만들기와 고치기 흐름: 고르기 창(포켓몬, 특성, 성격, 기술, 도구), `setMove`로 맞바꿈, 저장 시 `validateSample` 결과 표시
 - 삭제와 `partiesUsing` 확인 문구
