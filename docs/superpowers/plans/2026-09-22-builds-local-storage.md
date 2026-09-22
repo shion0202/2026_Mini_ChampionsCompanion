@@ -935,7 +935,7 @@ const sample = {
   ...emptySample(),
   id: 'aaaaaaaaaaaaaaaa',
   name: '물리형 보만다',
-  note: '스카프로 선공을 잡는다.\n후보는 상성 보완역이라 4번째와 자유롭게 바꾼다.',
+  note: '스카프로 선공을 잡는다.\n후보는 "상성 보완역"이라 <4번째>와 자유롭게 바꾼다.',
   pokemon: 'salamence',
   ability: 'Intimidate',
   nature: 'adamant',
@@ -996,12 +996,14 @@ Expected: FAIL — `Cannot find module '.../src/builds-view.js'`
 // 않으므로 브라우저 없이 스냅샷으로 비교한다.
 import { esc } from './html.js';
 import { spreadLabel, POINT_LETTERS } from './reference.js';
-import { NATURES, natureAdjust } from './builds.js';
+import { natureAdjust } from './builds.js';
 import { STAT_NAMES } from './locale.js';
 
-const empty = (what, action) =>
-  `<div class="empty-state"><p>저장한 ${what}이 없습니다.</p>` +
-  `<button class="text-button" data-builds-new="${action}">${what} 만들기</button></div>`;
+// 명사를 조사가 붙은 문장에 끼워넣지 않는다. '샘플이'는 맞지만 '파티이'는 틀린다.
+// 다른 뷰 모듈도 맥락마다 문장을 통으로 적는다.
+const empty = (message, action, label) =>
+  `<div class="empty-state"><p>${message}</p>` +
+  `<button class="text-button" data-builds-new="${action}">${label}</button></div>`;
 
 const speciesLabel = (locale, reference, id) => {
   const species = reference?.species?.[id];
@@ -1021,7 +1023,7 @@ const natureLabel = (locale, id) => {
 // reference가 null이면 포켓몬 이름 자리에 저장된 id가 나온다. 도감을 아직
 // 불러오지 않은 상태에서도 목록은 떠야 한다.
 export function sampleList(samples, locale, reference = null) {
-  if (!samples.length) return empty('샘플', 'sample');
+  if (!samples.length) return empty('저장한 샘플이 없습니다.', 'sample', '샘플 만들기');
   return `<ul class="builds-list">${samples
     .map(
       s =>
@@ -1035,7 +1037,7 @@ export function sampleList(samples, locale, reference = null) {
 }
 
 export function partyList(parties, samples, locale) {
-  if (!parties.length) return empty('파티', 'party');
+  if (!parties.length) return empty('저장한 파티가 없습니다.', 'party', '파티 만들기');
   const names = new Map(samples.map(s => [s.id, s.name]));
   return `<ul class="builds-list">${parties
     .map(p => {
