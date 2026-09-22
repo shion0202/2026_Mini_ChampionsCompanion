@@ -1560,6 +1560,151 @@ git commit -m "내 샘플 화면을 앱에 연결한다"
 
 ---
 
+### Task 7b: 보이는 대로 검색하게 한다
+
+Task 7의 검색은 `s.pokemon`(내부 키 `charizard`)을 비교한다. 화면에 나오는 것은
+`리자몽`이므로 사용자가 보이는 대로 입력하면 찾지 못한다. 입력창 안내도
+‘이름, 포켓몬’이라 포켓몬 이름으로 찾을 수 있다고 약속한다.
+
+앱의 다른 화면은 모두 `matchesQuery`를 쓴다. 한국어 이름, 초성, 도감 번호가 한
+함수에 들어 있다. 같은 것을 다시 만들지 않는다.
+
+**Files:**
+- Modify: `src/builds.js` (새 `searchSamples`, `searchParties`)
+- Modify: `src/app.js` (`renderBuilds`의 필터 교체, import 추가)
+- Modify: `tests/builds.test.mjs`
+
+**Interfaces:**
+- Consumes: `matchesQuery` (`src/data.js:187`)
+- Produces: `searchSamples(samples, query, reference, locale) → sample[]`,
+  `searchParties(parties, query) → party[]`
+
+판단이지 DOM 작업이 아니므로 `builds.js`에 두고 브라우저 없이 검사한다.
+`app-state.js`가 목록 구성을 맡는 것과 같은 이유다.
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+`tests/builds.test.mjs`의 import에 `searchSamples`, `searchParties`를 더하고
+파일 끝에 붙인다.
+
+```js
+const charizard = () => ({
+  ...emptySample(),
+  id: 'char000000000000',
+  name: '물리형',
+  pokemon: 'charizard',
+});
+
+test('샘플 이름에 없어도 포켓몬 한국어 이름으로 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], '리자몽', reference, locale), [s]);
+});
+
+test('초성과 영문 이름과 도감 번호로도 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], 'ㄹㅈㅁ', reference, locale), [s]);
+  assert.deepEqual(searchSamples([s], 'charizard', reference, locale), [s]);
+  assert.deepEqual(searchSamples([s], '6', reference, locale), [s]);
+});
+
+test('샘플 자신의 이름으로도 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], '물리', reference, locale), [s]);
+});
+
+test('맞지 않는 검색어는 걸러낸다', () => {
+  assert.deepEqual(searchSamples([charizard()], '보만다', reference, locale), []);
+});
+
+test('빈 검색어는 전부 준다', () => {
+  const list = [charizard()];
+  assert.deepEqual(searchSamples(list, '', reference, locale), list);
+  assert.deepEqual(searchSamples(list, '   ', reference, locale), list);
+});
+
+test('도감 자료가 없으면 저장된 키로만 찾는다', () => {
+  const s = charizard();
+  assert.deepEqual(searchSamples([s], 'chari', null, null), [s]);
+  assert.deepEqual(searchSamples([s], '리자몽', null, null), []);
+});
+
+test('파티는 이름으로 찾는다', () => {
+  const p = { ...emptyParty(), id: 'party00000000000', name: '스카프 선공 구축' };
+  assert.deepEqual(searchParties([p], '스카프', ''), [p]);
+  assert.deepEqual(searchParties([p], 'ㅅㅋㅍ', ''), [p]);
+  assert.deepEqual(searchParties([p], '없는것', ''), []);
+  assert.deepEqual(searchParties([p], ''), [p]);
+});
+```
+
+- [ ] **Step 2: 실패를 확인한다**
+
+Run: `node --test tests/builds.test.mjs`
+Expected: FAIL — `searchSamples is not a function`
+
+- [ ] **Step 3: 구현한다**
+
+`src/builds.js`의 import에 `matchesQuery`가 이미 있다. 파일 끝에 붙인다.
+
+```js
+// 목록 검색. 다른 화면과 같은 matchesQuery를 써서 한국어 이름, 초성, 도감 번호가
+// 모두 같은 방식으로 걸린다. 사용자가 화면에서 보는 것은 한국어 이름이므로
+// 저장된 키만 비교하면 보이는 대로 찾을 수 없다.
+export function searchSamples(samples, query, reference, locale) {
+  const needle = String(query ?? '').trim();
+  if (!needle) return samples;
+  return samples.filter(s => {
+    if (matchesQuery({ name: s.name, label: s.name }, needle)) return true;
+    const species = reference?.species?.[s.pokemon];
+    const label = species && locale ? locale.pokemon(species.name).label : '';
+    return matchesQuery(
+      { name: species?.name ?? s.pokemon ?? '', label, dex: species?.dex },
+      needle,
+    );
+  });
+}
+
+export function searchParties(parties, query) {
+  const needle = String(query ?? '').trim();
+  if (!needle) return parties;
+  return parties.filter(p => matchesQuery({ name: p.name, label: p.name }, needle));
+}
+```
+
+`src/app.js`의 `builds.js` import에 `searchSamples`, `searchParties`를 더하고,
+`renderBuilds`의 필터 부분을 바꾼다. 쓰이지 않게 된 `const query = ...` 줄은
+지운다.
+
+```js
+  const { samples, parties } = state.builds;
+  $('builds-rows').innerHTML =
+    state.buildsTab === 'sample'
+      ? sampleList(
+          searchSamples(samples, state.buildsQuery, state.reference, state.locale),
+          state.locale,
+          state.reference,
+        )
+      : partyList(searchParties(parties, state.buildsQuery), samples, state.locale);
+```
+
+- [ ] **Step 4: 확인한다**
+
+```bash
+node --test tests/builds.test.mjs
+node --test tests/*.test.mjs
+```
+
+- [ ] **Step 5: 커밋한다**
+
+```bash
+npm run format
+git add src/builds.js src/app.js tests/builds.test.mjs
+git commit -m "보이는 이름으로 샘플을 찾게 한다"
+```
+
+
+---
+
 ### Task 8: 브라우저 회귀 검증 스크립트
 
 목록·저장·JSON 입출력은 DOM과 파일 API를 거치므로 `node --test`가 닿지 않는다. 이 저장소는 그 범위를 `scripts/verify-*-browser.mjs`로 덮는다. 같은 관례를 따른다.
