@@ -65,3 +65,35 @@ export const emptyParty = () => ({
   members: [null, null, null, null, null, null],
   updatedAt: 0,
 });
+
+// 저장을 막을 이유만 모은다. 빈 배열이면 저장한다. 능력 포인트 범위는 통계
+// 자료의 검증(data.js)과 같은 값을 쓴다. 자체로 더 좁은 기준을 만들면 게임이
+// 허용하는 배치를 거절하게 된다.
+export function validateSample(sample) {
+  const errors = [];
+  if (!sample.name?.trim()) errors.push('이름을 입력하세요.');
+  if (!sample.pokemon) errors.push('포켓몬을 고르세요.');
+  const points = sample.points;
+  if (
+    !Array.isArray(points) ||
+    points.length !== 6 ||
+    !points.every(p => Number.isInteger(p) && p >= 0 && p <= 32)
+  )
+    errors.push('능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.');
+  else if (points.reduce((a, b) => a + b, 0) > 66)
+    errors.push('능력 포인트 합계는 66을 넘을 수 없습니다.');
+  // 빈 칸은 여러 개여도 중복이 아니다.
+  const moves = [...(sample.moves ?? []), ...(sample.altMoves ?? [])].filter(Boolean);
+  if (new Set(moves).size !== moves.length) errors.push('같은 기술을 두 번 넣을 수 없습니다.');
+  return errors;
+}
+
+// 빈 자리는 정상이다. 구상 중인 조합을 적어두는 것이 이 기능의 쓸모다.
+export function validateParty(party, samples) {
+  const errors = [];
+  if (!party.name?.trim()) errors.push('이름을 입력하세요.');
+  const ids = new Set(samples.map(s => s.id));
+  if (party.members.some(id => id !== null && !ids.has(id)))
+    errors.push('목록에 없는 샘플을 가리킵니다.');
+  return errors;
+}

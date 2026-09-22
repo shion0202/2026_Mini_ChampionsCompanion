@@ -2,7 +2,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { NATURES, natureAdjust, emptySample, emptyParty } from '../src/builds.js';
+import {
+  NATURES,
+  natureAdjust,
+  emptySample,
+  emptyParty,
+  validateSample,
+  validateParty,
+} from '../src/builds.js';
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
 
@@ -56,4 +63,77 @@ test('빈 샘플과 빈 파티는 저장 가능한 모양이다', () => {
 
 test('새로 만들 때마다 다른 id가 나온다', () => {
   assert.notEqual(emptySample().id, emptySample().id);
+});
+
+const filled = () => ({ ...emptySample(), name: '물리형', pokemon: 'Salamence' });
+
+test('빈 샘플은 이름과 포켓몬이 없다고 알린다', () => {
+  assert.deepEqual(validateSample(emptySample()), ['이름을 입력하세요.', '포켓몬을 고르세요.']);
+});
+
+test('공백만 있는 이름은 이름이 아니다', () => {
+  assert.deepEqual(validateSample({ ...filled(), name: '   ' }), ['이름을 입력하세요.']);
+});
+
+test('능력 포인트는 각 칸 32 이하다', () => {
+  assert.deepEqual(validateSample({ ...filled(), points: [0, 33, 0, 0, 0, 0] }), [
+    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+  ]);
+  assert.deepEqual(validateSample({ ...filled(), points: [0, 32, 0, 0, 0, 0] }), []);
+  assert.deepEqual(validateSample({ ...filled(), points: [0, -1, 0, 0, 0, 0] }), [
+    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+  ]);
+  assert.deepEqual(validateSample({ ...filled(), points: [0, 1.5, 0, 0, 0, 0] }), [
+    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+  ]);
+  assert.deepEqual(validateSample({ ...filled(), points: [0, 0, 0, 0, 0] }), [
+    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+  ]);
+});
+
+test('능력 포인트 합계는 66 이하다', () => {
+  assert.deepEqual(validateSample({ ...filled(), points: [32, 32, 2, 0, 0, 0] }), []);
+  assert.deepEqual(validateSample({ ...filled(), points: [32, 32, 3, 0, 0, 0] }), [
+    '능력 포인트 합계는 66을 넘을 수 없습니다.',
+  ]);
+});
+
+test('같은 기술을 채용과 후보에 겹쳐 넣을 수 없다', () => {
+  assert.deepEqual(
+    validateSample({
+      ...filled(),
+      moves: ['Earthquake', null, null, null],
+      altMoves: ['Earthquake'],
+    }),
+    ['같은 기술을 두 번 넣을 수 없습니다.'],
+  );
+  assert.deepEqual(
+    validateSample({ ...filled(), moves: ['Earthquake', 'Earthquake', null, null] }),
+    ['같은 기술을 두 번 넣을 수 없습니다.'],
+  );
+});
+
+test('빈 칸이 여러 개인 것은 기술 중복이 아니다', () => {
+  assert.deepEqual(validateSample(filled()), []);
+});
+
+test('없는 샘플을 가리키는 파티는 알린다', () => {
+  const samples = [{ ...emptySample(), id: 'aaaaaaaaaaaaaaaa' }];
+  const party = {
+    ...emptyParty(),
+    name: '구축',
+    members: ['aaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbb', null, null, null, null],
+  };
+  assert.deepEqual(validateParty(party, samples), ['목록에 없는 샘플을 가리킵니다.']);
+  assert.deepEqual(
+    validateParty(
+      { ...party, members: ['aaaaaaaaaaaaaaaa', null, null, null, null, null] },
+      samples,
+    ),
+    [],
+  );
+});
+
+test('빈 자리만 있는 파티도 이름만 있으면 저장된다', () => {
+  assert.deepEqual(validateParty({ ...emptyParty(), name: '구상 중' }, []), []);
 });
