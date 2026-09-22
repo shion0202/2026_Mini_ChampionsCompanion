@@ -1,4 +1,4 @@
-const CACHE = 'champions-shell-v22';
+const CACHE = 'champions-shell-v23';
 const APP_FILES = [
   './',
   './index.html',
@@ -17,6 +17,8 @@ const APP_FILES = [
   './src/filters.js',
   './src/reference-view.js',
   './src/type-chart-view.js',
+  './src/builds.js',
+  './src/builds-view.js',
   './src/speed.js',
   './src/speed-catalog.js',
   './src/speed-view.js',

@@ -32,6 +32,7 @@
       <button id="speed-link" aria-pressed="false">스피드 랭킹</button>
       <button id="types-link" aria-pressed="false">상성표</button>
       <button id="dex-link" aria-pressed="false">도감</button>
+      <button id="builds-link" aria-pressed="false">내 샘플</button>
       <button id="articles-link" aria-pressed="false">구축기사</button>
     </nav>
   </header>
@@ -88,6 +89,21 @@
       </div>
       <p class="type-chart-note">두 타입을 선택하면 각 타입의 배율을 곱해 복합 타입으로 계산합니다. 특성과 도구의 효과는 포함하지 않습니다.</p>
       <div id="type-chart-content"></div>
+    </section>
+    <section id="builds" class="builds-panel" aria-labelledby="builds-title" hidden>
+      <div class="list-heading"><h2 id="builds-title">내 샘플</h2></div>
+      <div class="segmented" role="group" aria-label="보기 전환">
+        <button data-builds-tab="sample" aria-pressed="true">샘플</button>
+        <button data-builds-tab="party" aria-pressed="false">파티</button>
+      </div>
+      <div class="builds-controls">
+        <label class="builds-search">검색<input id="builds-search" type="search" placeholder="이름, 포켓몬" autocomplete="off"></label>
+        <button id="builds-new" class="text-button">새로 만들기</button>
+        <button id="builds-export" class="text-button">JSON 내보내기</button>
+        <label class="text-button builds-import">JSON 가져오기<input id="builds-import" type="file" accept="application/json,.json" hidden></label>
+      </div>
+      <p id="builds-status" class="builds-status" role="status"></p>
+      <div id="builds-rows"></div>
     </section>
     <section id="speed" class="speed-panel" aria-labelledby="speed-title" hidden>
       <div class="list-heading"><h2 id="speed-title">스피드 랭킹</h2></div>

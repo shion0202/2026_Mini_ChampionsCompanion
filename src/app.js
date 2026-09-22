@@ -10,6 +10,8 @@ import { articleControls, articleSeasonLabel, renderArticleCards } from './artic
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
 import { speedRows, battleSpeedRows } from './speed.js';
 import { renderSpeedRows, renderSpeedLines } from './speed-view.js';
+import { readDoc, writeDoc, toJson, fromJson, mergeDocs } from './builds.js';
+import { sampleList, partyList } from './builds-view.js';
 import {
   renderReference,
   renderLearnsetShell,
@@ -84,6 +86,10 @@ const saved = preferences(storage);
 const favorites = saved.favorites;
 const state = {
   page: 'ranking',
+  builds: readDoc(storage),
+  buildsTab: 'sample',
+  buildsQuery: '',
+  buildsEditing: null,
   speed: { mode: 'base', query: '', type: '', includeMega: true, ascending: false },
   speedLimit: 80,
   articleData: null,
@@ -416,6 +422,7 @@ function showPage(page) {
     types: 'type-chart',
     articles: 'articles',
     speed: 'speed',
+    builds: 'builds',
   })) {
     $(panel).hidden = page !== key;
     $(`${key}-link`).setAttribute('aria-pressed', String(page === key));
@@ -538,6 +545,49 @@ function openSpeed(mode = 'base', { navigate = true } = {}) {
   window.scrollTo(0, 0);
 }
 
+const BUILDS_TABS = ['sample', 'party'];
+
+function buildsSave() {
+  if (!writeDoc(storage, state.builds)) {
+    $('builds-status').textContent =
+      '브라우저 저장 공간에 쓰지 못했습니다. 저장 공간이 가득 찼거나 막혀 있습니다.';
+    return false;
+  }
+  return true;
+}
+
+function renderBuilds() {
+  if (state.page !== 'builds') return;
+  document
+    .querySelectorAll('[data-builds-tab]')
+    .forEach(button =>
+      button.setAttribute('aria-pressed', String(button.dataset.buildsTab === state.buildsTab)),
+    );
+  if (!state.locale) {
+    $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중입니다.');
+    return;
+  }
+  const query = state.buildsQuery.trim().toLowerCase();
+  const { samples, parties } = state.builds;
+  if (state.buildsTab === 'sample') {
+    const shown = query
+      ? samples.filter(s => `${s.name} ${s.pokemon ?? ''}`.toLowerCase().includes(query))
+      : samples;
+    $('builds-rows').innerHTML = sampleList(shown, state.locale, state.reference);
+  } else {
+    const shown = query ? parties.filter(p => p.name.toLowerCase().includes(query)) : parties;
+    $('builds-rows').innerHTML = partyList(shown, samples, state.locale);
+  }
+}
+
+function openBuilds(tab = 'sample', { navigate = true } = {}) {
+  state.buildsTab = BUILDS_TABS.includes(tab) ? tab : 'sample';
+  showPage('builds');
+  if (navigate) history.pushState({ builds: state.buildsTab }, '', `#builds=${state.buildsTab}`);
+  renderBuilds();
+  window.scrollTo(0, 0);
+}
+
 function renderTypeChart() {
   if (state.page !== 'types') return;
   document
@@ -593,6 +643,7 @@ async function loadReference() {
   renderTypeChart();
   if (selectedEntry()) renderCategory();
   renderSpeed();
+  renderBuilds();
 }
 
 function selectPokemon(id, { navigate = true, preserveCategory = false } = {}) {
@@ -646,6 +697,7 @@ async function load(force = false) {
       if (state.dex) renderDex();
       renderArticles();
       renderSpeed();
+      renderBuilds();
     }
     let indexResult;
     try {
@@ -831,6 +883,44 @@ $('ranking-link').onclick = () => goToRanking({ top: true });
 $('speed-link').onclick = () => {
   if (state.page !== 'speed') openSpeed(state.speed.mode);
 };
+$('builds-link').addEventListener('click', () => {
+  if (state.page !== 'builds') openBuilds(state.buildsTab);
+});
+$('builds-search').addEventListener('input', event => {
+  state.buildsQuery = event.target.value;
+  renderBuilds();
+});
+document.querySelectorAll('[data-builds-tab]').forEach(button =>
+  button.addEventListener('click', () => {
+    openBuilds(button.dataset.buildsTab);
+  }),
+);
+$('builds-export').addEventListener('click', () => {
+  const blob = new Blob([toJson(state.builds)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `champions-builds-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+});
+$('builds-import').addEventListener('change', async event => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  const { doc, skipped, error } = fromJson(await file.text());
+  if (error) {
+    $('builds-status').textContent = error;
+    return;
+  }
+  // 덮어쓰지 않고 합친다. 이 기기에 있던 것을 지우면 되돌릴 수 없다.
+  state.builds = mergeDocs(state.builds, doc);
+  if (buildsSave())
+    $('builds-status').textContent =
+      `샘플 ${doc.samples.length}개, 파티 ${doc.parties.length}개를 가져왔습니다.` +
+      (skipped ? ` 형식을 확인할 수 없는 ${skipped}개는 제외했습니다.` : '');
+  renderBuilds();
+});
 $('speed-type').innerHTML += Object.entries(TYPE_LABELS)
   .map(([type, label]) => `<option value="${type}">${label}</option>`)
   .join('');
@@ -1163,6 +1253,10 @@ window.addEventListener('popstate', () => {
     openTypeChart(params.get('types'), { navigate: false });
     return;
   }
+  if (params.has('builds')) {
+    openBuilds(params.get('builds'), { navigate: false });
+    return;
+  }
   const dex = params.get('dex');
   if (dex) {
     openDex(dex, { navigate: false });
@@ -1229,3 +1323,5 @@ if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });
 if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ navigate: false });
 const startupSpeed = new URLSearchParams(location.hash.slice(1)).get('speed');
 if (startupSpeed !== null) openSpeed(startupSpeed, { navigate: false });
+const startupBuilds = new URLSearchParams(location.hash.slice(1)).get('builds');
+if (startupBuilds !== null) openBuilds(startupBuilds, { navigate: false });
