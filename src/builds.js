@@ -120,6 +120,29 @@ export function setMove(sample, slot, move) {
   return { ...sample, moves, altMoves };
 }
 
+// 채용했거나 이미 후보인 기술은 다시 넣지 않는다. validateSample이 같은 중복을
+// 저장 단계에서도 막지만, 넣을 수 없는 것을 넣게 두었다가 저장할 때 거절하는 것은
+// 불친절하다.
+export function addAltMove(sample, move) {
+  if (!move || sample.moves.includes(move) || sample.altMoves.includes(move)) return sample;
+  return { ...sample, altMoves: [...sample.altMoves, move] };
+}
+
+export const removeAltMove = (sample, move) => ({
+  ...sample,
+  altMoves: sample.altMoves.filter(m => m !== move),
+});
+
+// 입력 칸에서 읽은 문자열을 해석한다. 빈 칸은 0이고, 정수가 아니거나 0~32 밖이면
+// 이전 값을 지킨다. 화면에서 만들 수 없는 값을 만들지 않는 편이 저장할 때
+// 거절하는 것보다 낫다. 합계 66은 여러 칸이 함께 정해지므로 validateSample이 본다.
+export function setPoint(sample, index, raw) {
+  const text = String(raw ?? '').trim();
+  const value = text === '' ? 0 : Number(text);
+  if (!Number.isInteger(value) || value < 0 || value > 32) return sample;
+  return { ...sample, points: sample.points.map((p, i) => (i === index ? value : p)) };
+}
+
 export const partiesUsing = (doc, id) => doc.parties.filter(p => p.members.includes(id));
 
 // 파티가 샘플을 참조하므로 지운 샘플의 자리를 빈 자리로 되돌린다. 파티 자체는

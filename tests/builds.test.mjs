@@ -10,6 +10,9 @@ import {
   validateSample,
   validateParty,
   setMove,
+  addAltMove,
+  removeAltMove,
+  setPoint,
   partiesUsing,
   deleteSample,
   EMPTY_DOC,
@@ -530,4 +533,50 @@ test('정리는 원본을 고치지 않는다', () => {
   const drafts = { gone000000000000: { name: '지워진 것' } };
   pruneDrafts(drafts, { ...EMPTY_DOC });
   assert.deepEqual(Object.keys(drafts), ['gone000000000000']);
+});
+
+test('후보 기술을 더한다', () => {
+  const next = addAltMove(built(), 'Z');
+  assert.deepEqual(next.altMoves, ['E', 'F', 'G', 'Z']);
+});
+
+test('이미 채용했거나 후보에 있는 기술은 더하지 않는다', () => {
+  assert.deepEqual(addAltMove(built(), 'E').altMoves, ['E', 'F', 'G']);
+  assert.deepEqual(addAltMove(built(), 'A').altMoves, ['E', 'F', 'G']);
+  assert.deepEqual(addAltMove(built(), null).altMoves, ['E', 'F', 'G']);
+});
+
+test('후보 기술을 뺀다', () => {
+  assert.deepEqual(removeAltMove(built(), 'F').altMoves, ['E', 'G']);
+  assert.deepEqual(removeAltMove(built(), '없는것').altMoves, ['E', 'F', 'G']);
+});
+
+test('후보를 고쳐도 원본과 채용 기술은 그대로다', () => {
+  const sample = built();
+  addAltMove(sample, 'Z');
+  removeAltMove(sample, 'E');
+  assert.deepEqual(sample.altMoves, ['E', 'F', 'G']);
+  assert.deepEqual(addAltMove(built(), 'Z').moves, ['A', 'B', 'C', 'D']);
+});
+
+test('포인트 입력은 정수로 읽고 범위를 벗어난 입력은 무시한다', () => {
+  assert.deepEqual(setPoint(built(), 1, '32').points, [0, 32, 0, 0, 0, 0]);
+  assert.deepEqual(setPoint(built(), 1, '0').points, [0, 0, 0, 0, 0, 0]);
+  // 범위 밖은 이전 값을 지킨다. validateSample이 아니라 입력 단계에서 막는다.
+  const filledPoint = setPoint(built(), 1, '32');
+  assert.deepEqual(setPoint(filledPoint, 1, '33').points, [0, 32, 0, 0, 0, 0]);
+  assert.deepEqual(setPoint(filledPoint, 1, '-1').points, [0, 32, 0, 0, 0, 0]);
+  assert.deepEqual(setPoint(filledPoint, 1, '1.5').points, [0, 32, 0, 0, 0, 0]);
+  assert.deepEqual(setPoint(filledPoint, 1, 'abc').points, [0, 32, 0, 0, 0, 0]);
+});
+
+test('비운 칸은 0으로 읽는다', () => {
+  const filledPoint = setPoint(built(), 1, '32');
+  assert.deepEqual(setPoint(filledPoint, 1, '').points, [0, 0, 0, 0, 0, 0]);
+});
+
+test('포인트를 고쳐도 원본은 그대로다', () => {
+  const sample = built();
+  setPoint(sample, 1, '32');
+  assert.deepEqual(sample.points, [0, 0, 0, 0, 0, 0]);
 });
