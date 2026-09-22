@@ -1349,6 +1349,12 @@ function buildsSave() {
 
 function renderBuilds() {
   if (state.page !== 'builds') return;
+  // 한국어 명칭은 통계를 불러오는 경로에서 채워진다. 이 화면은 통계 없이도
+  // 열리므로 아직 없을 수 있다. 없는 채로 그리면 포켓몬 이름에서 터진다.
+  if (!state.locale) {
+    $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중');
+    return;
+  }
   document
     .querySelectorAll('[data-builds-tab]')
     .forEach(button =>
@@ -1376,7 +1382,15 @@ function openBuilds(tab = 'sample', { navigate = true } = {}) {
 }
 ```
 
-> `state.reference`는 도감을 아직 열지 않았으면 `null`이다. 그때는 목록에 포켓몬 이름 대신 저장된 id가 나온다. 이 작업에서는 그대로 두고, Step 7의 브라우저 확인에서 실제로 어떻게 보이는지 확인한 뒤 필요하면 `openBuilds`에서 도감 자료를 먼저 불러오도록 고친다.
+> **두 자료가 늦게 도착하므로 도착 시점에 다시 그려야 한다.** 둘 다 이미 같은
+> 패턴이 있으니 그 자리에 `renderBuilds()`를 한 줄씩 더한다.
+>
+> - `state.locale`: `src/app.js:642-648`이 `ko.json`을 불러온 뒤
+>   `renderDex()`, `renderArticles()`, `renderSpeed()`를 다시 부른다. 그 묶음에
+>   `renderBuilds()`를 더한다. 없으면 위 가드의 '불러오는 중'에서 멈춘다.
+> - `state.reference`: `src/app.js:586` 부근에서 `loadReference()`가 끝난 뒤
+>   `renderList()`와 `renderDex()`를 다시 부른다. 그 자리에 `renderBuilds()`를
+>   더한다. 없으면 목록에 포켓몬 이름 대신 저장된 id가 남는다.
 
 - [ ] **Step 4: 버튼과 경로를 잇는다**
 
