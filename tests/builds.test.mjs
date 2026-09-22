@@ -12,8 +12,14 @@ import {
   setMove,
   partiesUsing,
   deleteSample,
+  EMPTY_DOC,
   readDoc,
   writeDoc,
+  DRAFT_KEY,
+  readDrafts,
+  writeDrafts,
+  draftKey,
+  pruneDrafts,
   toJson,
   fromJson,
   mergeDocs,
@@ -467,4 +473,61 @@ test('파티는 이름으로 찾는다', () => {
   assert.deepEqual(searchParties([p], 'ㅅㅋㅍ', ''), [p]);
   assert.deepEqual(searchParties([p], '없는것', ''), []);
   assert.deepEqual(searchParties([p], ''), [p]);
+});
+
+test('초안 키는 새로 만들 때와 고칠 때가 다르다', () => {
+  assert.equal(draftKey('sample', null), 'new-sample');
+  assert.equal(draftKey('party', null), 'new-party');
+  assert.equal(draftKey('sample', 'abc'), 'abc');
+  assert.equal(draftKey('party', 'abc'), 'abc');
+});
+
+test('막히거나 비었거나 깨진 저장소는 빈 초안을 준다', () => {
+  for (const storage of [null, undefined, sealed, store({}), store({ [DRAFT_KEY]: '{' })]) {
+    assert.deepEqual(readDrafts(storage), {});
+  }
+});
+
+test('초안을 그대로 읽는다', () => {
+  const entries = {};
+  const drafts = { 'new-sample': { ...emptySample(), name: '쓰다 만 것' } };
+  assert.equal(writeDrafts(store(entries), drafts), true);
+  assert.deepEqual(readDrafts(store(entries)), drafts);
+});
+
+test('막힌 저장소에 쓰면 false를 주고 던지지 않는다', () => {
+  assert.equal(writeDrafts(sealed, {}), false);
+  assert.equal(writeDrafts(null, {}), false);
+});
+
+test('배열이나 원시값이 들어 있으면 빈 초안으로 본다', () => {
+  assert.deepEqual(readDrafts(store({ [DRAFT_KEY]: '[]' })), {});
+  assert.deepEqual(readDrafts(store({ [DRAFT_KEY]: '3' })), {});
+});
+
+test('문서에 없는 id를 가리키는 초안은 정리한다', () => {
+  const doc = {
+    samples: [{ ...emptySample(), id: 'live000000000000' }],
+    parties: [{ ...emptyParty(), id: 'party00000000000' }],
+    version: 0,
+  };
+  const drafts = {
+    'new-sample': { name: '새로 만드는 중' },
+    'new-party': { name: '새 파티' },
+    live000000000000: { name: '살아있는 샘플' },
+    party00000000000: { name: '살아있는 파티' },
+    gone000000000000: { name: '지워진 것' },
+  };
+  assert.deepEqual(Object.keys(pruneDrafts(drafts, doc)).sort(), [
+    'live000000000000',
+    'new-party',
+    'new-sample',
+    'party00000000000',
+  ]);
+});
+
+test('정리는 원본을 고치지 않는다', () => {
+  const drafts = { gone000000000000: { name: '지워진 것' } };
+  pruneDrafts(drafts, { ...EMPTY_DOC });
+  assert.deepEqual(Object.keys(drafts), ['gone000000000000']);
 });

@@ -135,6 +135,7 @@ export function deleteSample(doc, id) {
 }
 
 const KEY = 'champions:builds';
+export const DRAFT_KEY = 'champions:builds-draft';
 export const EMPTY_DOC = { samples: [], parties: [], version: 0 };
 
 // 통계 자료와 같은 태도다. 형식을 확인할 수 없는 항목은 고쳐 쓰지 않고 뺀다.
@@ -286,4 +287,40 @@ export function searchParties(parties, query) {
   const needle = String(query ?? '').trim();
   if (!needle) return parties;
   return parties.filter(p => matchesQuery({ name: p.name, label: p.name }, needle));
+}
+
+// 고치는 동안의 초안. 저장된 문서와 따로 두어 저장을 누르기 전에는 문서가 바뀌지
+// 않는다. 나갔다 돌아와도 이어서 고칠 수 있고 브라우저를 그냥 닫아도 잃지 않는다.
+// 새로 만드는 중인 것과 고치는 중인 것을 한 객체에 담되 키를 달리해, 여러 개를
+// 고치다 말아도 서로 덮어쓰지 않는다.
+export const draftKey = (kind, id) => id ?? `new-${kind}`;
+
+export function readDrafts(storage) {
+  try {
+    const raw = JSON.parse(storage?.getItem(DRAFT_KEY));
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeDrafts(storage, drafts) {
+  try {
+    if (!storage) return false;
+    storage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 지워진 샘플이나 파티의 초안은 돌아갈 곳이 없다. 앱을 열 때 털어낸다.
+export function pruneDrafts(drafts, doc) {
+  const live = new Set([
+    'new-sample',
+    'new-party',
+    ...doc.samples.map(s => s.id),
+    ...doc.parties.map(p => p.id),
+  ]);
+  return Object.fromEntries(Object.entries(drafts).filter(([key]) => live.has(key)));
 }
