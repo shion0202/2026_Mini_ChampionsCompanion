@@ -1428,11 +1428,15 @@ $('builds-import').addEventListener('change', async event => {
     return;
   }
   // 덮어쓰지 않고 합친다. 이 기기에 있던 것을 지우면 되돌릴 수 없다.
-  state.builds = mergeDocs(state.builds, doc);
+  const previous = state.builds;
+  state.builds = mergeDocs(previous, doc);
   if (buildsSave())
     $('builds-status').textContent =
       `샘플 ${doc.samples.length}개, 파티 ${doc.parties.length}개를 가져왔습니다.` +
       (skipped ? ` 형식을 확인할 수 없는 ${skipped}개는 제외했습니다.` : '');
+  // 저장하지 못했으면 화면도 되돌린다. 목록에 보이는데 새로고침하면 사라지는
+  // 상태가 저장 실패 자체보다 나쁘다. buildsSave가 이미 실패를 알렸다.
+  else state.builds = previous;
   renderBuilds();
 });
 ```
