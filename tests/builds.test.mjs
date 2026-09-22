@@ -17,9 +17,18 @@ import {
   toJson,
   fromJson,
   mergeDocs,
+  speciesOptions,
+  abilityOptions,
+  moveOptions,
 } from '../src/builds.js';
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
+import { createLocale } from '../src/locale.js';
+
+const reference = JSON.parse(
+  await readFile(new URL('../public/data/reference.json', import.meta.url)),
+);
+const locale = createLocale(ko);
 
 test('성격 표는 ko.json의 25개와 키가 정확히 같다', () => {
   assert.deepEqual(Object.keys(NATURES).sort(), Object.keys(ko.stat_alignment).sort());
@@ -358,4 +367,34 @@ test('범위를 벗어난 능력 포인트는 형식 문제가 아니라 저장 
   };
   assert.equal(readDoc(store(entries)).samples.length, 1);
   assert.deepEqual(validateSample(over), ['능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.']);
+});
+
+test('포켓몬 목록은 챔피언스 출전 폼만 준다', () => {
+  const all = speciesOptions(reference, locale, '');
+  // 현재 출전 목록은 349개다. 도감을 갱신하면 늘거나 줄 수 있으므로 하한만 본다.
+  assert.ok(all.length > 300);
+  assert.ok(all.every(row => row.label && row.name));
+  // reference.json에는 타 작품 종도 있다. 출전 목록 밖은 나오지 않는다.
+  assert.equal(
+    all.some(row => row.id === 'bulbasaur'),
+    false,
+  );
+  assert.ok(all.some(row => row.id === 'salamence'));
+});
+
+test('포켓몬 목록은 한국어 이름과 초성으로 찾는다', () => {
+  const byName = speciesOptions(reference, locale, '보만다');
+  assert.ok(byName.some(row => row.id === 'salamence'));
+  const byChosung = speciesOptions(reference, locale, 'ㅂㅁㄷ');
+  assert.ok(byChosung.some(row => row.id === 'salamence'));
+});
+
+test('특성 목록은 그 폼의 것만 준다', () => {
+  assert.deepEqual(abilityOptions(reference, 'salamence'), ['Intimidate', 'Moxie']);
+  assert.deepEqual(abilityOptions(reference, 'none'), []);
+});
+
+test('배우는 기술이 없는 폼은 null을 준다', () => {
+  assert.equal(moveOptions(reference, 'salamence').length, 62);
+  assert.equal(moveOptions(reference, 'none'), null);
 });

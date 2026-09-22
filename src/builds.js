@@ -1,3 +1,8 @@
+import { matchesQuery } from './data.js';
+// 스피드 화면에서 먼저 쓰여 그런 이름이 붙었을 뿐 챔피언스 출전 폼 목록 그
+// 자체다. 이름을 바꾸면 speed.js, 생성 스크립트, 문서까지 번지므로 그대로 쓴다.
+import { SPEED_SPECIES } from './speed-catalog.js';
+
 // 샘플과 파티의 모양, 검증, 저장. app-state.js처럼 DOM을 쓰지 않고 인자만 받아
 // 값을 돌려주므로 브라우저 없이 검사할 수 있다.
 
@@ -228,3 +233,25 @@ export function mergeDocs(current, incoming) {
     version: current.version,
   };
 }
+
+// 편집 화면에서 고를 수 있는 것들. reference.json에는 타 작품 종도 있으므로
+// 출전 목록으로 거른다. speed.js의 speedRows와 같은 자료원이다.
+export function speciesOptions(reference, locale, query = '') {
+  return Object.entries(reference.species)
+    .filter(([id]) => SPEED_SPECIES.has(id))
+    .map(([id, species]) => ({
+      id,
+      name: species.name,
+      label: locale.pokemon(species.name).label,
+      dex: species.dex,
+      types: species.types,
+    }))
+    .filter(row => matchesQuery(row, query))
+    .sort((a, b) => (a.dex ?? 0) - (b.dex ?? 0) || a.id.localeCompare(b.id));
+}
+
+export const abilityOptions = (reference, pokemon) => reference.species[pokemon]?.abilities ?? [];
+
+// null은 그 폼의 배우는 기술 자료가 없다는 뜻이다. 다른 세대 기술로 대체하지
+// 않는다. 화면이 미제공을 알리고 도감 전체에서 고르게 한다.
+export const moveOptions = (reference, pokemon) => reference.species[pokemon]?.learnset ?? null;
