@@ -1135,6 +1135,135 @@ git commit -m "샘플과 파티의 목록과 편집 화면을 그린다"
 
 ---
 
+### Task 6b: 샘플에 도구를 더한다
+
+설계 문서의 첫 모델에서 도구가 빠져 있었다. 통계 카테고리에 `held_item`이 있고
+실제 배치에는 도구가 들어가므로 샘플도 도구를 담아야 한다. Task 1·5·6의 결과물을
+함께 고치는 한 덩어리다.
+
+**Files:**
+- Modify: `src/builds.js` (`emptySample`, 새 `itemOptions`)
+- Modify: `src/builds-view.js` (`sampleEditor`)
+- Modify: `tests/builds.test.mjs`, `tests/builds-view.test.mjs`, `tests/builds-view.test.mjs.snapshot`
+
+**Interfaces:**
+- Consumes: 기존 `emptySample`, `sampleEditor`
+- Produces: `sample.item` (영문 도구 이름 또는 null), `itemOptions(reference) → string[]`
+
+도구는 포켓몬과 무관하게 고른다. 종족별 목록이 없으므로 `moveOptions`처럼
+포켓몬을 인자로 받지 않는다. `reference.held_item` 431개 중 `champions`가 참인
+166개만 준다. 도감 화면이 이미 같은 플래그로 수록 여부를 가르고 있고
+([src/app.js:363](src/app.js:363)), 수록되지 않은 도구를 배치에 넣을 수 없다.
+
+**형식 가드와 검증은 건드리지 않는다.** `item`은 `ability`·`nature`·`pokemon`과
+같은 부류의 선택적 문자열이고, 그 셋도 `isSample`이 제약하지 않는다. 도구만
+따로 검사하면 같은 종류의 필드를 다르게 다루게 된다. 도구는 비워둬도 되므로
+`validateSample`에도 조건을 더하지 않는다.
+
+- [ ] **Step 1: 실패하는 테스트를 쓴다**
+
+`tests/builds.test.mjs`의 import에 `itemOptions`를 더하고 파일 끝에 붙인다.
+
+```js
+test('빈 샘플은 도구를 지니지 않는다', () => {
+  assert.equal(emptySample().item, null);
+});
+
+test('도구 목록은 챔피언스 수록 도구만 준다', () => {
+  const items = itemOptions(reference);
+  assert.ok(items.includes('Choice Scarf'));
+  // abilityshield는 champions가 거짓이다.
+  assert.equal(items.includes('Ability Shield'), false);
+  assert.ok(items.every(name => typeof name === 'string'));
+  // 431개 중 166개가 수록이다. 도감을 갱신하면 달라질 수 있으므로 범위로 본다.
+  assert.ok(items.length > 100 && items.length < 431);
+});
+
+test('도구 목록에 중복이 없다', () => {
+  const items = itemOptions(reference);
+  assert.equal(new Set(items).size, items.length);
+});
+```
+
+`tests/builds-view.test.mjs`의 `sample` 픽스처에 `item: 'Choice Scarf',`를 더하고
+파일 끝에 붙인다.
+
+```js
+test('편집 화면은 지닌 도구를 한국어로 보여준다', () => {
+  const html = sampleEditor(sample, { reference, locale });
+  assert.ok(html.includes('구애스카프'));
+  assert.ok(html.includes('data-builds-item'));
+});
+
+test('도구가 없으면 고르라고 안내한다', () => {
+  const html = sampleEditor({ ...emptySample(), id: 'cccccccccccccccc' }, { reference, locale });
+  assert.ok(html.includes('도구 고르기'));
+  assert.equal(html.includes('구애스카프'), false);
+});
+```
+
+- [ ] **Step 2: 실패를 확인한다**
+
+Run: `node --test tests/builds.test.mjs tests/builds-view.test.mjs`
+Expected: FAIL — `itemOptions is not a function`, 그리고 `구애스카프`를 찾지 못함
+
+- [ ] **Step 3: 구현한다**
+
+`src/builds.js`의 `emptySample`에 한 줄 더한다. `ability` 바로 앞에 둔다.
+
+```js
+  item: null,
+```
+
+`src/builds.js` 끝에 붙인다.
+
+```js
+// 도구는 포켓몬과 무관하게 고르므로 종족을 받지 않는다. champions가 거짓인 도구는
+// 이 작품에 수록되지 않았으므로 배치에 넣을 수 없다. 도감 화면과 같은 기준이다.
+export const itemOptions = reference =>
+  Object.values(reference.held_item)
+    .filter(item => item.champions)
+    .map(item => item.name)
+    .sort();
+```
+
+`src/builds-view.js`의 `sampleEditor`에서 포켓몬 버튼 바로 다음에 도구 버튼을
+넣는다. 무엇을 쓰는지와 무엇을 지녔는지가 붙어 있어야 읽힌다.
+
+```js
+    `<button type="button" class="builds-pick" data-builds-item>` +
+    `${sample.item ? esc(locale.label('held_item', sample.item)) : '도구 고르기'}</button>` +
+```
+
+- [ ] **Step 4: 통과와 스냅샷을 확인한다**
+
+```bash
+node --test tests/builds.test.mjs
+node --test --test-update-snapshots tests/builds-view.test.mjs
+```
+
+스냅샷을 **열어서 읽는다.** 확인할 것:
+
+- 샘플 편집 화면에 `구애스카프`가 나온다 (`Choice Scarf`가 아니다)
+- 빈 샘플 편집 화면에 `도구 고르기`가 나오고 `구애스카프`는 없다
+- 기존 값(`보만다`, `고집 (공격 ↑ 특수공격 ↓)`, `AS + d`, 이스케이프된 설명)이
+  그대로다
+
+```bash
+node --test tests/*.test.mjs
+```
+
+- [ ] **Step 5: 커밋한다**
+
+```bash
+npm run format
+git add src/builds.js src/builds-view.js tests/builds.test.mjs tests/builds-view.test.mjs tests/builds-view.test.mjs.snapshot
+git commit -m "샘플이 지닌 도구를 담는다"
+```
+
+
+---
+
 ### Task 7: 앱에 연결
 
 **Files:**

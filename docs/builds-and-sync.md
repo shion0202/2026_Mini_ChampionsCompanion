@@ -13,7 +13,7 @@
 sample {
   id, name, note,
   pokemon, form,
-  ability, nature, points[6],
+  item, ability, nature, points[6],
   moves[4], altMoves[],
   updatedAt
 }
@@ -51,6 +51,9 @@ doc  { samples[], parties[], version }
   후보 목록이 자동으로 늘어나면 목록이 의도와 무관하게 불어난다.
 - 같은 기술이 `moves`와 `altMoves`에 동시에 있을 수 없고, 각 목록 안에서도
   중복될 수 없다.
+- `item`은 지닌 도구의 영문 이름이며 없으면 null이다. 도구는 포켓몬과 무관하게
+  고르므로 종족별 목록이 없다. `reference.json`의 `held_item` 431개 중 `champions`가
+  참인 166개만 고를 수 있다. 도감 화면이 이미 같은 플래그로 수록 여부를 가른다.
 - `note`에는 능력 보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유를 적는다.
   서식 없는 여러 줄 글이다. 파티의 `note`에는 왜 이런 조합인지를 적는다.
 - `members`는 길이 6의 배열이며 각 칸은 샘플 id이거나 빈 자리를 뜻하는 null이다.
