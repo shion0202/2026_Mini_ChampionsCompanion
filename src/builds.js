@@ -132,6 +132,12 @@ const KEY = 'champions:builds';
 export const EMPTY_DOC = { samples: [], parties: [], version: 0 };
 
 // 통계 자료와 같은 태도다. 형식을 확인할 수 없는 항목은 고쳐 쓰지 않고 뺀다.
+// data.js가 같은 6칸 능력 포인트를 원소 타입까지 확인하므로 여기도 같은 깊이로 본다.
+// 다만 값의 범위와 중복은 보지 않는다. 그것은 validateSample이 판단할 저장 조건이고,
+// 두 곳에 같은 규칙을 적으면 어긋난다. 범위를 벗어난 항목은 조용히 사라지는 대신
+// 화면에 떠서 고칠 수 있어야 한다.
+const isMoveSlot = m => m === null || typeof m === 'string';
+
 const isSample = s =>
   !!s &&
   typeof s === 'object' &&
@@ -139,9 +145,12 @@ const isSample = s =>
   typeof s.name === 'string' &&
   Array.isArray(s.points) &&
   s.points.length === 6 &&
+  s.points.every(Number.isInteger) &&
   Array.isArray(s.moves) &&
   s.moves.length === 4 &&
-  Array.isArray(s.altMoves);
+  s.moves.every(isMoveSlot) &&
+  Array.isArray(s.altMoves) &&
+  s.altMoves.every(m => typeof m === 'string');
 
 const isParty = p =>
   !!p &&
@@ -149,7 +158,8 @@ const isParty = p =>
   typeof p.id === 'string' &&
   typeof p.name === 'string' &&
   Array.isArray(p.members) &&
-  p.members.length === 6;
+  p.members.length === 6 &&
+  p.members.every(isMoveSlot);
 
 const normalizeDoc = raw =>
   !raw || typeof raw !== 'object'

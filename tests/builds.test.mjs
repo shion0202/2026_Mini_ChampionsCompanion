@@ -322,3 +322,40 @@ test('가져오기는 덮어쓰지 않고 합친다', () => {
   );
   assert.equal(merged.version, 5);
 });
+
+test('길이는 맞고 원소 형식이 틀린 항목도 목록에서 빠진다', () => {
+  const entries = {
+    'champions:builds': JSON.stringify({
+      samples: [
+        { ...built(), id: 'good000000000000' },
+        { ...built(), id: 'bad00000000000p1', points: ['a', 'b', 'c', 'd', 'e', 'f'] },
+        { ...built(), id: 'bad00000000000p2', moves: [1, 2, 3, 4] },
+        { ...built(), id: 'bad00000000000p3', altMoves: [null] },
+      ],
+      parties: [
+        { ...emptyParty(), id: 'goodparty0000000', name: '구축' },
+        { ...emptyParty(), id: 'badparty00000000', name: '나쁨', members: [1, 2, 3, 4, 5, 6] },
+      ],
+      version: 0,
+    }),
+  };
+  const doc = readDoc(store(entries));
+  assert.deepEqual(
+    doc.samples.map(s => s.id),
+    ['good000000000000'],
+  );
+  assert.deepEqual(
+    doc.parties.map(p => p.id),
+    ['goodparty0000000'],
+  );
+});
+
+test('범위를 벗어난 능력 포인트는 형식 문제가 아니라 저장 조건 문제다', () => {
+  // 가드는 형식만 본다. 40은 정수이므로 읽히고, 걸러내는 일은 validateSample이 한다.
+  const over = { ...built(), id: 'over000000000000', points: [40, 0, 0, 0, 0, 0] };
+  const entries = {
+    'champions:builds': JSON.stringify({ samples: [over], parties: [], version: 0 }),
+  };
+  assert.equal(readDoc(store(entries)).samples.length, 1);
+  assert.deepEqual(validateSample(over), ['능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.']);
+});
