@@ -15,7 +15,7 @@ const sample = {
   ...emptySample(),
   id: 'aaaaaaaaaaaaaaaa',
   name: '물리형 보만다',
-  note: '스카프로 선공을 잡는다.\n후보는 상성 보완역이라 4번째와 자유롭게 바꾼다.',
+  note: '스카프로 선공을 잡는다.\n후보는 "상성 보완역"이라 <4번째>와 자유롭게 바꾼다.',
   pokemon: 'salamence',
   ability: 'Intimidate',
   nature: 'adamant',
@@ -59,4 +59,11 @@ test('빈 샘플 편집 화면은 통계 값을 미리 채우지 않는다', t =
 
 test('파티 편집 화면은 빈 자리를 빈 자리로 보여준다', t => {
   t.assert.snapshot(partyEditor(party, [sample], locale));
+});
+
+test('설명의 따옴표와 꺾쇠는 이스케이프된다', () => {
+  const html = sampleEditor(sample, { reference, locale });
+  assert.ok(html.includes('&lt;4번째&gt;'));
+  assert.ok(html.includes('&quot;상성 보완역&quot;'));
+  assert.equal(html.includes('<4번째>'), false);
 });
