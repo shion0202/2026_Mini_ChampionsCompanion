@@ -127,3 +127,94 @@ export function deleteSample(doc, id) {
     ),
   };
 }
+
+const KEY = 'champions:builds';
+export const EMPTY_DOC = { samples: [], parties: [], version: 0 };
+
+// 통계 자료와 같은 태도다. 형식을 확인할 수 없는 항목은 고쳐 쓰지 않고 뺀다.
+const isSample = s =>
+  !!s &&
+  typeof s === 'object' &&
+  typeof s.id === 'string' &&
+  typeof s.name === 'string' &&
+  Array.isArray(s.points) &&
+  s.points.length === 6 &&
+  Array.isArray(s.moves) &&
+  s.moves.length === 4 &&
+  Array.isArray(s.altMoves);
+
+const isParty = p =>
+  !!p &&
+  typeof p === 'object' &&
+  typeof p.id === 'string' &&
+  typeof p.name === 'string' &&
+  Array.isArray(p.members) &&
+  p.members.length === 6;
+
+const normalizeDoc = raw =>
+  !raw || typeof raw !== 'object'
+    ? { ...EMPTY_DOC }
+    : {
+        samples: Array.isArray(raw.samples) ? raw.samples.filter(isSample) : [],
+        parties: Array.isArray(raw.parties) ? raw.parties.filter(isParty) : [],
+        version: Number.isInteger(raw.version) ? raw.version : 0,
+      };
+
+// preferences()와 같은 규칙: 막히거나 깨진 저장소가 앱을 멈추게 하지 않는다.
+export function readDoc(storage) {
+  try {
+    return normalizeDoc(JSON.parse(storage?.getItem(KEY)));
+  } catch {
+    return { ...EMPTY_DOC };
+  }
+}
+
+// 용량 초과나 차단을 숨기지 않는다. 화면이 저장되지 않았음을 알려야 한다.
+export function writeDoc(storage, doc) {
+  try {
+    if (!storage) return false;
+    storage.setItem(KEY, JSON.stringify(doc));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const toJson = doc => JSON.stringify(doc, null, 2);
+
+// 사용자가 고른 파일이므로 신뢰 경계다. 읽지 못한 항목 수를 돌려주어 화면이
+// 알릴 수 있게 한다.
+export function fromJson(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return {
+      doc: null,
+      skipped: 0,
+      error: '파일을 읽을 수 없습니다. 내보내기로 만든 JSON 파일인지 확인하세요.',
+    };
+  }
+  const doc = normalizeDoc(raw);
+  if (!doc.samples.length && !doc.parties.length)
+    return { doc: null, skipped: 0, error: '읽을 수 있는 샘플이나 파티가 없습니다.' };
+  const total =
+    (Array.isArray(raw?.samples) ? raw.samples.length : 0) +
+    (Array.isArray(raw?.parties) ? raw.parties.length : 0);
+  return { doc, skipped: total - doc.samples.length - doc.parties.length, error: null };
+}
+
+// 가져오기는 덮어쓰지 않는다. 다른 기기에 있던 것을 지우면 되돌릴 수 없다.
+// 같은 id는 가져온 쪽이 이긴다.
+export function mergeDocs(current, incoming) {
+  const merge = (mine, theirs) => {
+    const byId = new Map(mine.map(x => [x.id, x]));
+    for (const item of theirs) byId.set(item.id, item);
+    return [...byId.values()];
+  };
+  return {
+    samples: merge(current.samples, incoming.samples),
+    parties: merge(current.parties, incoming.parties),
+    version: current.version,
+  };
+}

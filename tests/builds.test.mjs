@@ -12,6 +12,11 @@ import {
   setMove,
   partiesUsing,
   deleteSample,
+  readDoc,
+  writeDoc,
+  toJson,
+  fromJson,
+  mergeDocs,
 } from '../src/builds.js';
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
@@ -233,4 +238,87 @@ test('삭제는 원본을 고치지 않는다', () => {
   deleteSample(doc, 'two2two2two2two2');
   assert.equal(doc.samples.length, 2);
   assert.equal(doc.parties[0].members[1], 'two2two2two2two2');
+});
+
+// app-state.test.mjs와 같은 방식의 가짜 저장소.
+const store = entries => ({
+  getItem: k => (k in entries ? entries[k] : null),
+  setItem: (k, v) => {
+    entries[k] = v;
+  },
+});
+const sealed = {
+  getItem: () => {
+    throw Error('blocked');
+  },
+  setItem: () => {
+    throw Error('blocked');
+  },
+};
+
+test('막히거나 비었거나 깨진 저장소는 빈 문서를 준다', () => {
+  for (const storage of [null, undefined, sealed, store({}), store({ 'champions:builds': '{' })]) {
+    assert.deepEqual(readDoc(storage), { samples: [], parties: [], version: 0 });
+  }
+});
+
+test('저장한 문서를 그대로 읽는다', () => {
+  const entries = {};
+  const doc = { samples: [built()], parties: [emptyParty()], version: 3 };
+  assert.equal(writeDoc(store(entries), doc), true);
+  assert.deepEqual(readDoc(store(entries)), doc);
+});
+
+test('막힌 저장소에 쓰면 false를 주고 예외를 던지지 않는다', () => {
+  assert.equal(writeDoc(sealed, { samples: [], parties: [], version: 0 }), false);
+  assert.equal(writeDoc(null, { samples: [], parties: [], version: 0 }), false);
+});
+
+test('모양이 깨진 항목은 목록에서 빠진다', () => {
+  const entries = {
+    'champions:builds': JSON.stringify({
+      samples: [built(), { id: 'x' }, null, { ...built(), points: [1, 2] }],
+      parties: [{ ...emptyParty(), name: '구축' }, 'nope'],
+      version: 1,
+    }),
+  };
+  const doc = readDoc(store(entries));
+  assert.equal(doc.samples.length, 1);
+  assert.equal(doc.parties.length, 1);
+  assert.equal(doc.version, 1);
+});
+
+test('내보낸 JSON을 다시 가져오면 같은 문서가 된다', () => {
+  const doc = { samples: [built()], parties: [{ ...emptyParty(), name: '구축' }], version: 2 };
+  const result = fromJson(toJson(doc));
+  assert.equal(result.error, null);
+  assert.equal(result.skipped, 0);
+  assert.deepEqual(result.doc, doc);
+});
+
+test('JSON이 아니거나 읽을 항목이 없으면 이유를 준다', () => {
+  assert.match(fromJson('없는 파일').error, /읽을 수 없습니다/);
+  assert.match(fromJson('{"samples":[],"parties":[]}').error, /읽을 수 있는/);
+});
+
+test('가져오기는 읽지 못한 항목 수를 센다', () => {
+  const text = JSON.stringify({ samples: [built(), { id: 'x' }], parties: [], version: 0 });
+  const result = fromJson(text);
+  assert.equal(result.skipped, 1);
+  assert.equal(result.doc.samples.length, 1);
+});
+
+test('가져오기는 덮어쓰지 않고 합친다', () => {
+  const mine = { ...emptySample(), id: 'mine1mine1mine12', name: '내 것' };
+  const theirs = { ...emptySample(), id: 'their1their1thei', name: '가져온 것' };
+  const updated = { ...mine, name: '고친 것' };
+  const merged = mergeDocs(
+    { samples: [mine], parties: [], version: 5 },
+    { samples: [theirs, updated], parties: [], version: 0 },
+  );
+  assert.deepEqual(
+    merged.samples.map(s => s.name),
+    ['고친 것', '가져온 것'],
+  );
+  assert.equal(merged.version, 5);
 });
