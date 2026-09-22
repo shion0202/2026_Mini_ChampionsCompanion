@@ -4,7 +4,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createLocale } from '../src/locale.js';
 import { emptySample, emptyParty } from '../src/builds.js';
-import { sampleList, partyList, sampleEditor, partyEditor } from '../src/builds-view.js';
+import {
+  sampleList,
+  partyList,
+  sampleEditor,
+  partyEditor,
+  pickerRows,
+} from '../src/builds-view.js';
 
 const read = file =>
   readFile(new URL(`../public/data/${file}.json`, import.meta.url)).then(JSON.parse);
@@ -141,4 +147,37 @@ test('파티 편집기도 같은 인자 모양을 쓴다', t => {
   t.assert.snapshot(
     partyEditor(party, [sample], { locale, existing: true, errors: ['이름을 입력하세요.'] }),
   );
+});
+
+const pickerFixture = [
+  { value: 'Salamence', label: '보만다', sub: '드래곤 · 비행' },
+  { value: 'Charizard', label: '리자몽', sub: '불꽃 · 비행' },
+  { value: 'Dragonite', label: '망나뇽', sub: '드래곤 · 비행' },
+];
+
+test('고르기 창은 값과 한국어 이름과 부제를 보여준다', t => {
+  t.assert.snapshot(pickerRows(pickerFixture, 10));
+});
+
+test('고르기 창은 한 번에 보여줄 수를 제한한다', () => {
+  const html = pickerRows(pickerFixture, 2);
+  assert.ok(html.includes('보만다'));
+  assert.ok(html.includes('리자몽'));
+  assert.equal(html.includes('망나뇽'), false);
+});
+
+test('부제가 없으면 자리를 만들지 않는다', () => {
+  const html = pickerRows([{ value: 'A', label: '가', sub: '' }], 10);
+  assert.equal(html.includes('picker-sub'), false);
+});
+
+test('찾는 것이 없으면 안내한다', () => {
+  assert.ok(pickerRows([], 10).includes('찾는 항목이 없습니다'));
+});
+
+test('값과 이름을 이스케이프한다', () => {
+  const html = pickerRows([{ value: '<v>', label: '<이름>', sub: '<부제>' }], 10);
+  assert.ok(html.includes('&lt;이름&gt;'));
+  assert.ok(html.includes('&lt;v&gt;'));
+  assert.equal(html.includes('<이름>'), false);
 });

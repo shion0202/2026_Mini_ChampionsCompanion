@@ -1,3 +1,7 @@
+exports[`고르기 창은 값과 한국어 이름과 부제를 보여준다 1`] = `
+"<ul class=\\"picker-list\\"><li><button type=\\"button\\" class=\\"picker-row\\" data-picker-value=\\"Salamence\\"><span class=\\"picker-name\\">보만다</span><small class=\\"picker-sub\\">드래곤 · 비행</small></button></li><li><button type=\\"button\\" class=\\"picker-row\\" data-picker-value=\\"Charizard\\"><span class=\\"picker-name\\">리자몽</span><small class=\\"picker-sub\\">불꽃 · 비행</small></button></li><li><button type=\\"button\\" class=\\"picker-row\\" data-picker-value=\\"Dragonite\\"><span class=\\"picker-name\\">망나뇽</span><small class=\\"picker-sub\\">드래곤 · 비행</small></button></li></ul>"
+`;
+
 exports[`도감 자료가 없으면 포켓몬 이름 대신 저장된 id가 나온다 1`] = `
 "<ul class=\\"builds-list\\"><li class=\\"builds-row\\"><button class=\\"builds-open\\" data-builds-sample=\\"aaaaaaaaaaaaaaaa\\"><span class=\\"builds-name\\">물리형 보만다</span><small class=\\"builds-sub\\">salamence · AS + d</small></button></li></ul>"
 `;

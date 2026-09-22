@@ -169,3 +169,19 @@ export function partyEditor(
     `</form>`
   );
 }
+
+// 포켓몬·도구·기술·샘플이 같은 창을 돌려 쓴다. 자료를 행으로 바꾸는 일은 app.js가
+// 하고 여기서는 그리기만 한다. 셋의 조작이 같으므로 창을 나누지 않는다.
+export function pickerRows(rows, limit) {
+  if (!rows.length) return '<div class="empty-state"><p>찾는 항목이 없습니다.</p></div>';
+  return `<ul class="picker-list">${rows
+    .slice(0, limit)
+    .map(
+      row =>
+        `<li><button type="button" class="picker-row" data-picker-value="${esc(row.value)}">` +
+        `<span class="picker-name">${esc(row.label)}</span>` +
+        `${row.sub ? `<small class="picker-sub">${esc(row.sub)}</small>` : ''}` +
+        `</button></li>`,
+    )
+    .join('')}</ul>`;
+}
