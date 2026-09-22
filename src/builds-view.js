@@ -75,6 +75,8 @@ export function sampleEditor(sample, { reference, locale }) {
     `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="예: 스카프 보만다"></label>` +
     `<button type="button" class="builds-pick builds-species" data-builds-species>` +
     `${esc(speciesLabel(locale, reference, sample.pokemon))}</button>` +
+    `<button type="button" class="builds-pick" data-builds-item>` +
+    `${sample.item ? esc(locale.label('held_item', sample.item)) : '도구 고르기'}</button>` +
     `<button type="button" class="builds-pick" data-builds-ability>` +
     `${sample.ability ? esc(locale.label('ability', sample.ability)) : '특성 고르기'}</button>` +
     `<button type="button" class="builds-pick" data-builds-nature>` +

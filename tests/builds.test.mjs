@@ -20,6 +20,7 @@ import {
   speciesOptions,
   abilityOptions,
   moveOptions,
+  itemOptions,
 } from '../src/builds.js';
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
@@ -397,4 +398,23 @@ test('특성 목록은 그 폼의 것만 준다', () => {
 test('배우는 기술이 없는 폼은 null을 준다', () => {
   assert.equal(moveOptions(reference, 'salamence').length, 62);
   assert.equal(moveOptions(reference, 'none'), null);
+});
+
+test('빈 샘플은 도구를 지니지 않는다', () => {
+  assert.equal(emptySample().item, null);
+});
+
+test('도구 목록은 챔피언스 수록 도구만 준다', () => {
+  const items = itemOptions(reference);
+  assert.ok(items.includes('Choice Scarf'));
+  // abilityshield는 champions가 거짓이다.
+  assert.equal(items.includes('Ability Shield'), false);
+  assert.ok(items.every(name => typeof name === 'string'));
+  // 431개 중 166개가 수록이다. 도감을 갱신하면 달라질 수 있으므로 범위로 본다.
+  assert.ok(items.length > 100 && items.length < 431);
+});
+
+test('도구 목록에 중복이 없다', () => {
+  const items = itemOptions(reference);
+  assert.equal(new Set(items).size, items.length);
 });

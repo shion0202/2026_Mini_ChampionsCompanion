@@ -55,6 +55,7 @@ export const emptySample = () => ({
   note: '',
   pokemon: null,
   form: null,
+  item: null,
   ability: null,
   nature: null,
   points: [0, 0, 0, 0, 0, 0],
@@ -255,3 +256,11 @@ export const abilityOptions = (reference, pokemon) => reference.species[pokemon]
 // null은 그 폼의 배우는 기술 자료가 없다는 뜻이다. 다른 세대 기술로 대체하지
 // 않는다. 화면이 미제공을 알리고 도감 전체에서 고르게 한다.
 export const moveOptions = (reference, pokemon) => reference.species[pokemon]?.learnset ?? null;
+
+// 도구는 포켓몬과 무관하게 고르므로 종족을 받지 않는다. champions가 거짓인 도구는
+// 이 작품에 수록되지 않았으므로 배치에 넣을 수 없다. 도감 화면과 같은 기준이다.
+export const itemOptions = reference =>
+  Object.values(reference.held_item)
+    .filter(item => item.champions)
+    .map(item => item.name)
+    .sort();

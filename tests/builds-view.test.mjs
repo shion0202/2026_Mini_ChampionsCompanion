@@ -17,6 +17,7 @@ const sample = {
   name: '물리형 보만다',
   note: '스카프로 선공을 잡는다.\n후보는 "상성 보완역"이라 <4번째>와 자유롭게 바꾼다.',
   pokemon: 'salamence',
+  item: 'Choice Scarf',
   ability: 'Intimidate',
   nature: 'adamant',
   points: [0, 32, 0, 0, 2, 32],
@@ -66,4 +67,16 @@ test('설명의 따옴표와 꺾쇠는 이스케이프된다', () => {
   assert.ok(html.includes('&lt;4번째&gt;'));
   assert.ok(html.includes('&quot;상성 보완역&quot;'));
   assert.equal(html.includes('<4번째>'), false);
+});
+
+test('편집 화면은 지닌 도구를 한국어로 보여준다', () => {
+  const html = sampleEditor(sample, { reference, locale });
+  assert.ok(html.includes('구애스카프'));
+  assert.ok(html.includes('data-builds-item'));
+});
+
+test('도구가 없으면 고르라고 안내한다', () => {
+  const html = sampleEditor({ ...emptySample(), id: 'cccccccccccccccc' }, { reference, locale });
+  assert.ok(html.includes('도구 고르기'));
+  assert.equal(html.includes('구애스카프'), false);
 });
