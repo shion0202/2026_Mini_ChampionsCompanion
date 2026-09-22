@@ -3097,3 +3097,57 @@ select optgroup {
 .builds-status:empty {
   display: none;
 }
+.builds-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* 삭제에 별도 색을 주지 않는다. 실수를 막는 것은 색이 아니라 확인 창이고,
+   이 앱에 없는 색을 새로 들이는 값어치가 없다. 자리만 떨어뜨려 둔다. */
+.builds-delete {
+  margin-inline-start: auto;
+}
+/* 색과 테두리는 .notice가 이미 준다. 여기서는 목록 모양만 지운다. */
+.builds-errors {
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+}
+.builds-errors:not([hidden]) {
+  padding-inline-start: 1rem;
+}
+.builds-resume {
+  margin: 0;
+  color: var(--muted);
+}
+.picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.picker-row {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+.picker-row:hover {
+  border-color: var(--teal);
+}
+.picker-sub {
+  color: var(--muted);
+}
+#picker-rows {
+  max-height: 55vh;
+  overflow-y: auto;
+}

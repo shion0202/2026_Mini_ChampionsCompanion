@@ -18,8 +18,15 @@ import {
   mergeDocs,
   searchSamples,
   searchParties,
+  emptySample,
+  emptyParty,
+  setPoint,
+  readDrafts,
+  writeDrafts,
+  draftKey,
+  pruneDrafts,
 } from './builds.js';
-import { sampleList, partyList } from './builds-view.js';
+import { sampleList, partyList, sampleEditor, partyEditor } from './builds-view.js';
 import {
   renderReference,
   renderLearnsetShell,
@@ -98,6 +105,9 @@ const state = {
   buildsTab: 'sample',
   buildsQuery: '',
   buildsEditing: null,
+  buildsDrafts: {},
+  buildsErrors: [],
+  buildsResumed: false,
   speed: { mode: 'base', query: '', type: '', includeMega: true, ascending: false },
   speedLimit: 80,
   articleData: null,
@@ -575,6 +585,7 @@ function renderBuilds() {
     $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중입니다.');
     return;
   }
+  if (state.buildsEditing) return renderBuildsEditor();
   const { samples, parties } = state.builds;
   $('builds-rows').innerHTML =
     state.buildsTab === 'sample'
@@ -592,6 +603,69 @@ function openBuilds(tab = 'sample', { navigate = true } = {}) {
   if (navigate) history.pushState({ builds: state.buildsTab }, '', `#builds=${state.buildsTab}`);
   renderBuilds();
   window.scrollTo(0, 0);
+}
+
+function saveDraft() {
+  const editing = state.buildsEditing;
+  if (!editing) return;
+  state.buildsDrafts = {
+    ...state.buildsDrafts,
+    [draftKey(editing.kind, editing.id)]: editing.draft,
+  };
+  writeDrafts(storage, state.buildsDrafts);
+}
+
+function dropDraft(kind, id) {
+  const { [draftKey(kind, id)]: _removed, ...rest } = state.buildsDrafts;
+  state.buildsDrafts = rest;
+  writeDrafts(storage, state.buildsDrafts);
+}
+
+function renderBuildsEditor() {
+  const editing = state.buildsEditing;
+  if (!editing || state.page !== 'builds' || !state.locale || !state.reference) return;
+  const shared = {
+    locale: state.locale,
+    existing: editing.id !== null,
+    resumed: state.buildsResumed,
+    errors: state.buildsErrors,
+  };
+  $('builds-rows').innerHTML =
+    editing.kind === 'sample'
+      ? sampleEditor(editing.draft, { reference: state.reference, ...shared })
+      : partyEditor(editing.draft, state.builds.samples, shared);
+}
+
+function openBuildsEditor(kind, id, { navigate = true } = {}) {
+  const list = kind === 'sample' ? state.builds.samples : state.builds.parties;
+  const saved = id === null ? null : (list.find(x => x.id === id) ?? null);
+  // 주소로 들어왔는데 그 id가 없으면 목록으로 돌려보낸다.
+  if (id !== null && !saved) {
+    openBuilds(kind, { navigate });
+    return;
+  }
+  const kept = state.buildsDrafts[draftKey(kind, id)];
+  const base = saved ?? (kind === 'sample' ? emptySample() : emptyParty());
+  state.buildsResumed = !!kept;
+  state.buildsErrors = [];
+  state.buildsEditing = { kind, id, draft: kept ?? base };
+  state.buildsTab = kind;
+  showPage('builds');
+  if (navigate)
+    history.pushState(
+      { builds: kind, edit: id ?? 'new' },
+      '',
+      `#builds=${kind}&edit=${id ?? 'new'}`,
+    );
+  renderBuildsEditor();
+  window.scrollTo(0, 0);
+}
+
+function closeBuildsEditor({ navigate = true } = {}) {
+  state.buildsEditing = null;
+  state.buildsErrors = [];
+  state.buildsResumed = false;
+  openBuilds(state.buildsTab, { navigate });
 }
 
 function renderTypeChart() {
@@ -896,6 +970,61 @@ $('builds-search').addEventListener('input', event => {
   state.buildsQuery = event.target.value;
   renderBuilds();
 });
+$('builds-rows').addEventListener('click', event => {
+  const newBuild = event.target.closest('[data-builds-new]');
+  if (newBuild) {
+    openBuildsEditor(newBuild.dataset.buildsNew, null);
+    return;
+  }
+  const openSample = event.target.closest('[data-builds-sample]');
+  if (openSample) {
+    openBuildsEditor('sample', openSample.dataset.buildsSample);
+    return;
+  }
+  const openParty = event.target.closest('[data-builds-party]');
+  if (openParty) {
+    openBuildsEditor('party', openParty.dataset.buildsParty);
+    return;
+  }
+  if (event.target.closest('[data-builds-cancel]')) closeBuildsEditor();
+});
+
+// 이름과 설명은 입력할 때마다 초안에 담는다. 다시 그리면 커서가 튀므로 그리지 않는다.
+$('builds-rows').addEventListener('input', event => {
+  const field = event.target.closest('[data-builds-field]');
+  if (!field || !state.buildsEditing) return;
+  const name = field.dataset.buildsField;
+  if (name !== 'name' && name !== 'note') return;
+  state.buildsEditing.draft = { ...state.buildsEditing.draft, [name]: field.value };
+  saveDraft();
+});
+
+// 포인트와 목록 선택은 값이 정해진 뒤에 다시 그린다.
+$('builds-rows').addEventListener('change', event => {
+  if (!state.buildsEditing) return;
+  const point = event.target.closest('[data-builds-point]');
+  if (point) {
+    state.buildsEditing.draft = setPoint(
+      state.buildsEditing.draft,
+      Number(point.dataset.buildsPoint),
+      point.value,
+    );
+    saveDraft();
+    renderBuildsEditor();
+    return;
+  }
+  const field = event.target.closest('[data-builds-field]');
+  if (!field) return;
+  const name = field.dataset.buildsField;
+  if (name !== 'ability' && name !== 'nature') return;
+  state.buildsEditing.draft = { ...state.buildsEditing.draft, [name]: field.value || null };
+  saveDraft();
+  renderBuildsEditor();
+});
+
+// 편집기는 form이라 Enter로 제출될 수 있다. 저장 배선은 다음 작업이므로 여기서는
+// 새로고침만 막는다.
+$('builds-rows').addEventListener('submit', event => event.preventDefault());
 document.querySelectorAll('[data-builds-tab]').forEach(button =>
   button.addEventListener('click', () => {
     openBuilds(button.dataset.buildsTab);
@@ -1264,7 +1393,13 @@ window.addEventListener('popstate', () => {
     return;
   }
   if (params.has('builds')) {
-    openBuilds(params.get('builds'), { navigate: false });
+    const edit = params.get('edit');
+    if (edit)
+      openBuildsEditor(params.get('builds'), edit === 'new' ? null : edit, { navigate: false });
+    else {
+      state.buildsEditing = null;
+      openBuilds(params.get('builds'), { navigate: false });
+    }
     return;
   }
   const dex = params.get('dex');
@@ -1322,6 +1457,9 @@ window.addEventListener('appinstalled', () => {
 });
 if ('serviceWorker' in navigator && window.isSecureContext)
   navigator.serviceWorker.register('./sw.js').catch(() => {});
+// 지워진 샘플의 초안은 돌아갈 곳이 없다. 열 때 한 번 털어낸다.
+state.buildsDrafts = pruneDrafts(readDrafts(storage), state.builds);
+writeDrafts(storage, state.buildsDrafts);
 load();
 loadReference();
 loadArticles();
@@ -1334,4 +1472,11 @@ if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ 
 const startupSpeed = new URLSearchParams(location.hash.slice(1)).get('speed');
 if (startupSpeed !== null) openSpeed(startupSpeed, { navigate: false });
 const startupBuilds = new URLSearchParams(location.hash.slice(1)).get('builds');
-if (startupBuilds !== null) openBuilds(startupBuilds, { navigate: false });
+if (startupBuilds !== null) {
+  const startupEdit = new URLSearchParams(location.hash.slice(1)).get('edit');
+  if (startupEdit)
+    openBuildsEditor(startupBuilds, startupEdit === 'new' ? null : startupEdit, {
+      navigate: false,
+    });
+  else openBuilds(startupBuilds, { navigate: false });
+}
