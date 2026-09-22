@@ -749,7 +749,7 @@ function dropDraft(kind, id) {
 
 function renderBuildsEditor() {
   const editing = state.buildsEditing;
-  if (!editing || state.page !== 'builds') return;
+  if (!editing || state.page !== 'builds' || !state.locale) return;
   const shared = {
     locale: state.locale,
     existing: editing.id !== null,
@@ -791,12 +791,23 @@ function closeBuildsEditor({ navigate = true } = {}) {
 }
 ```
 
-`renderBuilds()`의 첫 줄 바로 아래에, 편집 중이면 편집기를 그리도록 한 줄 더한다.
+`renderBuilds()`에 편집 중이면 편집기를 그리는 분기를 더한다. **`state.locale` 가드보다 뒤에 넣는다.** 편집기는 특성·성격·도구 이름을 한국어로 그리므로 locale이 없으면 터진다. 주소로 편집 화면에 바로 들어오면 locale이 아직 도착하지 않은 상태가 실제로 일어난다.
 
 ```js
-function renderBuilds() {
-  if (state.page !== 'builds') return;
+  if (!state.locale) {
+    $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중입니다.');
+    return;
+  }
   if (state.buildsEditing) return renderBuildsEditor();
+  const { samples, parties } = state.builds;
+```
+
+`renderBuildsEditor()` 자체도 같은 이유로 locale을 확인한다. 이미 그린 뒤 자료가 도착해 다시 그려지는 경로가 있기 때문이다.
+
+```js
+function renderBuildsEditor() {
+  const editing = state.buildsEditing;
+  if (!editing || state.page !== 'builds' || !state.locale) return;
 ```
 
 - [ ] **Step 3: 이벤트를 잇는다**
