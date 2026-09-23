@@ -12,6 +12,8 @@ import {
   setMove,
   keepsItem,
   sortBuilds,
+  filterSamples,
+  filterParties,
   SAMPLE_SORTS,
   PARTY_SORTS,
   addAltMove,
@@ -760,4 +762,78 @@ test('정렬은 원본을 고치지 않는다', () => {
 test('파티는 도감번호로 줄 세우지 않는다', () => {
   assert.deepEqual(PARTY_SORTS, ['updated', 'name']);
   assert.ok(SAMPLE_SORTS.includes('dex'));
+});
+
+// 타입 거르개. 랭킹·도감과 같은 matchesFilter를 쓰므로 OR/AND가 그쪽과 같다.
+const typed = [
+  { id: 's1', name: '리자몽', pokemon: 'charizard' },
+  { id: 's2', name: '보만다', pokemon: 'salamence' },
+  { id: 's3', name: '피카츄', pokemon: 'pikachu' },
+];
+const picks = rows => rows.map(r => r.name);
+
+test('타입을 고르면 그 타입의 샘플만 남는다', () => {
+  assert.deepEqual(picks(filterSamples(typed, { type: ['Fire'] }, reference)), ['리자몽']);
+  assert.deepEqual(picks(filterSamples(typed, { type: ['Flying'] }, reference)), [
+    '리자몽',
+    '보만다',
+  ]);
+});
+
+test('여럿을 고르면 하나라도 맞으면 남고, 모두를 고르면 다 갖춰야 남는다', () => {
+  const both = ['Fire', 'Dragon'];
+  assert.deepEqual(picks(filterSamples(typed, { type: both, modes: { type: 'or' } }, reference)), [
+    '리자몽',
+    '보만다',
+  ]);
+  assert.deepEqual(
+    picks(filterSamples(typed, { type: both, modes: { type: 'and' } }, reference)),
+    [],
+  );
+  // 리자몽은 불꽃·비행이므로 둘 다 갖춘다.
+  assert.deepEqual(
+    picks(filterSamples(typed, { type: ['Fire', 'Flying'], modes: { type: 'and' } }, reference)),
+    ['리자몽'],
+  );
+});
+
+test('고르지 않으면 모두 남는다', () => {
+  assert.deepEqual(picks(filterSamples(typed, {}, reference)), picks(typed));
+  assert.deepEqual(picks(filterSamples(typed, { type: [] }, reference)), picks(typed));
+});
+
+test('파티는 자리에 앉은 샘플들의 타입을 합쳐서 본다', () => {
+  const parties = [
+    { id: 'p1', name: '불꽃파티', members: ['s1', null, null, null, null, null] },
+    { id: 'p2', name: '전기파티', members: ['s3', null, null, null, null, null] },
+    { id: 'p3', name: '빈파티', members: [null, null, null, null, null, null] },
+  ];
+  assert.deepEqual(picks(filterParties(parties, typed, { type: ['Fire'] }, reference)), [
+    '불꽃파티',
+  ]);
+  // AND는 '이 타입들을 다 갖춘 파티'다. 한 자리로는 갖출 수 없다.
+  assert.deepEqual(
+    picks(
+      filterParties(
+        parties,
+        typed,
+        { type: ['Fire', 'Electric'], modes: { type: 'and' } },
+        reference,
+      ),
+    ),
+    [],
+  );
+  const mixed = [{ id: 'p4', name: '섞인파티', members: ['s1', 's3', null, null, null, null] }];
+  assert.deepEqual(
+    picks(
+      filterParties(
+        mixed,
+        typed,
+        { type: ['Fire', 'Electric'], modes: { type: 'and' } },
+        reference,
+      ),
+    ),
+    ['섞인파티'],
+  );
+  assert.deepEqual(picks(filterParties(parties, typed, { type: ['Fire'] }, null)), []);
 });

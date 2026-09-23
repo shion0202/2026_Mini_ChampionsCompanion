@@ -3,6 +3,7 @@
 import { esc } from './html.js';
 import { toId, STAT_LABELS, matchesQuery } from './data.js';
 import { portrait, typeBadges } from './app-view.js';
+import { itemArtwork } from './images.js';
 import { NATURES, natureAdjust, abilityOptions, speciesSprite, actualStats } from './builds.js';
 import { STAT_NAMES } from './locale.js';
 
@@ -373,7 +374,9 @@ export function pickerRows(rows, limit) {
     .map(
       row =>
         `<li><button type="button" class="picker-row" data-picker-value="${esc(row.value)}">` +
-        `${'sprite' in row ? portrait({ sprite: row.sprite }, 'picker-portrait') : ''}` +
+        // 도구는 도감 목록과 같은 그림을 쓴다(itemArtwork). 포켓몬은 랭킹과 같은
+        // portrait다. 둘 다 이미 있는 것을 그대로 부른다.
+        `${row.art === 'item' ? itemArtwork(row.name) : 'sprite' in row ? portrait({ sprite: row.sprite }, 'picker-portrait') : ''}` +
         `<span class="picker-text">` +
         `<span class="picker-name">${esc(row.label)}</span>` +
         `${row.sub ? `<small class="picker-sub">${esc(row.sub)}</small>` : ''}` +

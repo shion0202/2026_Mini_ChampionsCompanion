@@ -11,7 +11,7 @@ import {
 import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
-import { filterValues, filterSummary } from './filters.js';
+import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { megaSprite } from './images.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
@@ -27,6 +27,8 @@ import {
   searchSamples,
   searchParties,
   sortBuilds,
+  filterSamples,
+  filterParties,
   SAMPLE_SORTS,
   PARTY_SORTS,
   SORT_DESCENDS,
@@ -138,6 +140,8 @@ const state = {
   buildsTab: 'sample',
   buildsQuery: '',
   buildsSort: { key: 'updated', desc: true },
+  buildsType: [],
+  buildsModes: { type: 'or' },
   buildsEditing: null,
   buildsDrafts: {},
   buildsErrors: [],
@@ -630,12 +634,10 @@ function renderBuildsSort() {
   const wanted = keys.map(key => `<option value="${key}">${SORT_LABELS[key]}</option>`).join('');
   if (select.innerHTML !== wanted) select.innerHTML = wanted;
   select.value = state.buildsSort.key;
+  // 랭킹의 방향 단추와 같은 글을 쓴다. 화살표만으로는 무엇이 위인지 읽히지 않는다.
   const order = $('builds-order');
-  order.textContent = state.buildsSort.desc ? '↓' : '↑';
-  order.setAttribute(
-    'aria-label',
-    state.buildsSort.desc ? '내림차순, 누르면 오름차순' : '오름차순, 누르면 내림차순',
-  );
+  order.textContent = state.buildsSort.desc ? '↓ 내림차순' : '↑ 오름차순';
+  order.setAttribute('aria-pressed', String(state.buildsSort.desc));
 }
 
 function renderBuilds() {
@@ -653,16 +655,46 @@ function renderBuilds() {
   if (state.buildsEditing) return renderBuildsEditor();
   renderBuildsSort();
   const { samples, parties } = state.builds;
+  const picked = { type: state.buildsType, modes: state.buildsModes };
   const sorted = list => sortBuilds(list, state.buildsSort, state.reference);
+  // 랭킹과 같은 방식으로 무엇이 걸려 있는지 단추와 줄에 함께 보여준다.
+  const summaries = activeFilters(
+    { type: state.buildsType, rankModes: state.buildsModes },
+    { type: TYPE_LABELS },
+  );
+  $('builds-filter').innerHTML = rankingFilterButton(summaries.length);
+  $('builds-filter').setAttribute(
+    'aria-label',
+    `내 샘플 필터${summaries.length ? ` (${summaries.length}개 적용)` : ''}`,
+  );
+  $('builds-filter-summary').textContent = summaries.join(' / ');
+  $('builds-filter-summary').hidden = !summaries.length;
   $('builds-rows').innerHTML =
     state.buildsTab === 'sample'
       ? sampleList(
-          sorted(searchSamples(samples, state.buildsQuery, state.reference, state.locale)),
+          sorted(
+            filterSamples(
+              searchSamples(samples, state.buildsQuery, state.reference, state.locale),
+              picked,
+              state.reference,
+            ),
+          ),
           state.locale,
           state.reference,
           state.index,
         )
-      : partyList(sorted(searchParties(parties, state.buildsQuery)), samples, state.locale);
+      : partyList(
+          sorted(
+            filterParties(
+              searchParties(parties, state.buildsQuery),
+              samples,
+              picked,
+              state.reference,
+            ),
+          ),
+          samples,
+          state.locale,
+        );
 }
 
 function openBuilds(tab = 'sample', { navigate = true } = {}) {
@@ -775,7 +807,13 @@ function pickerSource() {
   if (picker.kind === 'item')
     // 고른 포켓몬이 쓸 수 있는 메가스톤만 목록에 남는다.
     return itemOptions(state.reference, draft.pokemon)
-      .map(name => ({ value: name, label: buildLabel('held_item', name), sub: '', name }))
+      .map(name => ({
+        value: name,
+        label: buildLabel('held_item', name),
+        sub: '',
+        name,
+        art: 'item',
+      }))
       .sort(byLabel);
   if (picker.kind === 'move') {
     // learnset은 id(aerialace)를 담고 도감 전체는 이름(Aerial Ace)을 담는다. 저장은
@@ -823,21 +861,16 @@ function pickerSource() {
   }));
 }
 
-// 기술은 수가 많아 이름만으로는 찾기 어렵다. 타입·분류·성질로 좁힌다. 나머지
-// 고르기에는 거를 것이 없어 이 값들이 늘 비어 있고 조건을 그냥 통과한다.
-const OPEN_FILTERS = [
-  ['picker-type', 'type', TYPE_LABELS, '모든 타입'],
-  ['picker-category', 'category', CATEGORY_NAMES, '모든 분류'],
-  ['picker-trait', 'trait', MOVE_TRAITS, '모든 성질'],
-];
-
+// 기술은 수가 많아 이름만으로는 찾기 어렵다. 도감의 기술 거르개와 같은 세 가지로
+// 좁히고, 생김새도 그쪽 것(filterGroup)을 그대로 쓴다. 나머지 고르기에는 거를 것이
+// 없어 이 값들이 늘 비어 있고 matchesFilter를 그냥 통과한다.
 function renderPicker() {
   const rows = pickerSource().filter(
     row =>
       matchesQuery(row, picker.query) &&
-      (!picker.type || row.type === picker.type) &&
-      (!picker.category || row.category === picker.category) &&
-      (!picker.trait || row.traits?.includes(picker.trait)),
+      matchesFilter(picker.type, t => row.type === t, picker.modes.type) &&
+      matchesFilter(picker.category, c => row.category === c, picker.modes.category) &&
+      matchesFilter(picker.trait, t => (row.traits ?? []).includes(t), picker.modes.trait),
   );
   $('picker-rows').innerHTML = pickerRows(rows, picker.limit);
   $('picker-more').hidden = rows.length <= picker.limit;
@@ -850,20 +883,25 @@ function openPicker(kind, slot = null) {
     toast('먼저 포켓몬을 선택하세요.');
     return;
   }
-  picker = { kind, slot, query: '', limit: 50, type: '', category: '', trait: '' };
+  picker = {
+    kind,
+    slot,
+    query: '',
+    limit: 50,
+    type: [],
+    category: [],
+    trait: [],
+    modes: { type: 'or', category: 'or', trait: 'or' },
+  };
   $('picker-title').textContent = PICKER_TITLES[kind];
   $('picker-search').value = '';
   $('picker-filters').hidden = kind !== 'move';
-  for (const [id, , names, all] of OPEN_FILTERS) {
-    const select = $(id);
-    if (!select.options.length)
-      select.innerHTML =
-        `<option value="">${all}</option>` +
-        Object.entries(names)
-          .map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`)
-          .join('');
-    select.value = '';
-  }
+  $('picker-filters').innerHTML =
+    kind === 'move'
+      ? group('picker-type', 'type', '타입', TYPE_LABELS, []) +
+        group('picker-category', 'category', '분류', MOVE_CATEGORIES, []) +
+        group('picker-trait', 'trait', '기술 성질', MOVE_TRAITS, [])
+      : '';
   const missing = kind === 'move' && moveOptions(state.reference, draft.pokemon) === null;
   $('picker-help').hidden = !missing;
   if (missing)
@@ -1252,6 +1290,19 @@ function openFilters(kind) {
   filterKind = kind;
   const ranking = kind === 'ranking';
   const dex = kind === 'dex';
+  if (kind === 'builds') {
+    $('filter-title').textContent = state.buildsTab === 'sample' ? '샘플 필터' : '파티 필터';
+    $('filter-fields').innerHTML = group(
+      'builds-type',
+      'type',
+      '타입',
+      TYPE_LABELS,
+      state.buildsType,
+      state.buildsModes.type,
+    );
+    $('filter-dialog').showModal();
+    return;
+  }
   $('filter-title').textContent = ranking ? '랭킹 필터' : dex ? '도감 필터' : '배우는 기술 필터';
   // The learnset and the move index filter on the same three properties.
   const moveGroups = (prefix, type, category, trait, modes) =>
@@ -1304,6 +1355,7 @@ function openFilters(kind) {
   $('filter-dialog').showModal();
 }
 $('ranking-filter').onclick = () => openFilters('ranking');
+$('builds-filter').onclick = () => openFilters('builds');
 $('ranking-link').onclick = () => goToRanking({ top: true });
 $('speed-link').onclick = () => {
   if (state.page !== 'speed') openSpeed(state.speed.mode);
@@ -1658,7 +1710,11 @@ $('filter-form').onsubmit = event => {
   const groups = [...$('filter-fields').querySelectorAll('[data-filter-group]')];
   const values = Object.fromEntries(groups.map(g => [g.dataset.filterGroup, groupValues(g)]));
   const modes = Object.fromEntries(groups.map(g => [g.dataset.filterGroup, groupMode(g)]));
-  if (filterKind === 'ranking') {
+  if (filterKind === 'builds') {
+    state.buildsType = values.type;
+    state.buildsModes = modes;
+    renderBuilds();
+  } else if (filterKind === 'ranking') {
     state.generation = values.generation;
     state.type = values.type;
     state.gimmick = values.gimmick;
@@ -1685,7 +1741,9 @@ $('filter-form').onsubmit = event => {
   }
   $('filter-dialog').close();
   (
-    ({ ranking: $('ranking-filter'), dex: $('dex-filter') })[filterKind] ?? $('learnset-filter')
+    ({ ranking: $('ranking-filter'), dex: $('dex-filter'), builds: $('builds-filter') })[
+      filterKind
+    ] ?? $('learnset-filter')
   )?.focus({ preventScroll: true });
 };
 
@@ -1730,13 +1788,27 @@ $('picker-more').addEventListener('click', () => {
   picker.limit += 50;
   renderPicker();
 });
-for (const [id, field] of OPEN_FILTERS)
-  $(id).addEventListener('change', event => {
-    if (!picker) return;
-    picker[field] = event.target.value;
-    picker.limit = 50;
-    renderPicker();
-  });
+// 적용 단추 없이 고르는 대로 바로 좁힌다. 창 안에서 또 창을 여는 대신 자리에서
+// 결과를 보는 편이 무엇을 고르고 있는지 읽기 쉽다.
+function readPickerFilters() {
+  if (!picker) return;
+  for (const g of $('picker-filters').querySelectorAll('[data-filter-group]')) {
+    picker[g.dataset.filterGroup] = groupValues(g);
+    picker.modes[g.dataset.filterGroup] = groupMode(g);
+    updateGroupSummary(g);
+  }
+  picker.limit = 50;
+  renderPicker();
+}
+$('picker-filters').addEventListener('change', event => {
+  if (event.target.closest('[data-filter-group]')) readPickerFilters();
+});
+$('picker-filters').addEventListener('click', event => {
+  if (!event.target.closest('[data-clear-group]')) return;
+  const g = event.target.closest('[data-filter-group]');
+  g.querySelectorAll('[data-choice]').forEach(input => (input.checked = false));
+  readPickerFilters();
+});
 $('picker-rows').addEventListener('click', event => {
   const row = event.target.closest('[data-picker-value]');
   if (row) applyPicked(row.dataset.pickerValue);

@@ -1,4 +1,5 @@
 import { matchesQuery, toId } from './data.js';
+import { matchesFilter } from './filters.js';
 import { megaSprite } from './images.js';
 import { STAT_KEYS } from './reference.js';
 // 스피드 화면에서 먼저 쓰여 그런 이름이 붙었을 뿐 챔피언스 출전 폼 목록 그
@@ -392,6 +393,27 @@ export function sortBuilds(list, { key = 'updated', desc = SORT_DESCENDS[key] } 
         : (a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0) || byName(a, b);
   const turn = desc ? -1 : 1;
   return [...list].sort((a, b) => turn * cmp(a, b));
+}
+
+// 타입으로 좁힌다. 랭킹·도감과 같은 matchesFilter를 쓰므로 하나라도(OR)와
+// 모두(AND)가 그쪽과 똑같이 움직인다. 파티는 자리에 앉은 샘플들의 타입을 모두
+// 합쳐서 본다. AND는 '이 타입들을 다 갖춘 파티'라는 뜻이 된다.
+const typesOf = (reference, pokemon) => reference?.species?.[pokemon]?.types ?? [];
+
+export function filterSamples(samples, { type = [], modes = {} } = {}, reference) {
+  return samples.filter(s =>
+    matchesFilter(type, t => typesOf(reference, s.pokemon).includes(t), modes.type),
+  );
+}
+
+export function filterParties(parties, samples, { type = [], modes = {} } = {}, reference) {
+  const byId = new Map(samples.map(s => [s.id, s]));
+  return parties.filter(p => {
+    const types = new Set(
+      p.members.filter(Boolean).flatMap(id => typesOf(reference, byId.get(id)?.pokemon)),
+    );
+    return matchesFilter(type, t => types.has(t), modes.type);
+  });
 }
 
 // 목록 검색. 다른 화면과 같은 matchesQuery를 써서 한국어 이름, 초성, 도감 번호가
