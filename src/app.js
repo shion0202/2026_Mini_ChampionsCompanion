@@ -1,5 +1,11 @@
 import { ApiClient } from './api.js';
-import { normalizeIndex, formatDate, CATEGORY_LABELS, SEASON_REGULATIONS } from './data.js';
+import {
+  normalizeIndex,
+  formatDate,
+  CATEGORY_LABELS,
+  SEASON_REGULATIONS,
+  matchesQuery,
+} from './data.js';
 import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
@@ -25,8 +31,14 @@ import {
   writeDrafts,
   draftKey,
   pruneDrafts,
+  speciesOptions,
+  itemOptions,
+  moveOptions,
+  setMove,
+  addAltMove,
+  removeAltMove,
 } from './builds.js';
-import { sampleList, partyList, sampleEditor, partyEditor } from './builds-view.js';
+import { sampleList, partyList, sampleEditor, partyEditor, pickerRows } from './builds-view.js';
 import {
   renderReference,
   renderLearnsetShell,
@@ -661,6 +673,110 @@ function openBuildsEditor(kind, id, { navigate = true } = {}) {
   window.scrollTo(0, 0);
 }
 
+const PICKER_TITLES = {
+  species: '포켓몬 고르기',
+  item: '도구 고르기',
+  move: '기술 고르기',
+  member: '샘플 고르기',
+};
+
+// 네 가지가 같은 창을 쓴다. 무엇을 고르는 중인지와 어디에 넣을지를 들고 있는다.
+let picker = null;
+
+function pickerSource() {
+  const draft = state.buildsEditing?.draft;
+  if (!picker || !draft) return [];
+  if (picker.kind === 'species')
+    // reference.species는 id(예: charizard)로 찾는다. name(예: Charizard)을 값으로
+    // 쓰면 특성·기술 목록과 표시 이름이 전부 어긋난다. name은 영문 검색용으로만 남긴다.
+    return speciesOptions(state.reference, state.locale, '').map(row => ({
+      value: row.id,
+      label: row.label,
+      sub: row.types.map(t => TYPE_LABELS[t] ?? t).join(' · '),
+      dex: row.dex,
+      name: row.name,
+    }));
+  if (picker.kind === 'item')
+    return itemOptions(state.reference).map(name => ({
+      value: name,
+      label: state.locale.label('held_item', name),
+      sub: '',
+      name,
+    }));
+  if (picker.kind === 'move') {
+    const learnable = moveOptions(state.reference, draft.pokemon);
+    const names = learnable ?? Object.values(state.reference.move).map(m => m.name);
+    return names.map(name => ({
+      value: name,
+      label: state.locale.label('move', name),
+      sub: '',
+      name,
+    }));
+  }
+  return state.builds.samples.map(s => ({
+    value: s.id,
+    label: s.name,
+    sub: s.pokemon
+      ? state.locale.pokemon(state.reference?.species?.[s.pokemon]?.name ?? s.pokemon).label
+      : '',
+    name: s.name,
+  }));
+}
+
+function renderPicker() {
+  const rows = pickerSource().filter(row => matchesQuery(row, picker.query));
+  $('picker-rows').innerHTML = pickerRows(rows, picker.limit);
+  $('picker-more').hidden = rows.length <= picker.limit;
+}
+
+function openPicker(kind, slot = null) {
+  const draft = state.buildsEditing?.draft;
+  if (!draft) return;
+  if (kind === 'move' && !draft.pokemon) {
+    toast('먼저 포켓몬을 고르세요.');
+    return;
+  }
+  picker = { kind, slot, query: '', limit: 50 };
+  $('picker-title').textContent = PICKER_TITLES[kind];
+  $('picker-search').value = '';
+  const missing = kind === 'move' && moveOptions(state.reference, draft.pokemon) === null;
+  $('picker-help').hidden = !missing;
+  if (missing)
+    $('picker-help').textContent =
+      '이 폼의 배우는 기술 자료가 없어 도감 전체에서 고릅니다. 실제로 배우는지는 확인되지 않습니다.';
+  renderPicker();
+  $('picker-dialog').showModal();
+}
+
+function applyPicked(value) {
+  const editing = state.buildsEditing;
+  if (!editing || !picker) return;
+  const draft = editing.draft;
+  if (picker.kind === 'species')
+    // 포켓몬이 바뀌면 그 포켓몬의 것이 아닌 특성이 남는다. 특성만 비운다.
+    // 기술은 사용자가 고른 것이므로 임의로 지우지 않는다.
+    editing.draft = { ...draft, pokemon: value, ability: null };
+  else if (picker.kind === 'item') editing.draft = { ...draft, item: value };
+  else if (picker.kind === 'member')
+    editing.draft = {
+      ...draft,
+      members: draft.members.map((m, i) => (i === picker.slot ? value : m)),
+    };
+  else if (picker.slot === 'alt') editing.draft = addAltMove(draft, value);
+  else {
+    const swapped = draft.altMoves.includes(value);
+    const previous = draft.moves[picker.slot];
+    editing.draft = setMove(draft, picker.slot, value);
+    // 후보와 자리를 맞바꾼 것은 화면만 보고는 알 수 없다.
+    if (swapped && previous)
+      toast(`후보의 ${state.locale.label('move', value)}와 자리를 바꿨습니다.`);
+  }
+  picker = null;
+  $('picker-dialog').close();
+  saveDraft();
+  renderBuildsEditor();
+}
+
 function closeBuildsEditor({ navigate = true } = {}) {
   state.buildsEditing = null;
   state.buildsErrors = [];
@@ -986,8 +1102,26 @@ $('builds-rows').addEventListener('click', event => {
     openBuildsEditor('party', openParty.dataset.buildsParty);
     return;
   }
+  if (event.target.closest('[data-builds-species]')) return openPicker('species');
+  if (event.target.closest('[data-builds-item]')) return openPicker('item');
+  if (event.target.closest('[data-builds-alt-add]')) return openPicker('move', 'alt');
+  const moveSlot = event.target.closest('[data-builds-move]');
+  if (moveSlot) return openPicker('move', Number(moveSlot.dataset.buildsMove));
+  const memberSlot = event.target.closest('[data-builds-member]');
+  if (memberSlot) return openPicker('member', Number(memberSlot.dataset.buildsMember));
+  const altRemove = event.target.closest('[data-builds-alt-remove]');
+  if (altRemove) {
+    state.buildsEditing.draft = removeAltMove(
+      state.buildsEditing.draft,
+      altRemove.dataset.buildsAltRemove,
+    );
+    saveDraft();
+    renderBuildsEditor();
+    return;
+  }
   if (event.target.closest('[data-builds-cancel]')) closeBuildsEditor();
 });
+$('builds-new').onclick = () => openBuildsEditor(state.buildsTab, null);
 
 // 이름과 설명은 입력할 때마다 초안에 담는다. 다시 그리면 커서가 튀므로 그리지 않는다.
 $('builds-rows').addEventListener('input', event => {
@@ -1248,6 +1382,29 @@ document.addEventListener('input', event => {
   }
 });
 $('close-effect').onclick = () => $('effect-dialog').close();
+$('close-picker').onclick = () => {
+  picker = null;
+  $('picker-dialog').close();
+};
+$('picker-search').addEventListener('input', event => {
+  if (!picker) return;
+  picker.query = event.target.value;
+  picker.limit = 50;
+  renderPicker();
+});
+$('picker-more').addEventListener('click', () => {
+  if (!picker) return;
+  picker.limit += 50;
+  renderPicker();
+});
+$('picker-rows').addEventListener('click', event => {
+  const row = event.target.closest('[data-picker-value]');
+  if (row) applyPicked(row.dataset.pickerValue);
+});
+// Escape로 닫아도 고르는 중이라는 상태가 남지 않게 한다.
+$('picker-dialog').addEventListener('close', () => {
+  picker = null;
+});
 document.querySelectorAll('[data-format]').forEach(button => {
   button.onclick = () => {
     if (state.format !== button.dataset.format) {
