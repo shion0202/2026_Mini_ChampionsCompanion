@@ -1,9 +1,16 @@
 // 샘플과 파티 화면의 마크업. app-view.js와 같이 문자열만 만들고 DOM을 만지지
 // 않으므로 브라우저 없이 스냅샷으로 비교한다.
 import { esc } from './html.js';
+import { toId } from './data.js';
 import { spreadLabel, POINT_LETTERS } from './reference.js';
 import { NATURES, natureAdjust, abilityOptions } from './builds.js';
 import { STAT_NAMES } from './locale.js';
+
+// 도감 화면과 같은 규칙이다(app-view.js). reference가 기술·특성·도구 모두의
+// 한국어 이름을 갖고 있고 ko.json은 일부가 비어 있으므로 reference를 먼저 본다.
+// ko.json만 보면 메가스톤 45개 등이 영문으로 떨어진다.
+const refLabel = (reference, locale, category, name) =>
+  reference?.[category]?.[toId(name)]?.label ?? locale.label(category, name);
 
 // 명사를 조사가 붙은 문장에 끼워넣지 않는다. '샘플이'는 맞지만 '파티이'는 틀린다.
 // 다른 뷰 모듈도 맥락마다 문장을 통으로 적는다.
@@ -110,10 +117,10 @@ export function partyList(parties, samples, locale) {
 
 // 기술은 영문 이름으로 담고 한국어로 보여준다. locale을 받지 않으면 저장된
 // 영문이 그대로 화면에 나온다.
-const moveSlot = locale => (move, slot) =>
+const moveSlot = (reference, locale) => (move, slot) =>
   `<li><span class="builds-slot">${slot + 1}</span>` +
   `<button class="builds-pick" data-builds-move="${slot}">` +
-  `${move ? esc(locale.label('move', move)) : '기술 선택'}</button></li>`;
+  `${move ? esc(refLabel(reference, locale, 'move', move)) : '기술 선택'}</button></li>`;
 
 const pointRow = (value, index) =>
   `<label class="builds-point"><span>${POINT_LETTERS[index]}</span>` +
@@ -126,7 +133,7 @@ export function sampleEditor(
   const total = sample.points.reduce((a, b) => a + b, 0);
   const abilities = abilityOptions(reference, sample.pokemon).map(name => ({
     value: name,
-    label: locale.label('ability', name),
+    label: refLabel(reference, locale, 'ability', name),
   }));
   return (
     `<form class="builds-editor" data-builds-form="sample">` +
@@ -135,7 +142,7 @@ export function sampleEditor(
     `<button type="button" class="builds-pick builds-species" data-builds-species>` +
     `${esc(speciesLabel(locale, reference, sample.pokemon))}</button>` +
     `<button type="button" class="builds-pick" data-builds-item>` +
-    `${sample.item ? esc(locale.label('held_item', sample.item)) : '도구 선택'}</button>` +
+    `${sample.item ? esc(refLabel(reference, locale, 'held_item', sample.item)) : '도구 선택'}</button>` +
     `<label class="builds-field">특성<select data-builds-field="ability"${abilities.length ? '' : ' disabled'}>` +
     `${choices(abilities, sample.ability, abilities.length ? '특성 선택' : '먼저 포켓몬을 선택하세요')}` +
     `</select></label>` +
@@ -145,12 +152,12 @@ export function sampleEditor(
     `<fieldset class="builds-points"><legend>능력 포인트 <small>합계 ${total} / 66</small></legend>` +
     `${sample.points.map(pointRow).join('')}</fieldset>` +
     `<fieldset class="builds-moves"><legend>채용 기술</legend>` +
-    `<ul>${sample.moves.map(moveSlot(locale)).join('')}</ul></fieldset>` +
+    `<ul>${sample.moves.map(moveSlot(reference, locale)).join('')}</ul></fieldset>` +
     `<fieldset class="builds-alts"><legend>후보 기술</legend>` +
     `<ul>${sample.altMoves
       .map(
         m =>
-          `<li><span class="builds-alt-name">${esc(locale.label('move', m))}</span>` +
+          `<li><span class="builds-alt-name">${esc(refLabel(reference, locale, 'move', m))}</span>` +
           `<button type="button" class="text-button" data-builds-alt-remove="${esc(m)}">빼기</button></li>`,
       )
       .join('')}</ul>` +

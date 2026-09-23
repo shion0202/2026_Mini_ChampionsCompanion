@@ -5,6 +5,7 @@ import {
   CATEGORY_LABELS,
   SEASON_REGULATIONS,
   matchesQuery,
+  toId,
 } from './data.js';
 import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
@@ -689,6 +690,11 @@ const PICKER_TITLES = {
 // 네 가지가 같은 창을 쓴다. 무엇을 고르는 중인지와 어디에 넣을지를 들고 있는다.
 let picker = null;
 
+// 도감 화면과 같은 규칙이다(app-view.js). reference가 기술·도구 모두의 한국어
+// 이름을 갖고 있고 ko.json은 일부가 비어 있으므로 reference를 먼저 본다.
+const buildLabel = (category, name) =>
+  state.reference?.[category]?.[toId(name)]?.label ?? state.locale.label(category, name);
+
 function pickerSource() {
   const draft = state.buildsEditing?.draft;
   if (!picker || !draft) return [];
@@ -705,7 +711,7 @@ function pickerSource() {
   if (picker.kind === 'item')
     return itemOptions(state.reference).map(name => ({
       value: name,
-      label: state.locale.label('held_item', name),
+      label: buildLabel('held_item', name),
       sub: '',
       name,
     }));
@@ -719,7 +725,7 @@ function pickerSource() {
       : Object.values(state.reference.move).map(m => m.name);
     return names.map(name => ({
       value: name,
-      label: state.locale.label('move', name),
+      label: buildLabel('move', name),
       sub: '',
       name,
     }));
@@ -779,8 +785,7 @@ function applyPicked(value) {
     const previous = draft.moves[picker.slot];
     editing.draft = setMove(draft, picker.slot, value);
     // 후보와 자리를 맞바꾼 것은 화면만 보고는 알 수 없다.
-    if (swapped && previous)
-      toast(`후보의 ${state.locale.label('move', value)}와 자리를 바꿨습니다.`);
+    if (swapped && previous) toast(`후보의 ${buildLabel('move', value)}와 자리를 바꿨습니다.`);
   }
   picker = null;
   $('picker-dialog').close();
