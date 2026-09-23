@@ -85,6 +85,12 @@ const editorActions = (existing, errors) =>
   `<button type="button" class="text-button" data-builds-cancel>목록으로</button>` +
   `</div>`;
 
+// 긴 편집기에서는 아래의 목록으로까지 내려가야 나갈 수 있었다. 랭킹 상세와 같은
+// 자리, 같은 모양으로 위에도 둔다. data-builds-cancel이라 아래 것과 같이 움직인다.
+const backToList =
+  `<div class="builds-nav">` +
+  `<button type="button" class="text-button" data-builds-cancel>← 목록으로</button></div>`;
+
 const resumeNote = resumed =>
   resumed
     ? '<p class="builds-resume">작성 중인 항목을 이어서 작성합니다. 저장하지 않은 내용이 남아 있었습니다.</p>'
@@ -283,6 +289,7 @@ export function sampleEditor(
   const abilities = comboOptions('ability', forField);
   return (
     `<form class="builds-editor" data-builds-form="sample">` +
+    backToList +
     `${resumeNote(resumed)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="샘플명 (예: 스카프 한카리아스)"></label>` +
     `<p class="builds-day-line">수정일 ${fmtDay(sample.updatedAt)}</p>` +
@@ -354,6 +361,7 @@ export function partyEditor(
   const byId = new Map(samples.map(s => [s.id, s]));
   return (
     `<form class="builds-editor" data-builds-form="party">` +
+    backToList +
     `${resumeNote(resumed)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(party.name)}" data-builds-field="name" placeholder="파티명"></label>` +
     `<fieldset class="builds-members"><legend>구성</legend><ul>${party.members

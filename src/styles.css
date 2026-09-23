@@ -3474,6 +3474,11 @@ select optgroup {
 .builds-alt-remove {
   flex: none;
 }
+/* 단추의 안쪽 여백만큼 당겨, 글이 아래 칸들의 왼쪽 끝과 맞아떨어지게 한다. */
+.builds-nav {
+  display: flex;
+  margin-inline-start: -8px;
+}
 .builds-status {
   color: var(--muted);
 }
