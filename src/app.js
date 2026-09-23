@@ -37,6 +37,10 @@ import {
   setMove,
   addAltMove,
   removeAltMove,
+  validateSample,
+  validateParty,
+  partiesUsing,
+  deleteSample,
 } from './builds.js';
 import { sampleList, partyList, sampleEditor, partyEditor, pickerRows } from './builds-view.js';
 import {
@@ -782,6 +786,70 @@ function applyPicked(value) {
   renderBuildsEditor();
 }
 
+function commitBuild() {
+  const editing = state.buildsEditing;
+  if (!editing) return;
+  const { kind, id, draft } = editing;
+  const errors =
+    kind === 'sample' ? validateSample(draft) : validateParty(draft, state.builds.samples);
+  state.buildsErrors = errors;
+  if (errors.length) {
+    renderBuildsEditor();
+    return;
+  }
+  const saved = { ...draft, updatedAt: Date.now() };
+  const list = kind === 'sample' ? 'samples' : 'parties';
+  const previous = state.builds;
+  state.builds = {
+    ...previous,
+    [list]:
+      id === null ? [...previous[list], saved] : previous[list].map(x => (x.id === id ? saved : x)),
+  };
+  // 쓰지 못했으면 되돌린다. 목록에 보이는데 새로고침하면 사라지는 상태를 만들지
+  // 않는다. buildsSave가 이미 실패를 알렸다.
+  if (!buildsSave()) {
+    state.builds = previous;
+    return;
+  }
+  dropDraft(kind, id);
+  toast('저장했습니다.');
+  closeBuildsEditor();
+}
+
+let confirmAction = null;
+
+function askConfirm(message, action) {
+  $('confirm-body').textContent = message;
+  confirmAction = action;
+  $('confirm-dialog').showModal();
+}
+
+function removeBuild() {
+  const editing = state.buildsEditing;
+  if (!editing || editing.id === null) return;
+  const { kind, id } = editing;
+  const used = kind === 'sample' ? partiesUsing(state.builds, id).length : 0;
+  const message =
+    kind === 'sample'
+      ? `‘${editing.draft.name}’을 지웁니다.` +
+        (used ? ` 이 샘플을 쓰는 파티 ${used}개의 자리가 비워집니다.` : '')
+      : `‘${editing.draft.name}’을 지웁니다.`;
+  askConfirm(message, () => {
+    const previous = state.builds;
+    state.builds =
+      kind === 'sample'
+        ? deleteSample(previous, id)
+        : { ...previous, parties: previous.parties.filter(p => p.id !== id) };
+    if (!buildsSave()) {
+      state.builds = previous;
+      return;
+    }
+    dropDraft(kind, id);
+    toast('지웠습니다.');
+    closeBuildsEditor();
+  });
+}
+
 function closeBuildsEditor({ navigate = true } = {}) {
   state.buildsEditing = null;
   state.buildsErrors = [];
@@ -1125,6 +1193,7 @@ $('builds-rows').addEventListener('click', event => {
     return;
   }
   if (event.target.closest('[data-builds-cancel]')) closeBuildsEditor();
+  if (event.target.closest('[data-builds-delete]')) return removeBuild();
 });
 $('builds-new').onclick = () => openBuildsEditor(state.buildsTab, null);
 
@@ -1161,9 +1230,10 @@ $('builds-rows').addEventListener('change', event => {
   renderBuildsEditor();
 });
 
-// 편집기는 form이라 Enter로 제출될 수 있다. 저장 배선은 다음 작업이므로 여기서는
-// 새로고침만 막는다.
-$('builds-rows').addEventListener('submit', event => event.preventDefault());
+$('builds-rows').addEventListener('submit', event => {
+  event.preventDefault();
+  commitBuild();
+});
 document.querySelectorAll('[data-builds-tab]').forEach(button =>
   button.addEventListener('click', () => {
     openBuilds(button.dataset.buildsTab);
@@ -1387,6 +1457,16 @@ document.addEventListener('input', event => {
   }
 });
 $('close-effect').onclick = () => $('effect-dialog').close();
+$('close-confirm').onclick = () => $('confirm-dialog').close();
+$('cancel-confirm').onclick = () => $('confirm-dialog').close();
+$('accept-confirm').onclick = () => {
+  const action = confirmAction;
+  $('confirm-dialog').close();
+  action?.();
+};
+$('confirm-dialog').addEventListener('close', () => {
+  confirmAction = null;
+});
 $('close-picker').onclick = () => {
   picker = null;
   $('picker-dialog').close();

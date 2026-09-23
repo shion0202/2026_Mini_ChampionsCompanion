@@ -132,6 +132,38 @@ try {
     true,
   );
 
+  // 편집: 빈 값에서 만들어 저장한다
+  await page.goto('http://localhost:4173/#builds=sample');
+  await page.locator('#builds-rows').waitFor({ state: 'visible' });
+  await page.locator('[data-builds-new="sample"]').click();
+  await page.locator('[data-builds-form="sample"]').waitFor({ state: 'visible' });
+  await page.locator('[data-builds-field="name"]').fill('검증용 샘플');
+  await page.locator('[data-builds-species]').click();
+  await page.locator('#picker-search').fill('보만다');
+  await page.locator('[data-picker-value="Salamence"]').click();
+  await page.locator('[data-builds-field="ability"]').selectOption('Intimidate');
+  await page.locator('[data-builds-field="nature"]').selectOption('adamant');
+  await page.locator('[data-builds-point="1"]').fill('32');
+  await page.locator('[data-builds-save]').click();
+  await page.locator('#builds-rows').getByText('검증용 샘플').waitFor({ state: 'visible' });
+
+  // 저장한 것은 새로고침 후에도 남는다
+  await page.reload();
+  await page.locator('#builds-rows').getByText('검증용 샘플').waitFor({ state: 'visible' });
+
+  // 이름을 비우면 저장을 막고 이유를 보여준다
+  await page.locator('#builds-rows').getByText('검증용 샘플').click();
+  await page.locator('[data-builds-field="name"]').fill('');
+  await page.locator('[data-builds-save]').click();
+  assert.match(await page.locator('[data-builds-errors]').innerText(), /이름을 입력하세요/);
+
+  // 초안은 나갔다 돌아와도 남는다
+  await page.locator('[data-builds-cancel]').click();
+  await page.locator('#builds-rows').getByText('검증용 샘플').click();
+  await page.locator('.builds-resume').waitFor({ state: 'visible' });
+
+  await page.screenshot({ path: 'test-results/builds-editor.png' });
+
   assert.deepEqual(errors, []);
   console.log('Builds list, storage and JSON exchange passed.');
 } finally {
