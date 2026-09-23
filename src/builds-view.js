@@ -104,7 +104,7 @@ export function partyList(parties, samples, locale) {
   return `<ul class="builds-list">${parties
     .map(p => {
       const filled = p.members.filter(Boolean);
-      const shown = filled.map(id => names.get(id) ?? '없는 샘플').join(', ');
+      const shown = filled.map(id => names.get(id) ?? '존재하지 않는 샘플').join(', ');
       return (
         `<li class="builds-row"><button class="builds-open" data-builds-party="${esc(p.id)}">` +
         `<span class="builds-name">${esc(p.name)}</span>` +
@@ -186,7 +186,7 @@ const memberFacts = (sample, reference, locale) => {
 
 const memberRow = (byId, reference, locale, index) => (id, slot) => {
   const sample = id ? byId.get(id) : null;
-  const name = sample ? sample.name : id ? '없는 샘플' : '빈 자리';
+  const name = sample ? sample.name : id ? '존재하지 않는 샘플' : '빈 자리';
   const species = sample ? speciesLabel(locale, reference, sample.pokemon) : '';
   return (
     `<li class="builds-member"><div class="builds-member-head">` +
