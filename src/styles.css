@@ -3509,10 +3509,12 @@ select optgroup {
 /* 후보를 더하는 단추는 기술 목록에서 떼어내고 칸 아래 선에는 붙인다. 후보가
    하나도 없으면 떼어낼 목록이 없으므로 칸 가운데에 놓는다. */
 .builds-alts [data-builds-alt-add] {
-  margin: 16px 0 -8px;
+  margin: 6px 0 -8px;
 }
+/* 비었을 때는 legend가 위 테두리를 밟고 있어 위쪽이 더 좁아 보인다. 그만큼
+   끌어올려야 가운데로 읽힌다. */
 .builds-alts ul:empty + [data-builds-alt-add] {
-  margin: 0 0 -4px;
+  margin: -4px 0 -4px;
 }
 /* 저장과 목록으로는 각각 다른 버튼 규칙을 쓴다. .primary-button은 margin-top이
    15px이라 가운데 정렬된 줄에서 혼자 내려앉는다. 여백을 지우고 높이를 맞춘다. */

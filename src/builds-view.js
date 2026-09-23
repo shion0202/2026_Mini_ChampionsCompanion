@@ -72,9 +72,9 @@ const editorActions = (existing, errors) =>
   errorList(errors) +
   `<div class="builds-actions">` +
   `<button type="submit" class="primary-button" data-builds-save>저장</button>` +
-  `<button type="button" class="text-button" data-builds-cancel>목록으로</button>` +
   `<button type="button" class="text-button" data-builds-reset>초기화</button>` +
   `${existing ? '<button type="button" class="text-button builds-delete" data-builds-delete>삭제</button>' : ''}` +
+  `<button type="button" class="text-button" data-builds-cancel>목록으로</button>` +
   `</div>`;
 
 const resumeNote = resumed =>
