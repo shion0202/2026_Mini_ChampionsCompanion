@@ -704,8 +704,13 @@ function pickerSource() {
       name,
     }));
   if (picker.kind === 'move') {
+    // learnset은 id(aerialace)를 담고 도감 전체는 이름(Aerial Ace)을 담는다. 저장은
+    // 영문 이름으로 하므로 id를 이름으로 바꾼다. 둘을 섞으면 같은 기술이 고른 경로에
+    // 따라 다르게 저장되고, 후보와의 맞바꿈과 중복 검사가 조용히 어긋난다.
     const learnable = moveOptions(state.reference, draft.pokemon);
-    const names = learnable ?? Object.values(state.reference.move).map(m => m.name);
+    const names = learnable
+      ? learnable.map(id => state.reference.move[id]?.name ?? id)
+      : Object.values(state.reference.move).map(m => m.name);
     return names.map(name => ({
       value: name,
       label: state.locale.label('move', name),
