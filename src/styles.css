@@ -3097,10 +3097,12 @@ select optgroup {
 /* 랭킹의 정렬 줄과 같은 모양을 쓴다(.ranking-controls). 기준 칸과 방향 단추의
    너비를 고정해, 고를 수 있는 기준이 둘뿐인 파티에서도 샘플과 같은 폭에서 줄이
    넘어간다. 글자 길이에 따라 넘어가는 자리가 달라지면 안 된다. */
+/* 이름표가 붙은 칸만 키가 커진다. 아래를 맞춰야 세 조작의 높이가 나란히 선다. */
 .builds-sort {
   flex: none;
   display: grid;
   grid-template-columns: 124px 104px 44px;
+  align-items: end;
   gap: 8px;
 }
 .builds-sort select {
@@ -3530,11 +3532,21 @@ select optgroup {
   color: var(--muted);
 }
 /* ⌕ 글자는 em 박스 아래쪽에 앉아 가운데보다 내려 보인다. 이 창에서만 끌어올린다. */
+/* 돋보기는 글자 상자가 아래로 치우쳐 가운데보다 내려앉아 보인다. */
 #picker-dialog .search-box > span {
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+}
+/* 세로 상자 안에서는 줄어들 수 있는 것이 먼저 줄어든다. 검색줄과 거르개 줄은
+   줄지 않게 묶고, 남는 자리는 목록이 가져간다. */
+#picker-dialog .search-box,
+#picker-filters,
+#picker-help,
+#picker-more,
+#picker-dialog .dialog-heading {
+  flex: none;
 }
 #picker-dialog .search-box {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 #picker-help {
   margin: 0 0 16px;
@@ -3555,12 +3567,13 @@ select optgroup {
 #picker-more {
   margin-top: 12px;
 }
-/* 기술 고르기에만 나오는 줄. 도감 필터와 같은 .filter-group을 그대로 쓰므로
-   여기서는 자리만 잡는다. */
+/* 기술 고르기에만 나오는 줄. 도감의 .dex-controls와 같은 모양이라 자리만 잡는다. */
 .picker-filters {
-  display: grid;
-  gap: 8px;
   margin: 0 0 14px;
+}
+.picker-filters .active-filter-summary {
+  margin: 0;
+  min-width: 0;
 }
 /* 구성원은 한 줄이 아니라 머리줄과 상세로 이루어진다. fieldset li의 가로 배치를
    덮어야 상세가 옆으로 붙지 않는다. */

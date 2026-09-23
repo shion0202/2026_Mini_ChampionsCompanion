@@ -1,7 +1,7 @@
 import { matchesQuery, toId } from './data.js';
 import { matchesFilter } from './filters.js';
 import { megaSprite } from './images.js';
-import { STAT_KEYS } from './reference.js';
+import { STAT_KEYS, generation } from './reference.js';
 // 스피드 화면에서 먼저 쓰여 그런 이름이 붙었을 뿐 챔피언스 출전 폼 목록 그
 // 자체다. 이름을 바꾸면 speed.js, 생성 스크립트, 문서까지 번지므로 그대로 쓴다.
 import { SPEED_SPECIES } from './speed-catalog.js';
@@ -398,21 +398,38 @@ export function sortBuilds(list, { key = 'updated', desc = SORT_DESCENDS[key] } 
 // 타입으로 좁힌다. 랭킹·도감과 같은 matchesFilter를 쓰므로 하나라도(OR)와
 // 모두(AND)가 그쪽과 똑같이 움직인다. 파티는 자리에 앉은 샘플들의 타입을 모두
 // 합쳐서 본다. AND는 '이 타입들을 다 갖춘 파티'라는 뜻이 된다.
+// 세대는 랭킹과 같이 도감 번호로 가른다(reference.js의 generation). 메가 폼도
+// 원종과 번호가 같으므로 같은 세대로 잡힌다.
 const typesOf = (reference, pokemon) => reference?.species?.[pokemon]?.types ?? [];
+const genOf = (reference, pokemon) => generation(reference?.species?.[pokemon]?.dex);
 
-export function filterSamples(samples, { type = [], modes = {} } = {}, reference) {
-  return samples.filter(s =>
-    matchesFilter(type, t => typesOf(reference, s.pokemon).includes(t), modes.type),
+export function filterSamples(
+  samples,
+  { type = [], generation: gen = [], modes = {} } = {},
+  reference,
+) {
+  return samples.filter(
+    s =>
+      matchesFilter(type, t => typesOf(reference, s.pokemon).includes(t), modes.type) &&
+      matchesFilter(gen, g => genOf(reference, s.pokemon) === Number(g), modes.generation),
   );
 }
 
-export function filterParties(parties, samples, { type = [], modes = {} } = {}, reference) {
+export function filterParties(
+  parties,
+  samples,
+  { type = [], generation: gen = [], modes = {} } = {},
+  reference,
+) {
   const byId = new Map(samples.map(s => [s.id, s]));
   return parties.filter(p => {
-    const types = new Set(
-      p.members.filter(Boolean).flatMap(id => typesOf(reference, byId.get(id)?.pokemon)),
+    const members = p.members.filter(Boolean).map(id => byId.get(id)?.pokemon);
+    const types = new Set(members.flatMap(pokemon => typesOf(reference, pokemon)));
+    const gens = new Set(members.map(pokemon => genOf(reference, pokemon)));
+    return (
+      matchesFilter(type, t => types.has(t), modes.type) &&
+      matchesFilter(gen, g => gens.has(Number(g)), modes.generation)
     );
-    return matchesFilter(type, t => types.has(t), modes.type);
   });
 }
 

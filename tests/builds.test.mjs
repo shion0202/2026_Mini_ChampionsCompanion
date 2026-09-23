@@ -837,3 +837,20 @@ test('파티는 자리에 앉은 샘플들의 타입을 합쳐서 본다', () =>
   );
   assert.deepEqual(picks(filterParties(parties, typed, { type: ['Fire'] }, null)), []);
 });
+
+test('세대로도 거른다. 랭킹과 같이 도감 번호로 가른다', () => {
+  // 리자몽 6(1세대), 보만다 373(3세대), 피카츄 25(1세대)
+  assert.deepEqual(picks(filterSamples(typed, { generation: ['1'] }, reference)), [
+    '리자몽',
+    '피카츄',
+  ]);
+  assert.deepEqual(picks(filterSamples(typed, { generation: ['3'] }, reference)), ['보만다']);
+  // 메가 폼도 원종과 번호가 같아 같은 세대로 잡힌다.
+  const mega = [{ id: 'm1', name: '메가리자몽', pokemon: 'charizardmegax' }];
+  assert.deepEqual(picks(filterSamples(mega, { generation: ['1'] }, reference)), ['메가리자몽']);
+  // 세대와 타입은 함께 걸린다.
+  assert.deepEqual(
+    picks(filterSamples(typed, { generation: ['1'], type: ['Electric'] }, reference)),
+    ['피카츄'],
+  );
+});
