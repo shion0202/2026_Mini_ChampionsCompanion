@@ -3290,8 +3290,9 @@ select optgroup {
 }
 /* 후보 기술은 줄이 많아지므로 촘촘하게 두고, 이름을 채용 기술의 이름과 같은
    들여쓰기에 맞춘다. 채용 기술은 왼쪽에 번호가 붙어 그만큼 밀려 있다. */
-.builds-alts ul {
-  gap: 4px;
+/* .builds-editor fieldset ul보다 명시도가 높아야 gap이 실제로 좁아진다. */
+.builds-editor fieldset.builds-alts ul {
+  gap: 2px;
 }
 .builds-alt-name {
   flex: 1;
@@ -3299,9 +3300,11 @@ select optgroup {
   font-size: 14px;
   padding-inline-start: 26px;
 }
-/* 저장과 목록으로는 각각 다른 버튼 규칙을 쓰고 있어 높이가 어긋난다. */
+/* 저장과 목록으로는 각각 다른 버튼 규칙을 쓴다. .primary-button은 margin-top이
+   15px이라 가운데 정렬된 줄에서 혼자 내려앉는다. 여백을 지우고 높이를 맞춘다. */
 .builds-actions > * {
   min-height: 44px;
+  margin: 0;
   display: inline-flex;
   align-items: center;
 }

@@ -642,6 +642,9 @@ function dropDraft(kind, id) {
 
 function renderBuildsEditor() {
   const editing = state.buildsEditing;
+  // 편집기는 openBuildsEditor에서 바로 불리기도 한다. 여기서도 검색줄을 감춰야
+  // renderBuilds를 거치지 않는 경로에서 그대로 남지 않는다.
+  if (state.page === 'builds') $('builds-controls').hidden = !!editing;
   if (!editing || state.page !== 'builds' || !state.locale || !state.reference) return;
   const shared = {
     locale: state.locale,
@@ -695,6 +698,10 @@ let picker = null;
 const buildLabel = (category, name) =>
   state.reference?.[category]?.[toId(name)]?.label ?? state.locale.label(category, name);
 
+// 화면에 보이는 것은 한국어 이름이므로 그 순서로 정렬한다. 영문 순서는 읽는
+// 사람에게 아무 규칙이 아니다. 포켓몬만 도감 번호순을 지킨다.
+const byLabel = (a, b) => a.label.localeCompare(b.label, 'ko');
+
 function pickerSource() {
   const draft = state.buildsEditing?.draft;
   if (!picker || !draft) return [];
@@ -709,12 +716,9 @@ function pickerSource() {
       name: row.name,
     }));
   if (picker.kind === 'item')
-    return itemOptions(state.reference).map(name => ({
-      value: name,
-      label: buildLabel('held_item', name),
-      sub: '',
-      name,
-    }));
+    return itemOptions(state.reference)
+      .map(name => ({ value: name, label: buildLabel('held_item', name), sub: '', name }))
+      .sort(byLabel);
   if (picker.kind === 'move') {
     // learnset은 id(aerialace)를 담고 도감 전체는 이름(Aerial Ace)을 담는다. 저장은
     // 영문 이름으로 하므로 id를 이름으로 바꾼다. 둘을 섞으면 같은 기술이 고른 경로에
@@ -723,12 +727,9 @@ function pickerSource() {
     const names = learnable
       ? learnable.map(id => state.reference.move[id]?.name ?? id)
       : Object.values(state.reference.move).map(m => m.name);
-    return names.map(name => ({
-      value: name,
-      label: buildLabel('move', name),
-      sub: '',
-      name,
-    }));
+    return names
+      .map(name => ({ value: name, label: buildLabel('move', name), sub: '', name }))
+      .sort(byLabel);
   }
   return state.builds.samples.map(s => ({
     value: s.id,
