@@ -3335,15 +3335,22 @@ select optgroup {
 .builds-point-name {
   text-align: center;
 }
-/* 입력칸과 단추를 나란히 두되 단추를 칸 밖에 둔다. 칸 안에 넣으면 단추가 있는
-   줄과 없는 줄의 가운데가 어긋난다. */
+/* 최대와 0은 입력칸 아래에 나란히 둔다. 옆에 두면 손가락만 한 크기가 안 나오고,
+   여섯 칸이 모두 같은 모양이라 줄도 어긋나지 않는다. */
 .builds-point-row {
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 4px;
 }
+/* 브라우저가 칸 안에 넣는 1씩 오르내리는 화살표는 너무 작아 걷어낸다. */
+.builds-point input::-webkit-outer-spin-button,
+.builds-point input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 .builds-point input {
-  flex: 1;
+  appearance: textfield;
+  -moz-appearance: textfield;
   min-width: 0;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -3355,19 +3362,14 @@ select optgroup {
   font-size: 14px;
   text-align: center;
 }
-.builds-point-steps {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 2px;
-  flex: none;
-}
 .builds-point-step {
-  width: 26px;
+  min-height: 36px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--white);
   color: var(--muted);
-  font-size: 10px;
+  font: inherit;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
 }
@@ -3481,8 +3483,7 @@ select optgroup {
 #picker-more {
   margin-top: 12px;
 }
-/* 후보 기술은 줄이 많아지므로 촘촘하게 두고, 이름을 채용 기술의 이름과 같은
-   들여쓰기에 맞춘다. 채용 기술은 왼쪽에 번호가 붙어 그만큼 밀려 있다. */
+/* 후보 기술은 줄이 많아지므로 촘촘하게 둔다. */
 /* .builds-editor fieldset ul보다 명시도가 높아야 gap이 실제로 좁아진다. */
 .builds-editor fieldset.builds-alts ul {
   gap: 2px;
@@ -3491,7 +3492,10 @@ select optgroup {
   flex: 1;
   color: var(--ink);
   font-size: 14px;
-  padding-inline-start: 26px;
+}
+/* 후보를 더하는 단추는 기술 목록에서 떼어내고 칸 아래 선에는 붙인다. */
+.builds-alts [data-builds-alt-add] {
+  margin: 16px 0 -8px;
 }
 /* 저장과 목록으로는 각각 다른 버튼 규칙을 쓴다. .primary-button은 margin-top이
    15px이라 가운데 정렬된 줄에서 혼자 내려앉는다. 여백을 지우고 높이를 맞춘다. */

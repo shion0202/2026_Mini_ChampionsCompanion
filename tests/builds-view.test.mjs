@@ -185,6 +185,18 @@ test('초안을 이어서 고칠 때만 안내한다', () => {
   assert.equal(sampleEditor(sample, { reference, locale }).includes('이어서 고치는 중'), false);
 });
 
+// type을 빼먹은 단추는 폼을 보낸다. 기술 칸을 누르면 저장되고 목록으로 나가버렸다.
+test('편집기 안에서 폼을 보내는 단추는 저장뿐이다', () => {
+  for (const html of [
+    sampleEditor(sample, { reference, locale, existing: true }),
+    partyEditor(party, [sample], { locale, existing: true }),
+  ]) {
+    const submits = [...html.matchAll(/<button(?![^>]*type="button")[^>]*>/g)].map(m => m[0]);
+    assert.equal(submits.length, 1, submits.join('\n'));
+    assert.ok(submits[0].includes('data-builds-save'));
+  }
+});
+
 test('파티 편집기도 같은 인자 모양을 쓴다', t => {
   t.assert.snapshot(
     partyEditor(party, [sample], { locale, existing: true, errors: ['이름을 입력하세요.'] }),

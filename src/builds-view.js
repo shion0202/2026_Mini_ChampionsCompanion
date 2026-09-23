@@ -123,7 +123,7 @@ const moveTypeBadge = (reference, move) => {
 
 const moveSlot = (reference, locale) => (move, slot) =>
   `<li><span class="builds-slot">${slot + 1}</span>` +
-  `<button class="builds-pick builds-move" data-builds-move="${slot}">` +
+  `<button type="button" class="builds-pick builds-move" data-builds-move="${slot}">` +
   `${move ? `${esc(refLabel(reference, locale, 'move', move))}${moveTypeBadge(reference, move)}` : '기술 선택'}` +
   `</button></li>`;
 
@@ -137,20 +137,19 @@ const altRow = (reference, locale) => move =>
 
 // 도감 화면과 같은 능력 이름을 쓴다(STAT_LABELS). H·A·B 한 글자는 익숙한 사람만
 // 읽는다. 값을 넣는 곳과 결과를 보는 곳을 나누어, 고치면서 실수치를 바로 본다.
-// 32와 0은 가장 자주 쓰는 값이라 한 번에 가도록 단추를 둔다. 단추를 입력칸 밖에
-// 따로 두어야 단추가 없는 칸과도 나란히 선다.
+// 32와 0은 가장 자주 쓰는 값이라 한 번에 가도록 단추를 둔다. 1씩 오르내리는 단추는
+// 손가락으로 누르기에 너무 작아 두지 않는다. 그 사이 값은 칸에 직접 적는다.
 const pointRow = (value, index) =>
   `<div class="builds-point">` +
   `<span class="builds-point-name">${STAT_LABELS[index]}</span>` +
-  `<div class="builds-point-row">` +
   `<input type="number" min="0" max="32" step="1" value="${value}"` +
   ` data-builds-point="${index}" aria-label="${STAT_LABELS[index]} 능력 포인트">` +
-  `<span class="builds-point-steps">` +
+  `<div class="builds-point-row">` +
   `<button type="button" class="builds-point-step" data-builds-point-max="${index}"` +
-  ` aria-label="${STAT_LABELS[index]} 최대">▲</button>` +
+  ` aria-label="${STAT_LABELS[index]} 최대">최대</button>` +
   `<button type="button" class="builds-point-step" data-builds-point-zero="${index}"` +
-  ` aria-label="${STAT_LABELS[index]} 0">▼</button>` +
-  `</span></div></div>`;
+  ` aria-label="${STAT_LABELS[index]} 0">0</button>` +
+  `</div></div>`;
 
 const actualCard = (index, value) =>
   `<div class="builds-actual"><small>${STAT_LABELS[index]}</small><strong>${value}</strong></div>`;
