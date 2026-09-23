@@ -156,31 +156,29 @@ const pointRow = (value, index) =>
 // 파티를 보는 까닭이 여기 있다. 어느 샘플을 넣었는지만으로는 그 자리가 무엇을
 // 하는지 알 수 없어, 도구·특성·보정·포인트·기술을 자리에서 펼쳐 본다. 여닫는 일은
 // <details>가 한다. 직접 상태를 들고 있을 이유가 없다.
+// 한 줄에 하나씩, 이름표와 값만 둔다. 여기는 고치는 곳이 아니라 훑어보는 곳이라
+// 칸이나 배지로 나눌 이유가 없다. 능력 포인트는 H2 A32 S32처럼 줄여 적는다.
+const STAT_SHORT = ['H', 'A', 'B', 'C', 'D', 'S'];
 const memberFacts = (sample, reference, locale) => {
   const spent = sample.points
-    .map((p, i) => (p ? `${STAT_LABELS[i]} ${p}` : null))
+    .map((p, i) => (p ? `${STAT_SHORT[i]}${p}` : null))
     .filter(Boolean)
-    .join(' · ');
+    .join(' ');
+  const moves = sample.moves
+    .filter(Boolean)
+    .map(m => refLabel(reference, locale, 'move', m))
+    .join(' / ');
   const facts = [
     ['도구', sample.item ? refLabel(reference, locale, 'held_item', sample.item) : '없음'],
     ['특성', sample.ability ? refLabel(reference, locale, 'ability', sample.ability) : '없음'],
     ['능력 보정', sample.nature ? natureLabel(locale, sample.nature) : '없음'],
     ['능력 포인트', spent || '없음'],
+    ['기술', moves || '없음'],
   ];
-  const moves = sample.moves.filter(Boolean);
   return (
     `<dl class="builds-member-facts">` +
     facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('') +
-    `</dl>` +
-    (moves.length
-      ? `<ul class="builds-member-moves">${moves
-          .map(
-            m =>
-              `<li class="builds-move">${esc(refLabel(reference, locale, 'move', m))}` +
-              `${moveTypeBadge(reference, m)}</li>`,
-          )
-          .join('')}</ul>`
-      : `<p class="builds-sub">채용한 기술이 없습니다.</p>`)
+    `</dl>`
   );
 };
 

@@ -3536,40 +3536,26 @@ select optgroup {
   cursor: pointer;
   padding: 4px 0;
 }
+/* 한 줄에 하나씩. 이름표 너비를 묶어 값이 세로로 맞아떨어지게 한다. */
 .builds-member-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 6px 12px;
+  gap: 6px;
   margin: 4px 0 8px;
 }
 .builds-member-facts div {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   font-size: 13px;
 }
 .builds-member-facts dt {
-  color: var(--muted);
+  width: 66px;
   flex: none;
+  color: var(--muted);
 }
 .builds-member-facts dd {
   margin: 0;
+  min-width: 0;
   color: var(--ink);
-}
-.builds-member-moves {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 6px;
-}
-.builds-member-moves li {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 12px;
-  background: var(--white);
-  color: var(--ink);
-  font-size: 13px;
 }
 /* 후보 기술은 줄이 많아지므로 촘촘하게 둔다. */
 /* .builds-editor fieldset ul보다 명시도가 높아야 gap이 실제로 좁아진다. */
