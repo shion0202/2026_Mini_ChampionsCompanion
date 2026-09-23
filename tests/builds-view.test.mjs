@@ -42,7 +42,7 @@ test('빈 목록은 무엇을 하면 되는지 알린다', t => {
   t.assert.snapshot([sampleList([], locale, reference), partyList([], [], locale)]);
 });
 
-test('샘플 목록은 이름, 포켓몬, 배분 요약을 보여준다', t => {
+test('샘플 목록은 이름과 포켓몬만 보여준다', t => {
   t.assert.snapshot(sampleList([sample], locale, reference));
 });
 

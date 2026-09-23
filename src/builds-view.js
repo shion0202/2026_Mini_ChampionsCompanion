@@ -3,7 +3,6 @@
 import { esc } from './html.js';
 import { toId, STAT_LABELS, matchesQuery } from './data.js';
 import { portrait, typeBadges } from './app-view.js';
-import { spreadLabel } from './reference.js';
 import {
   NATURES,
   natureAdjust,
@@ -93,8 +92,7 @@ export function sampleList(samples, locale, reference = null, index = null) {
         `${portrait({ sprite: speciesSprite(reference, index, s.pokemon) }, 'builds-portrait')}` +
         `<span class="builds-text">` +
         `<span class="builds-name">${esc(s.name)}</span>` +
-        `<small class="builds-sub">${esc(speciesLabel(locale, reference, s.pokemon))}` +
-        ` · ${esc(spreadLabel(s.points))}</small>` +
+        `<small class="builds-sub">${esc(speciesLabel(locale, reference, s.pokemon))}</small>` +
         `</span></button></li>`,
     )
     .join('')}</ul>`;
