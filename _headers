@@ -1,0 +1,23 @@
+# Cloudflare Pages가 읽는 응답 헤더 설정. dist/로 복사되어야 효력이 있다.
+
+# 서비스 워커와 진입 문서는 캐시에 오래 두지 않는다. 이 둘이 캐시되면 사이트를
+# 새로 배포해도 기기에서는 옛 앱이 계속 열린다. no-cache는 저장은 하되 쓰기 전에
+# 서버에 확인하라는 뜻이다.
+/sw.js
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache
+
+# 도감과 한국어 이름은 빌드마다 바뀔 수 있고 서비스 워커가 따로 캐시한다.
+/public/data/*
+  Cache-Control: no-cache
+
+# TWA 검증 파일. 안드로이드가 주소창을 숨길지 이 파일로 판단하므로 옛 값이 남으면
+# 지문을 고쳐도 반영되지 않는다.
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Cache-Control: no-cache

@@ -16,10 +16,11 @@
 처음 요구였던 **"PC가 꺼져 있어도 모바일에서 열린다"** 가 실제로 된다. 서비스
 워커가 보안 컨텍스트(HTTPS)를 요구하므로 배포를 건너뛸 수 없다.
 
-할 일은 셋이다.
+실행 절차는 `docs/builds-deploy.md`에 있다. 배포 전 코드 점검은 끝났고 막히는
+곳은 없었다. 할 일은 셋이다.
 
-1. **Cloudflare Pages 배포** — 정적 파일 그대로 올린다. 빌드 단계가 없으므로
-   출력 디렉터리는 저장소 루트다.
+1. **Cloudflare Pages 배포** — 빌드 명령 `npm run build`, 출력 디렉터리 `dist`.
+   루트를 그대로 서빙하면 `docs/`와 `tests/`, `scripts/`가 함께 공개된다.
 2. **`.well-known/assetlinks.json`** — TWA가 주소창 없이 열리려면 이 파일이
    배포된 도메인에서 서빙되어야 한다. 서명 키의 SHA-256 지문이 들어간다.
 3. **Bubblewrap으로 APK** — `manifest.webmanifest`와 `sw.js`는 이미 설치
