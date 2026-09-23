@@ -401,6 +401,19 @@ test('포켓몬 목록은 한국어 이름과 초성으로 찾는다', () => {
   assert.ok(byChosung.some(row => row.id === 'salamence'));
 });
 
+test('포켓몬은 id로 담고 기술과 도구는 영문 이름으로 담는다', () => {
+  const row = speciesOptions(reference, locale, '리자몽')[0];
+  // reference.species는 id로 찾는다. name으로는 찾지 못한다.
+  assert.ok(reference.species[row.id]);
+  assert.equal(reference.species[row.name], undefined);
+  // 배우는 기술은 id 목록이므로 담기 전에 이름으로 바꿔야 한다.
+  const learnset = moveOptions(reference, row.id);
+  assert.ok(learnset.every(id => reference.move[id]));
+  assert.notEqual(reference.move[learnset[0]].name, learnset[0]);
+  // 도구는 이름 그대로 담는다.
+  assert.ok(itemOptions(reference).includes('Choice Scarf'));
+});
+
 test('특성 목록은 그 폼의 것만 준다', () => {
   assert.deepEqual(abilityOptions(reference, 'salamence'), ['Intimidate', 'Moxie']);
   assert.deepEqual(abilityOptions(reference, 'none'), []);

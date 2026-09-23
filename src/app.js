@@ -1260,10 +1260,19 @@ $('builds-import').addEventListener('change', async event => {
   // 덮어쓰지 않고 합친다. 이 기기에 있던 것을 지우면 되돌릴 수 없다.
   const previous = state.builds;
   state.builds = mergeDocs(previous, doc);
-  if (buildsSave())
+  if (buildsSave()) {
     $('builds-status').textContent =
       `샘플 ${doc.samples.length}개, 파티 ${doc.parties.length}개를 가져왔습니다.` +
       (skipped ? ` 형식을 확인할 수 없는 ${skipped}개는 제외했습니다.` : '');
+    const touched = new Set([...doc.samples, ...doc.parties].map(x => x.id));
+    // 가져온 항목의 초안은 가져오기 이전 것이라 더 오래됐다. 남겨두면 이어서
+    // 고치다 저장할 때 방금 가져온 내용을 덮어쓴다.
+    state.buildsDrafts = Object.fromEntries(
+      Object.entries(state.buildsDrafts).filter(([key]) => !touched.has(key)),
+    );
+    writeDrafts(storage, state.buildsDrafts);
+    if (state.buildsEditing) closeBuildsEditor();
+  }
   // 저장하지 못했으면 화면도 되돌린다. 목록에 보이는데 새로고침하면 사라지는
   // 상태가 저장 실패 자체보다 나쁘다. buildsSave가 이미 실패를 알렸다.
   else state.builds = previous;

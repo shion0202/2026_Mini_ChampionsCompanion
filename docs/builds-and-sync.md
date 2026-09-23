@@ -21,9 +21,15 @@ party { id, name, note, members[6], updatedAt }
 doc  { samples[], parties[], version }
 ```
 
-- `pokemon`은 통계와 같은 영문 이름을 그대로 쓴다. `form`은 폼이 없으면 null이다.
-  한국어 표시는 기존 `locale.js`가 맡으므로 저장은 영문 이름으로 통일한다. 기술·
-  도구·특성도 같은 이유로 영문 이름을 저장한다.
+- `pokemon`은 영문 이름이 아니라 `reference.species`가 키로 쓰는 종족 id다
+  (`charizard`). id로 찾아야 특성과 배우는 기술 목록을 끌어올 수 있고, 영문
+  이름을 저장하면 그 찾기가 깨진다. `form`은 오늘은 쓰지 않는다. 메가와 지역
+  폼이 이미 각자 별도의 종족 id를 갖기 때문이다.
+- `item`·`ability`·`moves`·`altMoves`는 영문 이름이다(`Choice Scarf`,
+  `Dragon Claw`). `nature`는 성격 id다(`adamant`). 참조 테이블마다 키가 다르기
+  때문에 이렇게 갈린다 — 도구·특성·기술 참조는 이름으로 찾고 종족 참조는 id로
+  찾는다. 둘을 헷갈리면 실제로 버그가 났으므로, 새 필드를 추가할 때는 id와
+  이름 중 어느 쪽을 담는지 반드시 밝힌다.
 - 능력 보정은 성격 id 하나로 저장한다. `ko.json`의 `stat_alignment`에 25개
   성격이 모두 한국어 이름과 함께 들어 있으므로(`adamant`→고집) 편집 화면은
   성격을 이름으로 고른다. 올리는/내리는 능력은 `up`·`down`으로 따로 저장하지
