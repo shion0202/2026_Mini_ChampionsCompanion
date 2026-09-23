@@ -3544,6 +3544,23 @@ select optgroup {
 #picker-more {
   margin-top: 12px;
 }
+/* 기술 고르기에만 나오는 줄. 좁아지면 한 칸씩 내려간다. */
+.picker-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.picker-filters label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.picker-filters select {
+  min-height: 40px;
+  max-width: none;
+}
 /* 구성원은 한 줄이 아니라 머리줄과 상세로 이루어진다. fieldset li의 가로 배치를
    덮어야 상세가 옆으로 붙지 않는다. */
 .builds-editor fieldset.builds-members li {

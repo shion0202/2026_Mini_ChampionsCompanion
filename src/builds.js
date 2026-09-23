@@ -349,11 +349,29 @@ export function moveOptions(reference, pokemon) {
 
 // 도구는 포켓몬과 무관하게 고르므로 종족을 받지 않는다. champions가 거짓인 도구는
 // 이 작품에 수록되지 않았으므로 배치에 넣을 수 없다. 도감 화면과 같은 기준이다.
-export const itemOptions = reference =>
-  Object.values(reference.held_item)
-    .filter(item => item.champions)
+// 메가스톤은 그 돌을 쓸 수 있는 포켓몬에게만 보인다. 피카츄를 고르고 앱솔나이트를
+// 뒤지는 일은 없다. held_item의 megaStone은 메가 폼의 id이고, 모든 폼이 baseSpecies를
+// 들고 있으므로 원종을 고르든 메가 폼을 고르든 같은 값으로 견줄 수 있다.
+// 포켓몬을 아직 고르지 않았으면 메가스톤을 감춘다. 누구의 것인지 모르는 채로
+// 81개를 늘어놓아도 고를 수가 없다.
+const stoneFits = (reference, pokemon, entry) => {
+  if (!entry?.megaStone) return true;
+  const mine = reference?.species?.[pokemon]?.baseSpecies;
+  const target = reference?.species?.[entry.megaStone]?.baseSpecies;
+  return !!mine && !!target && toId(mine) === toId(target);
+};
+
+export function itemOptions(reference, pokemon = null) {
+  return Object.values(reference.held_item)
+    .filter(item => item.champions && stoneFits(reference, pokemon, item))
     .map(item => item.name)
     .sort();
+}
+
+// 포켓몬을 바꾸면 남의 메가스톤이 남는다. 고를 수 없는 것이 지닌 도구로 남아
+// 저장되는 일은 없어야 한다. 메가스톤이 아닌 도구는 누구든 지닐 수 있어 그대로 둔다.
+export const keepsItem = (reference, pokemon, item) =>
+  !item || stoneFits(reference, pokemon, reference?.held_item?.[toId(item)]);
 
 // 정렬. 기본은 최근에 저장한 것이 먼저다. 파티는 포켓몬을 하나로 정할 수 없으므로
 // 도감번호로 줄 세울 수 없다. 저장한 적 없는 항목은 updatedAt이 0이라 최신순의

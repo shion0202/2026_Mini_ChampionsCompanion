@@ -40,6 +40,7 @@ import {
   speciesOptions,
   speciesSprite,
   itemOptions,
+  keepsItem,
   moveOptions,
   setMove,
   addAltMove,
@@ -66,6 +67,7 @@ import {
   renderSpreads,
   selectMoves,
   moveTable,
+  CATEGORY_NAMES,
 } from './reference-view.js';
 import {
   esc,
@@ -771,7 +773,8 @@ function pickerSource() {
       sprite: row.sprite,
     }));
   if (picker.kind === 'item')
-    return itemOptions(state.reference)
+    // 고른 포켓몬이 쓸 수 있는 메가스톤만 목록에 남는다.
+    return itemOptions(state.reference, draft.pokemon)
       .map(name => ({ value: name, label: buildLabel('held_item', name), sub: '', name }))
       .sort(byLabel);
   if (picker.kind === 'move') {
@@ -786,8 +789,27 @@ function pickerSource() {
         Object.values(state.reference.move)
           .filter(m => m.champions)
           .map(m => m.name);
+    // 타입과 분류를 줄에 함께 적는다. 무엇을 쓸지 고민하는 자리라 이름만으로는
+    // 고를 수가 없다. 걸러내는 일도 이 값으로 한다.
     return names
-      .map(name => ({ value: name, label: buildLabel('move', name), sub: '', name }))
+      .map(name => {
+        const move = state.reference.move[toId(name)] ?? {};
+        return {
+          value: name,
+          label: buildLabel('move', name),
+          sub: [
+            TYPE_LABELS[move.type] ?? move.type,
+            CATEGORY_NAMES[move.category],
+            move.power ? `위력 ${move.power}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          name,
+          type: move.type ?? '',
+          category: move.category ?? '',
+          traits: move.traits ?? [],
+        };
+      })
       .sort(byLabel);
   }
   return state.builds.samples.map(s => ({
@@ -801,8 +823,22 @@ function pickerSource() {
   }));
 }
 
+// 기술은 수가 많아 이름만으로는 찾기 어렵다. 타입·분류·성질로 좁힌다. 나머지
+// 고르기에는 거를 것이 없어 이 값들이 늘 비어 있고 조건을 그냥 통과한다.
+const OPEN_FILTERS = [
+  ['picker-type', 'type', TYPE_LABELS, '모든 타입'],
+  ['picker-category', 'category', CATEGORY_NAMES, '모든 분류'],
+  ['picker-trait', 'trait', MOVE_TRAITS, '모든 성질'],
+];
+
 function renderPicker() {
-  const rows = pickerSource().filter(row => matchesQuery(row, picker.query));
+  const rows = pickerSource().filter(
+    row =>
+      matchesQuery(row, picker.query) &&
+      (!picker.type || row.type === picker.type) &&
+      (!picker.category || row.category === picker.category) &&
+      (!picker.trait || row.traits?.includes(picker.trait)),
+  );
   $('picker-rows').innerHTML = pickerRows(rows, picker.limit);
   $('picker-more').hidden = rows.length <= picker.limit;
 }
@@ -814,9 +850,20 @@ function openPicker(kind, slot = null) {
     toast('먼저 포켓몬을 선택하세요.');
     return;
   }
-  picker = { kind, slot, query: '', limit: 50 };
+  picker = { kind, slot, query: '', limit: 50, type: '', category: '', trait: '' };
   $('picker-title').textContent = PICKER_TITLES[kind];
   $('picker-search').value = '';
+  $('picker-filters').hidden = kind !== 'move';
+  for (const [id, , names, all] of OPEN_FILTERS) {
+    const select = $(id);
+    if (!select.options.length)
+      select.innerHTML =
+        `<option value="">${all}</option>` +
+        Object.entries(names)
+          .map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`)
+          .join('');
+    select.value = '';
+  }
   const missing = kind === 'move' && moveOptions(state.reference, draft.pokemon) === null;
   $('picker-help').hidden = !missing;
   if (missing)
@@ -831,9 +878,14 @@ function applyPicked(value) {
   if (!editing || !picker) return;
   const draft = editing.draft;
   if (picker.kind === 'species')
-    // 포켓몬이 바뀌면 그 포켓몬의 것이 아닌 특성이 남는다. 특성만 비운다.
-    // 기술은 사용자가 고른 것이므로 임의로 지우지 않는다.
-    editing.draft = { ...draft, pokemon: value, ability: null };
+    // 포켓몬이 바뀌면 그 포켓몬의 것이 아닌 특성과 메가스톤이 남는다. 둘은 고를
+    // 수 없는 값이 되므로 비운다. 기술은 사용자가 고른 것이므로 임의로 지우지 않는다.
+    editing.draft = {
+      ...draft,
+      pokemon: value,
+      ability: null,
+      item: keepsItem(state.reference, value, draft.item) ? draft.item : null,
+    };
   else if (picker.kind === 'item') editing.draft = { ...draft, item: value };
   else if (picker.kind === 'member')
     editing.draft = {
@@ -1678,6 +1730,13 @@ $('picker-more').addEventListener('click', () => {
   picker.limit += 50;
   renderPicker();
 });
+for (const [id, field] of OPEN_FILTERS)
+  $(id).addEventListener('change', event => {
+    if (!picker) return;
+    picker[field] = event.target.value;
+    picker.limit = 50;
+    renderPicker();
+  });
 $('picker-rows').addEventListener('click', event => {
   const row = event.target.closest('[data-picker-value]');
   if (row) applyPicked(row.dataset.pickerValue);

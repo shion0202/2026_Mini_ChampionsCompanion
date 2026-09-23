@@ -10,6 +10,7 @@ import {
   validateSample,
   validateParty,
   setMove,
+  keepsItem,
   sortBuilds,
   SAMPLE_SORTS,
   PARTY_SORTS,
@@ -452,8 +453,37 @@ test('도구 목록은 챔피언스 수록 도구만 준다', () => {
   // abilityshield는 champions가 거짓이다.
   assert.equal(items.includes('Ability Shield'), false);
   assert.ok(items.every(name => typeof name === 'string'));
-  // 431개 중 166개가 수록이다. 도감을 갱신하면 달라질 수 있으므로 범위로 본다.
-  assert.ok(items.length > 100 && items.length < 431);
+  // 도감을 갱신하면 달라질 수 있으므로 범위로 본다.
+  assert.ok(items.length > 50 && items.length < 431);
+});
+
+// 피카츄를 고르고 앱솔나이트를 뒤지는 일은 없다.
+test('메가스톤은 그 돌을 쓸 수 있는 포켓몬에게만 보인다', () => {
+  assert.deepEqual(
+    itemOptions(reference, 'absol').filter(n => n.startsWith('Absolite')),
+    ['Absolite', 'Absolite Z'],
+  );
+  assert.deepEqual(
+    itemOptions(reference, 'charizard').filter(n => n.startsWith('Charizardite')),
+    ['Charizardite X', 'Charizardite Y'],
+  );
+  // 메가 폼을 골랐을 때도 같은 돌이 나온다. 둘 다 baseSpecies가 같다.
+  assert.deepEqual(itemOptions(reference, 'absolmega'), itemOptions(reference, 'absol'));
+  // 메가진화가 없는 포켓몬과 아직 고르지 않은 경우에는 돌이 하나도 없다.
+  const stones = list => list.filter(n => keepsItem(reference, 'pikachu', n) === false);
+  assert.deepEqual(stones(itemOptions(reference, 'pikachu')), []);
+  assert.deepEqual(stones(itemOptions(reference)), []);
+  // 메가스톤이 아닌 도구는 누구에게나 보인다.
+  for (const id of [null, 'pikachu', 'absol'])
+    assert.ok(itemOptions(reference, id).includes('Choice Scarf'));
+});
+
+test('포켓몬을 바꾸면 남의 메가스톤은 지닐 수 없다', () => {
+  assert.equal(keepsItem(reference, 'absol', 'Absolite'), true);
+  assert.equal(keepsItem(reference, 'pikachu', 'Absolite'), false);
+  // 메가스톤이 아닌 도구와 빈 값은 그대로 둔다.
+  assert.equal(keepsItem(reference, 'pikachu', 'Choice Scarf'), true);
+  assert.equal(keepsItem(reference, 'pikachu', null), true);
 });
 
 test('도구 목록에 중복이 없다', () => {

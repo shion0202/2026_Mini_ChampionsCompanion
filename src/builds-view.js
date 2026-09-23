@@ -3,14 +3,7 @@
 import { esc } from './html.js';
 import { toId, STAT_LABELS, matchesQuery } from './data.js';
 import { portrait, typeBadges } from './app-view.js';
-import {
-  NATURES,
-  natureAdjust,
-  abilityOptions,
-  itemOptions,
-  speciesSprite,
-  actualStats,
-} from './builds.js';
+import { NATURES, natureAdjust, abilityOptions, speciesSprite, actualStats } from './builds.js';
 import { STAT_NAMES } from './locale.js';
 
 // 도감 화면과 같은 규칙이다(app-view.js). reference가 기술·특성·도구 모두의
@@ -252,10 +245,6 @@ export function comboOptions(field, { reference, locale, pokemon }) {
       value: name,
       label: refLabel(reference, locale, 'ability', name),
     }));
-  if (field === 'item')
-    return itemOptions(reference)
-      .map(name => ({ value: name, label: refLabel(reference, locale, 'held_item', name) }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
   return natureChoices(locale);
 }
 
@@ -291,7 +280,6 @@ export function sampleEditor(
   const actual = actualStats(reference, sample.pokemon, sample.points, sample.nature);
   const forField = { reference, locale, pokemon: sample.pokemon };
   const abilities = comboOptions('ability', forField);
-  const items = comboOptions('item', forField);
   return (
     `<form class="builds-editor" data-builds-form="sample">` +
     `${resumeNote(resumed)}` +
@@ -301,15 +289,12 @@ export function sampleEditor(
     `${portrait({ sprite: speciesSprite(reference, index, sample.pokemon) }, 'builds-hero-art')}` +
     `<button type="button" class="builds-pick builds-species" data-builds-species>` +
     `${esc(speciesLabel(locale, reference, sample.pokemon))}</button></div>` +
-    `${combo({
-      field: 'item',
-      label: '도구',
-      valueLabel: sample.item ? refLabel(reference, locale, 'held_item', sample.item) : '도구 선택',
-      options: items,
-      open: combos?.field === 'item',
-      query: combos?.query,
-      search: '도구 검색',
-    })}` +
+    // 도구는 창을 띄워 고른다. 자리에서 펼치는 목록은 좁아서 무엇이 있는지
+    // 훑어볼 수가 없다. 고르는 일이 곧 무엇을 쓸지 고민하는 일이라 넓어야 한다.
+    `<div class="builds-combo"><span class="builds-combo-label">도구</span>` +
+    `<button type="button" class="builds-pick" data-builds-item>` +
+    `${sample.item ? esc(refLabel(reference, locale, 'held_item', sample.item)) : '도구 선택'}` +
+    `</button></div>` +
     `${combo({
       field: 'ability',
       label: '특성',

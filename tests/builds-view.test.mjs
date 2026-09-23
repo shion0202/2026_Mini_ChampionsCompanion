@@ -79,7 +79,7 @@ test('설명의 따옴표와 꺾쇠는 이스케이프된다', () => {
 test('편집 화면은 지닌 도구를 한국어로 보여준다', () => {
   const html = sampleEditor(sample, { reference, locale });
   assert.ok(html.includes('구애스카프'));
-  assert.ok(html.includes('data-builds-combo-open="item"'));
+  assert.ok(html.includes('data-builds-item'));
 });
 
 test('도구가 없으면 고르라고 안내한다', () => {
@@ -88,9 +88,9 @@ test('도구가 없으면 고르라고 안내한다', () => {
   assert.equal(html.includes('구애스카프'), false);
 });
 
-test('도구와 특성과 성격은 펼치기 전에는 고른 값만 보여준다', () => {
+test('특성과 성격은 펼치기 전에는 고른 값만 보여준다', () => {
   const html = sampleEditor(sample, { reference, locale });
-  for (const field of ['item', 'ability', 'nature'])
+  for (const field of ['ability', 'nature'])
     assert.ok(html.includes(`data-builds-combo-open="${field}"`), field);
   // 고른 값이 단추에 보인다.
   assert.ok(html.includes('구애스카프'));

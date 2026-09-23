@@ -122,7 +122,7 @@ export function renderReference(data, locale, pokemon, formId, mode) {
     ${matchupGroups}</section>
     <p class="category-tip">폼 전환은 도감에서만 적용되며, 통계는 ${esc(pokemon.label)} 기준입니다.</p>`;
 }
-const CATEGORY_NAMES = { Physical: '물리', Special: '특수', Status: '변화' };
+export const CATEGORY_NAMES = { Physical: '물리', Special: '특수', Status: '변화' };
 // Borrowed descriptions name the game they came from. The keys are the version
 // identifiers the build records; downloadable content is shown as its base game.
 export const GAME_LABELS = {
