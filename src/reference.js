@@ -68,12 +68,55 @@ export function defenseChart(
     }),
   );
 }
+// 능력 포인트는 한 능력에 32까지, 합계 66까지 준다. 그래서 보통 두 능력에 몰아주고
+// 남는 몇 점을 다른 곳에 둔다. 2점 이하는 배분의 성격을 바꾸지 않으므로 이름에서
+// 빼고, 10점 이상은 주요 투자로 보아 대문자, 그 사이는 소량 조정으로 보아 소문자로
+// 적는다. H32 B30 C4가 HBc, H32 B20 C14가 HBC가 되는 기준이다.
+const TRIVIAL_POINTS = 2;
+const MAJOR_POINTS = 10;
+
+function spreadParts(points) {
+  const kept = points
+    .map((value, index) => ({ value, index, letter: POINT_LETTERS[index] }))
+    .filter(part => part.value > TRIVIAL_POINTS);
+  const major = kept.filter(part => part.value >= MAJOR_POINTS);
+  // 한 글자짜리 이름은 서로 다른 배분을 구분하지 못한다. 하마돈처럼 H를 고정하고
+  // 방어와 특방에 나눠 주는 배분이 전부 H 하나로 묶이던 문제다. 주요 투자가
+  // 하나뿐이면 그다음으로 많이 준 능력까지 주요로 올린다.
+  if (major.length < 2) {
+    const next = [...kept]
+      .filter(part => part.value < MAJOR_POINTS)
+      .sort((a, b) => b.value - a.value || a.index - b.index)[0];
+    if (next) major.push(next);
+  }
+  const chosen = new Set(major.map(part => part.index));
+  // 대문자를 먼저, 소문자를 그다음에 적되 각각 HABCDS 순서를 지킨다. 그래야 어느
+  // 쪽에 몰렸는지가 HBd와 HDb처럼 이름에서 바로 읽힌다.
+  return {
+    major: kept.filter(part => chosen.has(part.index)),
+    minor: kept.filter(part => !chosen.has(part.index)),
+  };
+}
+
+export const spreadKey = points =>
+  spreadParts(points)
+    .major.map(part => part.letter)
+    .join('');
+
+export function spreadLabel(points) {
+  const { major, minor } = spreadParts(points);
+  if (!major.length) return '무배분';
+  return (
+    major.map(part => part.letter).join('') + minor.map(part => part.letter.toLowerCase()).join('')
+  );
+}
+
 export function groupSpreads(rows) {
   const groups = new Map();
   for (const row of rows) {
-    const max = row.points.map((p, i) => (p === 32 ? POINT_LETTERS[i] : '')).join('');
-    const key = max || `individual-${row.rank}`;
-    if (!groups.has(key)) groups.set(key, { label: max || '세부 조정', percent: 0, rows: [], max });
+    const major = spreadKey(row.points);
+    const key = major || '무배분';
+    if (!groups.has(key)) groups.set(key, { label: key, percent: 0, rows: [], major });
     const group = groups.get(key);
     group.rows.push(row);
     group.percent =
@@ -87,16 +130,6 @@ export function groupSpreads(rows) {
       label: group.rows.length === 1 ? spreadLabel(group.rows[0].points) : group.label,
     }))
     .sort((a, b) => (b.percent ?? -1) - (a.percent ?? -1));
-}
-export function spreadLabel(points) {
-  const largest = Math.max(...points);
-  if (!largest) return '무배분';
-  const cutoff = Math.min(16, largest * 0.75);
-  const main = points.map((p, i) => (p >= cutoff ? POINT_LETTERS[i] : '')).join('');
-  const minor = points
-    .map((p, i) => (p > 0 && p < cutoff ? POINT_LETTERS[i].toLowerCase() : ''))
-    .join('');
-  return main + (minor ? ` + ${minor}` : '');
 }
 export function defenseComparisons(types, chart, abilities) {
   const base = defenseChart(types, chart);

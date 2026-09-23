@@ -64,18 +64,52 @@ test('comparisons preserve base values and only show changed type-specific alter
   );
 });
 
-test('spread abbreviations describe major investment without merging sub-32 spreads', () => {
+// 순서는 H A B C D S. 대문자를 먼저 적고 소문자를 그다음에 적되 각각 그 순서를
+// 지킨다. 어느 쪽에 몰렸는지가 HBd와 HDb처럼 이름에서 바로 읽혀야 한다.
+test('spread names split major investment from the leftover points', () => {
+  assert.equal(spreadLabel([32, 0, 20, 14, 0, 0]), 'HBC');
+  assert.equal(spreadLabel([32, 0, 24, 0, 0, 10]), 'HBS');
+  assert.equal(spreadLabel([32, 0, 30, 4, 0, 0]), 'HBc');
+  // 2포인트 이하는 배분의 성격을 바꾸지 않으므로 이름에서 뺀다.
+  assert.equal(spreadLabel([2, 0, 0, 32, 0, 32]), 'CS');
+  // 하마돈처럼 한쪽에 몰아준 배분은 몰아준 쪽이 대문자로 앞에 온다.
+  assert.equal(spreadLabel([32, 0, 26, 0, 8, 0]), 'HBd');
+  assert.equal(spreadLabel([32, 0, 8, 0, 26, 0]), 'HDb');
+  assert.equal(spreadLabel([32, 0, 17, 0, 17, 0]), 'HBD');
   assert.equal(spreadLabel([20, 0, 0, 19, 0, 20]), 'HCS');
-  assert.equal(spreadLabel([22, 0, 11, 1, 0, 32]), 'HS + bc');
-  assert.equal(spreadLabel([10, 0, 23, 13, 0, 20]), 'BS + hc');
+  assert.equal(spreadLabel([22, 0, 11, 1, 0, 32]), 'HBS');
+  assert.equal(spreadLabel([10, 0, 23, 13, 0, 20]), 'HBCS');
   assert.equal(spreadLabel([0, 0, 0, 0, 0, 0]), '무배분');
+});
+
+test('a single letter never becomes a group, the next largest stat joins it', () => {
+  // 주요 투자가 하나뿐이어도 이름은 두 글자 이상이어야 서로 다른 배분이 갈린다.
+  assert.equal(spreadLabel([32, 0, 6, 0, 0, 0]), 'HB');
+  assert.equal(spreadLabel([6, 0, 0, 0, 0, 32]), 'HS');
+  // 정말로 한 능력에만 주었으면 더 붙일 것이 없다.
+  assert.equal(spreadLabel([32, 0, 0, 0, 0, 0]), 'H');
+});
+
+test('spreads that differ only in leftover points are counted together', () => {
   const rows = [
-    { rank: 1, percent: 20, points: [20, 0, 0, 19, 0, 20] },
-    { rank: 2, percent: 10, points: [19, 0, 0, 20, 0, 20] },
+    { rank: 1, percent: 20, points: [32, 0, 20, 14, 0, 0] },
+    { rank: 2, percent: 10, points: [32, 0, 24, 0, 0, 10] },
+    { rank: 3, percent: 6, points: [32, 0, 30, 4, 0, 0] },
   ];
   const groups = groupSpreads(rows);
-  assert.equal(groups.length, 2);
-  assert.equal(groups[0].label, 'HCS');
+  // 세 배분이 예전에는 전부 H 하나로 묶였다. 이제 주요 투자로 갈린다.
+  assert.deepEqual(
+    groups.map(g => g.label),
+    ['HBC', 'HBS', 'HBc'],
+  );
+  const rounded = [
+    { rank: 1, percent: 13.5, points: [27, 25, 5, 0, 0, 9] },
+    { rank: 2, percent: 3, points: [26, 25, 6, 0, 0, 9] },
+  ];
+  const merged = groupSpreads(rounded);
+  assert.equal(merged.length, 1, '남는 포인트만 다른 배분은 한 묶음이다');
+  assert.equal(merged[0].label, 'HA');
+  assert.equal(merged[0].percent, 16.5);
 });
 test('Mega Salamence stat ranges match the supplied game-reference example', () => {
   const stats = statRanges(data.species.salamencemega.stats);
@@ -138,7 +172,7 @@ test('conditional abilities require matching conditions and preserve existing im
   assert.equal(defenseChart(['Normal'], data.types, { ability: 'intimidate' }).Fighting, 2);
   assert.equal(defenseChart(['Bug', 'Ghost'], data.types, { ability: 'wonderguard' }).Water, 0);
 });
-test('32-point grouping combines AS leftovers but keeps custom investments separate', () => {
+test('grouping combines AS leftovers and never mutates the source rows', () => {
   const rows = [
     { rank: 1, percent: 13.5, points: [1, 32, 1, 0, 0, 32] },
     { rank: 2, percent: 11.8, points: [2, 32, 0, 0, 0, 32] },
@@ -147,8 +181,10 @@ test('32-point grouping combines AS leftovers but keeps custom investments separ
     { rank: 5, percent: 3, points: [26, 25, 6, 0, 0, 9] },
   ];
   const result = groupSpreads(rows);
-  assert.equal(result.length, 4);
-  assert.equal(result[0].label, 'AS');
+  assert.deepEqual(
+    result.map(g => g.label),
+    ['AS', 'HA', 'CS'],
+  );
   assert.equal(result[0].percent, 25.3);
   assert.equal(result[0].rows.length, 2);
   assert.equal(rows.length, 5);

@@ -285,15 +285,24 @@ export function renderSpreads(rows, mode) {
       table(rows) +
       '<p class="category-tip">HP, 공격, 방어, 특수공격, 특수방어, 스피드 순서입니다.</p>'
     );
-  const pointTags = g =>
-    (g.rows.length === 1
-      ? g.rows[0].points
-          .map((value, i) => ({ letter: POINT_LETTERS[i], value }))
-          .filter(p => p.value)
-      : g.max.split('').map(letter => ({ letter, value: 32 }))
-    )
-      .map(p => `<span>${p.letter} ${p.value}</span>`)
+  const pointTags = g => {
+    if (g.rows.length === 1)
+      return g.rows[0].points
+        .map((value, i) => ({ letter: POINT_LETTERS[i], value }))
+        .filter(p => p.value)
+        .map(p => `<span>${p.letter} ${p.value}</span>`)
+        .join('');
+    // 합산한 묶음은 배분마다 값이 달라 한 숫자로 적을 수 없다. 실제 범위를 적는다.
+    return g.major
+      .split('')
+      .map(letter => {
+        const values = g.rows.map(r => r.points[POINT_LETTERS.indexOf(letter)]);
+        const low = Math.min(...values);
+        const high = Math.max(...values);
+        return `<span>${letter} ${low === high ? low : `${low}~${high}`}</span>`;
+      })
       .join('');
+  };
   const group = g =>
     `<details><summary><strong>${g.label}</strong>` +
     `<span class="${percentClass(g.percent)}">${percentageText(g.percent)}</span>` +
@@ -302,7 +311,7 @@ export function renderSpreads(rows, mode) {
   return (
     switches +
     `<div class="spread-groups">${groupSpreads(rows).map(group).join('')}</div>` +
-    `<p class="category-tip grouping-rule">제공된 상위 배분 중 32포인트를 준 능력치가 같은 배분을 합산합니다.` +
-    ` 대문자는 주요 투자, 소문자는 소량 조정입니다.</p>`
+    `<p class="category-tip grouping-rule">제공된 상위 배분 중 주요 투자 능력치가 같은 배분을 합산합니다.` +
+    ` 10포인트 이상은 대문자로 주요 투자, 3~9포인트는 소문자로 소량 조정이며, 2포인트 이하는 이름에서 뺍니다.</p>`
   );
 }
