@@ -3271,7 +3271,37 @@ select optgroup {
 .picker-sub {
   color: var(--muted);
 }
+/* ⌕ 글자는 em 박스 아래쪽에 앉아 가운데보다 내려 보인다. 이 창에서만 끌어올린다. */
+#picker-dialog .search-box > span {
+  transform: translateY(-2px);
+}
+#picker-dialog .search-box {
+  margin-bottom: 16px;
+}
+#picker-help {
+  margin: 0 0 16px;
+}
 #picker-rows {
   max-height: 55vh;
   overflow-y: auto;
+}
+#picker-more {
+  margin-top: 12px;
+}
+/* 후보 기술은 줄이 많아지므로 촘촘하게 두고, 이름을 채용 기술의 이름과 같은
+   들여쓰기에 맞춘다. 채용 기술은 왼쪽에 번호가 붙어 그만큼 밀려 있다. */
+.builds-alts ul {
+  gap: 4px;
+}
+.builds-alt-name {
+  flex: 1;
+  color: var(--ink);
+  font-size: 14px;
+  padding-inline-start: 26px;
+}
+/* 저장과 목록으로는 각각 다른 버튼 규칙을 쓰고 있어 높이가 어긋난다. */
+.builds-actions > * {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }

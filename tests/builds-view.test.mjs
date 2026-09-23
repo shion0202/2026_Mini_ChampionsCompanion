@@ -83,7 +83,7 @@ test('편집 화면은 지닌 도구를 한국어로 보여준다', () => {
 
 test('도구가 없으면 고르라고 안내한다', () => {
   const html = sampleEditor({ ...emptySample(), id: 'cccccccccccccccc' }, { reference, locale });
-  assert.ok(html.includes('도구 고르기'));
+  assert.ok(html.includes('도구 선택'));
   assert.equal(html.includes('구애스카프'), false);
 });
 
@@ -108,7 +108,7 @@ test('고른 특성과 성격에 selected가 붙는다', () => {
 
 test('포켓몬을 고르지 않으면 특성 목록이 비어 있다', () => {
   const html = sampleEditor({ ...emptySample(), id: 'dddddddddddddddd' }, { reference, locale });
-  assert.ok(html.includes('먼저 포켓몬을 고르세요'));
+  assert.ok(html.includes('먼저 포켓몬을 선택하세요'));
 });
 
 test('저장한 적 있는 샘플에만 삭제 버튼이 있다', () => {

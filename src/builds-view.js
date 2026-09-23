@@ -13,16 +13,16 @@ const empty = (message, action, label) =>
 
 const speciesLabel = (locale, reference, id) => {
   const species = reference?.species?.[id];
-  return species ? locale.pokemon(species.name).label : (id ?? '포켓몬 미선택');
+  return species ? locale.pokemon(species.name).label : (id ?? '포켓몬 선택');
 };
 
 // 성격은 한국어 이름과 보정을 함께 보여준다. 이름만으로는 무엇이 오르내리는지
 // 바로 읽히지 않는다.
 const natureLabel = (locale, id) => {
-  if (!id) return '보정 미선택';
+  if (!id) return '능력 보정 선택';
   const [up, down] = natureAdjust(id);
   const name = locale.label('stat_alignment', id);
-  if (!up) return `${name} (보정 없음)`;
+  if (!up) return `${name} (무보정)`;
   return `${name} (${STAT_NAMES[up]} ↑ ${STAT_NAMES[down]} ↓)`;
 };
 
@@ -38,11 +38,24 @@ const choices = (items, selected, placeholder) =>
     )
     .join('');
 
-// 성격은 한국어 이름순으로 고른다. 저장은 id로 한다.
+// 성격은 보정을 기준으로 정렬한다. 가나다순이면 원하는 보정을 찾으려고 목록을
+// 처음부터 훑어야 한다. 올리는 능력을 공격·방어·특공·특방·스피드 순으로 묶고
+// 그 안에서 내리는 능력을 같은 순서로 둔다. 보정이 없는 성격은 맨 뒤로 보낸다.
+// 저장은 id로 한다.
+const ADJUST_ORDER = ['Attack', 'Defense', 'Sp. Atk', 'Sp. Def', 'Speed'];
+const adjustRank = stat => {
+  const at = ADJUST_ORDER.indexOf(stat);
+  return at === -1 ? ADJUST_ORDER.length : at;
+};
 const natureChoices = locale =>
-  Object.keys(NATURES)
-    .map(id => ({ value: id, label: natureLabel(locale, id) }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+  Object.entries(NATURES)
+    .map(([id, [up, down]]) => ({ value: id, label: natureLabel(locale, id), up, down }))
+    .sort(
+      (a, b) =>
+        adjustRank(a.up) - adjustRank(b.up) ||
+        adjustRank(a.down) - adjustRank(b.down) ||
+        a.label.localeCompare(b.label, 'ko'),
+    );
 
 // 경고 상자는 이미 .notice가 있다. 라이트와 다크가 함께 정의돼 있으므로 새 색을
 // 만들지 않고 그대로 쓴다.
@@ -95,10 +108,12 @@ export function partyList(parties, samples, locale) {
     .join('')}</ul>`;
 }
 
-const moveSlot = (move, slot) =>
+// 기술은 영문 이름으로 담고 한국어로 보여준다. locale을 받지 않으면 저장된
+// 영문이 그대로 화면에 나온다.
+const moveSlot = locale => (move, slot) =>
   `<li><span class="builds-slot">${slot + 1}</span>` +
   `<button class="builds-pick" data-builds-move="${slot}">` +
-  `${move ? esc(move) : '기술 고르기'}</button></li>`;
+  `${move ? esc(locale.label('move', move)) : '기술 선택'}</button></li>`;
 
 const pointRow = (value, index) =>
   `<label class="builds-point"><span>${POINT_LETTERS[index]}</span>` +
@@ -116,31 +131,31 @@ export function sampleEditor(
   return (
     `<form class="builds-editor" data-builds-form="sample">` +
     `${resumeNote(resumed)}${errorList(errors)}` +
-    `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="예: 스카프 보만다"></label>` +
+    `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="샘플명 (예: 스카프 한카리아스)"></label>` +
     `<button type="button" class="builds-pick builds-species" data-builds-species>` +
     `${esc(speciesLabel(locale, reference, sample.pokemon))}</button>` +
     `<button type="button" class="builds-pick" data-builds-item>` +
-    `${sample.item ? esc(locale.label('held_item', sample.item)) : '도구 고르기'}</button>` +
+    `${sample.item ? esc(locale.label('held_item', sample.item)) : '도구 선택'}</button>` +
     `<label class="builds-field">특성<select data-builds-field="ability"${abilities.length ? '' : ' disabled'}>` +
-    `${choices(abilities, sample.ability, abilities.length ? '특성 고르기' : '먼저 포켓몬을 고르세요')}` +
+    `${choices(abilities, sample.ability, abilities.length ? '특성 선택' : '먼저 포켓몬을 선택하세요')}` +
     `</select></label>` +
     `<label class="builds-field">능력 보정<select data-builds-field="nature">` +
-    `${choices(natureChoices(locale), sample.nature, '보정 고르기')}` +
+    `${choices(natureChoices(locale), sample.nature, '능력 보정 선택')}` +
     `</select></label>` +
     `<fieldset class="builds-points"><legend>능력 포인트 <small>합계 ${total} / 66</small></legend>` +
     `${sample.points.map(pointRow).join('')}</fieldset>` +
     `<fieldset class="builds-moves"><legend>채용 기술</legend>` +
-    `<ul>${sample.moves.map(moveSlot).join('')}</ul></fieldset>` +
+    `<ul>${sample.moves.map(moveSlot(locale)).join('')}</ul></fieldset>` +
     `<fieldset class="builds-alts"><legend>후보 기술</legend>` +
     `<ul>${sample.altMoves
       .map(
         m =>
-          `<li><span>${esc(m)}</span>` +
+          `<li><span class="builds-alt-name">${esc(locale.label('move', m))}</span>` +
           `<button type="button" class="text-button" data-builds-alt-remove="${esc(m)}">빼기</button></li>`,
       )
       .join('')}</ul>` +
-    `<button type="button" class="text-button" data-builds-alt-add>후보 더하기</button></fieldset>` +
-    `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유">${esc(sample.note)}</textarea></label>` +
+    `<button type="button" class="text-button" data-builds-alt-add>후보 기술 추가</button></fieldset>` +
+    `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유 등">${esc(sample.note)}</textarea></label>` +
     `${editorActions(existing)}` +
     `</form>`
   );

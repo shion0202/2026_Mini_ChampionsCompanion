@@ -597,6 +597,8 @@ function renderBuilds() {
     .forEach(button =>
       button.setAttribute('aria-pressed', String(button.dataset.buildsTab === state.buildsTab)),
     );
+  // 고치는 중에는 목록 검색과 JSON 버튼이 할 일이 없다. 자리만 차지한다.
+  $('builds-controls').hidden = !!state.buildsEditing;
   if (!state.locale) {
     $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중입니다.');
     return;
@@ -678,10 +680,10 @@ function openBuildsEditor(kind, id, { navigate = true } = {}) {
 }
 
 const PICKER_TITLES = {
-  species: '포켓몬 고르기',
-  item: '도구 고르기',
-  move: '기술 고르기',
-  member: '샘플 고르기',
+  species: '포켓몬 선택',
+  item: '도구 선택',
+  move: '기술 선택',
+  member: '샘플 선택',
 };
 
 // 네 가지가 같은 창을 쓴다. 무엇을 고르는 중인지와 어디에 넣을지를 들고 있는다.
@@ -742,7 +744,7 @@ function openPicker(kind, slot = null) {
   const draft = state.buildsEditing?.draft;
   if (!draft) return;
   if (kind === 'move' && !draft.pokemon) {
-    toast('먼저 포켓몬을 고르세요.');
+    toast('먼저 포켓몬을 선택하세요.');
     return;
   }
   picker = { kind, slot, query: '', limit: 50 };
