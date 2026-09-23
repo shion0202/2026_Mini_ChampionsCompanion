@@ -1,10 +1,10 @@
 // 샘플과 파티 화면의 마크업. app-view.js와 같이 문자열만 만들고 DOM을 만지지
 // 않으므로 브라우저 없이 스냅샷으로 비교한다.
 import { esc } from './html.js';
-import { toId } from './data.js';
+import { toId, STAT_LABELS } from './data.js';
 import { portrait } from './app-view.js';
-import { spreadLabel, POINT_LETTERS } from './reference.js';
-import { NATURES, natureAdjust, abilityOptions, speciesSprite } from './builds.js';
+import { spreadLabel } from './reference.js';
+import { NATURES, natureAdjust, abilityOptions, speciesSprite, actualStats } from './builds.js';
 import { STAT_NAMES } from './locale.js';
 
 // 도감 화면과 같은 규칙이다(app-view.js). reference가 기술·특성·도구 모두의
@@ -125,15 +125,21 @@ const moveSlot = (reference, locale) => (move, slot) =>
   `<button class="builds-pick" data-builds-move="${slot}">` +
   `${move ? esc(refLabel(reference, locale, 'move', move)) : '기술 선택'}</button></li>`;
 
+// 도감 화면과 같은 능력 이름을 쓴다(STAT_LABELS). H·A·B 한 글자는 익숙한 사람만
+// 읽는다. 값을 넣는 곳과 결과를 보는 곳을 나누어, 고치면서 실수치를 바로 본다.
 const pointRow = (value, index) =>
-  `<label class="builds-point"><span>${POINT_LETTERS[index]}</span>` +
+  `<label class="builds-point"><span>${STAT_LABELS[index]}</span>` +
   `<input type="number" min="0" max="32" step="1" value="${value}" data-builds-point="${index}"></label>`;
+
+const actualCard = (index, value) =>
+  `<div class="builds-actual"><small>${STAT_LABELS[index]}</small><strong>${value}</strong></div>`;
 
 export function sampleEditor(
   sample,
   { reference, locale, index = null, existing = false, resumed = false, errors = [] },
 ) {
   const total = sample.points.reduce((a, b) => a + b, 0);
+  const actual = actualStats(reference, sample.pokemon, sample.points, sample.nature);
   const abilities = abilityOptions(reference, sample.pokemon).map(name => ({
     value: name,
     label: refLabel(reference, locale, 'ability', name),
@@ -155,7 +161,15 @@ export function sampleEditor(
     `${choices(natureChoices(locale), sample.nature, '능력 보정 선택')}` +
     `</select></label>` +
     `<fieldset class="builds-points"><legend>능력 포인트 <small>합계 ${total} / 66</small></legend>` +
-    `${sample.points.map(pointRow).join('')}</fieldset>` +
+    `<div class="builds-point-grid">${sample.points.map(pointRow).join('')}</div>` +
+    `<div class="builds-actuals">` +
+    `${
+      actual
+        ? `<p class="builds-actual-head">실수치 <small>Lv.50</small></p>` +
+          `<div class="builds-actual-grid">${actual.map((v, i) => actualCard(i, v)).join('')}</div>`
+        : '<p class="builds-resume">포켓몬을 선택하면 실수치를 함께 보여줍니다.</p>'
+    }` +
+    `</div></fieldset>` +
     `<fieldset class="builds-moves"><legend>채용 기술</legend>` +
     `<ul>${sample.moves.map(moveSlot(reference, locale)).join('')}</ul></fieldset>` +
     `<fieldset class="builds-alts"><legend>후보 기술</legend>` +

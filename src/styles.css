@@ -3235,10 +3235,40 @@ select optgroup {
 .builds-sub {
   color: var(--muted);
 }
+/* 값을 넣는 곳과 결과를 보는 곳을 위아래로 나눈다. 좁은 화면에서는 여섯 칸이
+   한 줄에 들어가지 않으므로 자동으로 접힌다. */
 .builds-points {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+}
+.builds-point-grid,
+.builds-actual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
   gap: 8px;
+}
+.builds-actual-head {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.builds-actual {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--teal-soft);
+}
+.builds-actual small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.builds-actual strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
 }
 .builds-point {
   display: grid;

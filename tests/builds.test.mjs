@@ -30,6 +30,7 @@ import {
   abilityOptions,
   moveOptions,
   itemOptions,
+  actualStats,
   searchSamples,
   searchParties,
 } from '../src/builds.js';
@@ -592,4 +593,30 @@ test('포인트를 고쳐도 원본은 그대로다', () => {
   const sample = built();
   setPoint(sample, 1, '32');
   assert.deepEqual(sample.points, [0, 0, 0, 0, 0, 0]);
+});
+
+test('실수치는 종족값과 포인트와 보정으로 정한다', () => {
+  // 보만다 종족값 95/135/80/110/80/100.
+  assert.deepEqual(
+    actualStats(reference, 'salamence', [0, 0, 0, 0, 0, 0], null),
+    [170, 155, 100, 130, 100, 120],
+  );
+  // 고집은 공격이 오르고 특수공격이 내린다. 내림까지 확인한다.
+  assert.deepEqual(
+    actualStats(reference, 'salamence', [0, 32, 0, 0, 0, 32], 'adamant'),
+    [170, 205, 100, 117, 100, 152],
+  );
+});
+
+test('HP는 보정을 받지 않는다', () => {
+  const up = actualStats(reference, 'salamence', [32, 0, 0, 0, 0, 0], 'adamant');
+  const down = actualStats(reference, 'salamence', [32, 0, 0, 0, 0, 0], 'modest');
+  assert.equal(up[0], down[0]);
+  assert.equal(up[0], 95 + 32 + 75);
+});
+
+test('종족값을 모르면 실수치를 만들지 않는다', () => {
+  assert.equal(actualStats(reference, 'nope', [0, 0, 0, 0, 0, 0], null), null);
+  assert.equal(actualStats(reference, null, [0, 0, 0, 0, 0, 0], null), null);
+  assert.equal(actualStats(null, 'salamence', [0, 0, 0, 0, 0, 0], null), null);
 });

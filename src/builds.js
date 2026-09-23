@@ -1,5 +1,6 @@
 import { matchesQuery } from './data.js';
 import { megaSprite } from './images.js';
+import { STAT_KEYS } from './reference.js';
 // 스피드 화면에서 먼저 쓰여 그런 이름이 붙었을 뿐 챔피언스 출전 폼 목록 그
 // 자체다. 이름을 바꾸면 speed.js, 생성 스크립트, 문서까지 번지므로 그대로 쓴다.
 import { SPEED_SPECIES } from './speed-catalog.js';
@@ -276,6 +277,31 @@ export function speciesOptions(reference, locale, query = '', index = null) {
     .filter(row => matchesQuery(row, query))
     .sort((a, b) => (a.dex ?? 0) - (b.dex ?? 0) || a.id.localeCompare(b.id));
 }
+
+// Lv.50 실수치. HP는 종족값 + 포인트 + 75, 나머지는 내림((종족값 + 포인트 + 20)
+// × 보정)이다. reference.js의 statRanges가 쓰는 식과 같다. 종족값을 모르면
+// null을 주어 화면이 빈 자리를 보여주게 한다.
+export function actualStats(reference, pokemon, points, nature) {
+  const stats = reference?.species?.[pokemon]?.stats;
+  if (!stats) return null;
+  const [up, down] = natureAdjust(nature);
+  return STAT_KEYS.map((key, i) => {
+    const base = stats[key] + (points[i] ?? 0);
+    if (key === 'hp') return base + 75;
+    const name = STAT_KEYS_TO_NAME[key];
+    const scale = name === up ? 1.1 : name === down ? 0.9 : 1;
+    return Math.floor((base + 20) * scale);
+  });
+}
+// STAT_KEYS는 hp·atk…이고 성격 표는 STAT_NAMES의 키(Attack…)를 쓴다. 둘을 잇는다.
+const STAT_KEYS_TO_NAME = {
+  hp: 'HP',
+  atk: 'Attack',
+  def: 'Defense',
+  spa: 'Sp. Atk',
+  spd: 'Sp. Def',
+  spe: 'Speed',
+};
 
 // 랭킹·스피드 화면과 같은 이미지를 쓴다. 메가 폼은 앱이 들고 있는 자료로 찾고
 // 나머지는 통계 인덱스에서 찾는다. 통계를 불러오지 못했으면 null이며, 그때는
