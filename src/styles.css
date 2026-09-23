@@ -2758,9 +2758,6 @@ select optgroup {
 .type-chart-switch {
   margin: 0 0 12px;
 }
-.type-chart-switch button {
-  min-height: 44px;
-}
 .type-chart-note,
 .type-picker-help {
   color: var(--muted);
