@@ -3192,6 +3192,62 @@ select optgroup {
   gap: 0.15rem;
   min-width: 0;
 }
+/* 자리에서 펼쳐지는 목록. 아래 내용을 밀어내지 않도록 띄워서 겹친다. */
+.builds-combo {
+  position: relative;
+  display: grid;
+  gap: 5px;
+}
+.builds-combo-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.builds-combo-panel {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 10px 30px #0003;
+}
+.builds-combo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  max-height: 44vh;
+  overflow-y: auto;
+}
+.builds-combo-row {
+  width: 100%;
+  min-height: 40px;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.builds-combo-row:hover,
+.builds-combo-row:focus-visible {
+  background: var(--teal-soft);
+}
+.builds-combo-empty {
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
 .builds-hero {
   display: flex;
   align-items: center;

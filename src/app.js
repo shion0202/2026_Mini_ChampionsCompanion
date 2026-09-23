@@ -43,7 +43,15 @@ import {
   partiesUsing,
   deleteSample,
 } from './builds.js';
-import { sampleList, partyList, sampleEditor, partyEditor, pickerRows } from './builds-view.js';
+import {
+  sampleList,
+  partyList,
+  sampleEditor,
+  partyEditor,
+  pickerRows,
+  comboRows,
+  comboOptions,
+} from './builds-view.js';
 import {
   renderReference,
   renderLearnsetShell,
@@ -125,6 +133,7 @@ const state = {
   buildsDrafts: {},
   buildsErrors: [],
   buildsResumed: false,
+  buildsCombo: null,
   speed: { mode: 'base', query: '', type: '', includeMega: true, ascending: false },
   speedLimit: 80,
   articleData: null,
@@ -650,6 +659,7 @@ function renderBuildsEditor() {
   const shared = {
     locale: state.locale,
     index: state.index,
+    combos: state.buildsCombo,
     existing: editing.id !== null,
     resumed: state.buildsResumed,
     errors: state.buildsErrors,
@@ -1203,8 +1213,59 @@ $('builds-rows').addEventListener('click', event => {
     renderBuildsEditor();
     return;
   }
+  const comboOpen = event.target.closest('[data-builds-combo-open]');
+  if (comboOpen) {
+    const field = comboOpen.dataset.buildsComboOpen;
+    // 같은 것을 다시 누르면 접는다. 다른 것을 누르면 그쪽만 펼친다.
+    state.buildsCombo = state.buildsCombo?.field === field ? null : { field, query: '' };
+    renderBuildsEditor();
+    $('builds-rows').querySelector('[data-builds-combo-search]')?.focus();
+    return;
+  }
+  const picked = event.target.closest('[data-builds-combo-value]');
+  if (picked && state.buildsCombo) {
+    const field = state.buildsCombo.field;
+    state.buildsEditing.draft = {
+      ...state.buildsEditing.draft,
+      [field]: picked.dataset.buildsComboValue,
+    };
+    state.buildsCombo = null;
+    saveDraft();
+    renderBuildsEditor();
+    return;
+  }
   if (event.target.closest('[data-builds-cancel]')) closeBuildsEditor();
   if (event.target.closest('[data-builds-delete]')) return removeBuild();
+});
+
+// 검색은 목록만 바꾼다. 편집기를 통째로 다시 그리면 글자마다 커서가 끝으로 튄다.
+$('builds-rows').addEventListener('input', event => {
+  const search = event.target.closest('[data-builds-combo-search]');
+  if (!search || !state.buildsCombo || !state.buildsEditing) return;
+  state.buildsCombo = { ...state.buildsCombo, query: search.value };
+  const list = $('builds-rows').querySelector('[data-builds-combo-list]');
+  if (list)
+    list.innerHTML = comboRows(
+      comboOptions(state.buildsCombo.field, {
+        reference: state.reference,
+        locale: state.locale,
+        pokemon: state.buildsEditing.draft.pokemon,
+      }),
+      search.value,
+    );
+});
+
+// 바깥을 누르거나 Escape를 누르면 접는다. 펼친 채로 두면 아래 내용을 가린다.
+document.addEventListener('click', event => {
+  if (!state.buildsCombo) return;
+  if (event.target.closest('[data-builds-combo]')) return;
+  state.buildsCombo = null;
+  renderBuildsEditor();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !state.buildsCombo) return;
+  state.buildsCombo = null;
+  renderBuildsEditor();
 });
 $('builds-new').onclick = () => openBuildsEditor(state.buildsTab, null);
 

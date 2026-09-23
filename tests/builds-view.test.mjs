@@ -78,7 +78,7 @@ test('설명의 따옴표와 꺾쇠는 이스케이프된다', () => {
 test('편집 화면은 지닌 도구를 한국어로 보여준다', () => {
   const html = sampleEditor(sample, { reference, locale });
   assert.ok(html.includes('구애스카프'));
-  assert.ok(html.includes('data-builds-item'));
+  assert.ok(html.includes('data-builds-combo-open="item"'));
 });
 
 test('도구가 없으면 고르라고 안내한다', () => {
@@ -87,23 +87,65 @@ test('도구가 없으면 고르라고 안내한다', () => {
   assert.equal(html.includes('구애스카프'), false);
 });
 
-test('특성과 성격은 창이 아니라 목록에서 고른다', () => {
+test('도구와 특성과 성격은 펼치기 전에는 고른 값만 보여준다', () => {
   const html = sampleEditor(sample, { reference, locale });
-  // 보만다의 특성은 위협과 자기과신 둘이다.
-  assert.ok(html.includes('<select data-builds-field="ability"'));
+  for (const field of ['item', 'ability', 'nature'])
+    assert.ok(html.includes(`data-builds-combo-open="${field}"`), field);
+  // 고른 값이 단추에 보인다.
+  assert.ok(html.includes('구애스카프'));
   assert.ok(html.includes('위협'));
-  assert.ok(html.includes('자기과신'));
-  assert.ok(html.includes('<select data-builds-field="nature"'));
-  assert.ok(html.includes('고집'));
-  // 더 이상 버튼이 아니다.
-  assert.equal(html.includes('data-builds-ability>'), false);
-  assert.equal(html.includes('data-builds-nature>'), false);
+  assert.ok(html.includes('고집 (공격 ↑ 특수공격 ↓)'));
+  // 접혀 있으면 목록도 검색창도 만들지 않는다.
+  assert.equal(html.includes('data-builds-combo-list'), false);
+  assert.equal(html.includes('data-builds-combo-search'), false);
+  // 고르지 않은 특성은 아직 나오지 않는다.
+  assert.equal(html.includes('자기과신'), false);
 });
 
-test('고른 특성과 성격에 selected가 붙는다', () => {
-  const html = sampleEditor(sample, { reference, locale });
-  assert.ok(html.includes('value="Intimidate" selected'));
-  assert.ok(html.includes('value="adamant" selected'));
+test('펼친 것만 검색창과 목록을 만든다', () => {
+  const html = sampleEditor(sample, {
+    reference,
+    locale,
+    combos: { field: 'ability', query: '' },
+  });
+  assert.ok(html.includes('data-builds-combo-search'));
+  assert.ok(html.includes('data-builds-combo-value="Intimidate"'));
+  assert.ok(html.includes('data-builds-combo-value="Moxie"'));
+  assert.ok(html.includes('자기과신'));
+  // 펼치지 않은 성격은 목록을 만들지 않는다.
+  assert.equal(html.includes('data-builds-combo-value="jolly"'), false);
+});
+
+test('검색어는 목록을 좁힌다', () => {
+  const html = sampleEditor(sample, {
+    reference,
+    locale,
+    combos: { field: 'nature', query: '고집' },
+  });
+  assert.ok(html.includes('data-builds-combo-value="adamant"'));
+  assert.equal(html.includes('data-builds-combo-value="jolly"'), false);
+});
+
+test('맞는 것이 없으면 목록 대신 알린다', () => {
+  const html = sampleEditor(sample, {
+    reference,
+    locale,
+    combos: { field: 'nature', query: '없는성격' },
+  });
+  assert.ok(html.includes('찾는 항목이 없습니다'));
+});
+
+test('포켓몬을 고르지 않으면 특성을 펼치지 못한다', () => {
+  const html = sampleEditor(
+    { ...emptySample(), id: 'eeeeeeeeeeeeeeee' },
+    { reference, locale, combos: { field: 'ability', query: '' } },
+  );
+  assert.ok(
+    html.includes(
+      'data-builds-combo-open="ability" aria-expanded="true" aria-haspopup="listbox" disabled',
+    ),
+  );
+  assert.equal(html.includes('data-builds-combo-search'), false);
 });
 
 test('포켓몬을 고르지 않으면 특성 목록이 비어 있다', () => {

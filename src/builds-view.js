@@ -1,10 +1,17 @@
 // 샘플과 파티 화면의 마크업. app-view.js와 같이 문자열만 만들고 DOM을 만지지
 // 않으므로 브라우저 없이 스냅샷으로 비교한다.
 import { esc } from './html.js';
-import { toId, STAT_LABELS } from './data.js';
+import { toId, STAT_LABELS, matchesQuery } from './data.js';
 import { portrait } from './app-view.js';
 import { spreadLabel } from './reference.js';
-import { NATURES, natureAdjust, abilityOptions, speciesSprite, actualStats } from './builds.js';
+import {
+  NATURES,
+  natureAdjust,
+  abilityOptions,
+  itemOptions,
+  speciesSprite,
+  actualStats,
+} from './builds.js';
 import { STAT_NAMES } from './locale.js';
 
 // 도감 화면과 같은 규칙이다(app-view.js). reference가 기술·특성·도구 모두의
@@ -33,18 +40,6 @@ const natureLabel = (locale, id) => {
   if (!up) return `${name} (무보정)`;
   return `${name} (${STAT_NAMES[up]} ↑ ${STAT_NAMES[down]} ↓)`;
 };
-
-// 후보가 적은 항목은 창을 열지 않고 목록에서 고른다. 모바일에서는 OS 선택기가
-// 떠서 가장 빠르고, 우리가 만들 코드가 거의 없다.
-const choices = (items, selected, placeholder) =>
-  `<option value="">${placeholder}</option>` +
-  items
-    .map(
-      o =>
-        `<option value="${esc(o.value)}"${o.value === selected ? ' selected' : ''}>` +
-        `${esc(o.label)}</option>`,
-    )
-    .join('');
 
 // 성격은 보정을 기준으로 정렬한다. 가나다순이면 원하는 보정을 찾으려고 목록을
 // 처음부터 훑어야 한다. 올리는 능력을 공격·방어·특공·특방·스피드 순으로 묶고
@@ -134,16 +129,69 @@ const pointRow = (value, index) =>
 const actualCard = (index, value) =>
   `<div class="builds-actual"><small>${STAT_LABELS[index]}</small><strong>${value}</strong></div>`;
 
+// 도구 166개와 성격 25개는 고를 때 찾을 수 있어야 한다. 네이티브 select는 검색이
+// 안 되고, 모달 창은 편집기 위에 또 겹친다. 그래서 자리에서 펼쳐지는 목록을 둔다.
+// ponytail: 직접 만든 목록이다. 브라우저가 검색되는 select를 주면 걷어낸다
+export const comboRows = (options, query) => {
+  const rows = options.filter(o => matchesQuery({ name: o.value, label: o.label }, query ?? ''));
+  if (!rows.length) return '<li class="builds-combo-empty">찾는 항목이 없습니다.</li>';
+  return rows
+    .map(
+      o =>
+        `<li><button type="button" role="option" class="builds-combo-row"` +
+        ` data-builds-combo-value="${esc(o.value)}">${esc(o.label)}</button></li>`,
+    )
+    .join('');
+};
+
+// 고를 수 있는 것들. 편집기가 그릴 때와 검색으로 목록만 다시 그릴 때가 같은
+// 목록을 봐야 하므로 한 곳에서만 만든다.
+export function comboOptions(field, { reference, locale, pokemon }) {
+  if (field === 'ability')
+    return abilityOptions(reference, pokemon).map(name => ({
+      value: name,
+      label: refLabel(reference, locale, 'ability', name),
+    }));
+  if (field === 'item')
+    return itemOptions(reference)
+      .map(name => ({ value: name, label: refLabel(reference, locale, 'held_item', name) }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+  return natureChoices(locale);
+}
+
+const combo = ({ field, label, valueLabel, options, open, query, search, disabled = false }) =>
+  `<div class="builds-combo" data-builds-combo="${field}">` +
+  `<span class="builds-combo-label">${label}</span>` +
+  `<button type="button" class="builds-pick" data-builds-combo-open="${field}"` +
+  ` aria-expanded="${open}" aria-haspopup="listbox"${disabled ? ' disabled' : ''}>` +
+  `${esc(valueLabel)}</button>` +
+  (open && !disabled
+    ? `<div class="builds-combo-panel">` +
+      `<div class="search-box"><span aria-hidden="true">⌕</span>` +
+      `<input type="search" data-builds-combo-search value="${esc(query ?? '')}"` +
+      ` placeholder="${esc(search)}" autocomplete="off" aria-label="${esc(search)}"></div>` +
+      `<ul class="builds-combo-list" role="listbox" data-builds-combo-list>` +
+      `${comboRows(options, query)}</ul></div>`
+    : '') +
+  `</div>`;
+
 export function sampleEditor(
   sample,
-  { reference, locale, index = null, existing = false, resumed = false, errors = [] },
+  {
+    reference,
+    locale,
+    index = null,
+    combos = null,
+    existing = false,
+    resumed = false,
+    errors = [],
+  },
 ) {
   const total = sample.points.reduce((a, b) => a + b, 0);
   const actual = actualStats(reference, sample.pokemon, sample.points, sample.nature);
-  const abilities = abilityOptions(reference, sample.pokemon).map(name => ({
-    value: name,
-    label: refLabel(reference, locale, 'ability', name),
-  }));
+  const forField = { reference, locale, pokemon: sample.pokemon };
+  const abilities = comboOptions('ability', forField);
+  const items = comboOptions('item', forField);
   return (
     `<form class="builds-editor" data-builds-form="sample">` +
     `${resumeNote(resumed)}${errorList(errors)}` +
@@ -152,14 +200,38 @@ export function sampleEditor(
     `${portrait({ sprite: speciesSprite(reference, index, sample.pokemon) }, 'builds-hero-art')}` +
     `<button type="button" class="builds-pick builds-species" data-builds-species>` +
     `${esc(speciesLabel(locale, reference, sample.pokemon))}</button></div>` +
-    `<button type="button" class="builds-pick" data-builds-item>` +
-    `${sample.item ? esc(refLabel(reference, locale, 'held_item', sample.item)) : '도구 선택'}</button>` +
-    `<label class="builds-field">특성<select data-builds-field="ability"${abilities.length ? '' : ' disabled'}>` +
-    `${choices(abilities, sample.ability, abilities.length ? '특성 선택' : '먼저 포켓몬을 선택하세요')}` +
-    `</select></label>` +
-    `<label class="builds-field">능력 보정<select data-builds-field="nature">` +
-    `${choices(natureChoices(locale), sample.nature, '능력 보정 선택')}` +
-    `</select></label>` +
+    `${combo({
+      field: 'item',
+      label: '도구',
+      valueLabel: sample.item ? refLabel(reference, locale, 'held_item', sample.item) : '도구 선택',
+      options: items,
+      open: combos?.field === 'item',
+      query: combos?.query,
+      search: '도구 검색',
+    })}` +
+    `${combo({
+      field: 'ability',
+      label: '특성',
+      valueLabel: sample.ability
+        ? refLabel(reference, locale, 'ability', sample.ability)
+        : abilities.length
+          ? '특성 선택'
+          : '먼저 포켓몬을 선택하세요',
+      options: abilities,
+      open: combos?.field === 'ability',
+      query: combos?.query,
+      search: '특성 검색',
+      disabled: !abilities.length,
+    })}` +
+    `${combo({
+      field: 'nature',
+      label: '능력 보정',
+      valueLabel: natureLabel(locale, sample.nature),
+      options: comboOptions('nature', forField),
+      open: combos?.field === 'nature',
+      query: combos?.query,
+      search: '능력 보정 검색',
+    })}` +
     `<fieldset class="builds-points"><legend>능력 포인트 <small>합계 ${total} / 66</small></legend>` +
     `<div class="builds-point-grid">${sample.points.map(pointRow).join('')}</div>` +
     `<div class="builds-actuals">` +
