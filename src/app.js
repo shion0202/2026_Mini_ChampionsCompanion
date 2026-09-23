@@ -601,6 +601,14 @@ function buildsSave() {
   return true;
 }
 
+// 고치는 중에는 목록 검색과 JSON 버튼이 할 일이 없어 자리만 차지하고, 샘플·파티
+// 탭은 눌러도 아무 일도 일어나지 않으면서 눌리는 척한다. 편집기는 renderBuilds를
+// 거치지 않는 경로로도 그려지므로 두 곳이 같은 함수를 부른다.
+function renderBuildsChrome(editing) {
+  $('builds-controls').hidden = !!editing;
+  document.querySelectorAll('[data-builds-tab]').forEach(button => (button.disabled = !!editing));
+}
+
 function renderBuilds() {
   if (state.page !== 'builds') return;
   document
@@ -608,8 +616,7 @@ function renderBuilds() {
     .forEach(button =>
       button.setAttribute('aria-pressed', String(button.dataset.buildsTab === state.buildsTab)),
     );
-  // 고치는 중에는 목록 검색과 JSON 버튼이 할 일이 없다. 자리만 차지한다.
-  $('builds-controls').hidden = !!state.buildsEditing;
+  renderBuildsChrome(state.buildsEditing);
   if (!state.locale) {
     $('builds-rows').innerHTML = loadingState('한국어 명칭을 불러오는 중입니다.');
     return;
@@ -653,9 +660,8 @@ function dropDraft(kind, id) {
 
 function renderBuildsEditor() {
   const editing = state.buildsEditing;
-  // 편집기는 openBuildsEditor에서 바로 불리기도 한다. 여기서도 검색줄을 감춰야
-  // renderBuilds를 거치지 않는 경로에서 그대로 남지 않는다.
-  if (state.page === 'builds') $('builds-controls').hidden = !!editing;
+  // 편집기는 openBuildsEditor에서 바로 불리기도 한다.
+  if (state.page === 'builds') renderBuildsChrome(editing);
   if (!editing || state.page !== 'builds' || !state.locale || !state.reference) return;
   const shared = {
     locale: state.locale,

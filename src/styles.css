@@ -1533,6 +1533,11 @@ dialog .icon-button {
   border-radius: 8px;
   color: var(--muted);
 }
+/* 잠긴 탭. 눌러도 되는 것처럼 보이면 눌러보고 아무 일도 없는 쪽이 더 헷갈린다. */
+.segmented button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .form-switch button {
   border: 1px solid var(--line);
 }
