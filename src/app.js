@@ -1137,7 +1137,8 @@ function selectPokemon(id, { navigate = true, preserveCategory = false } = {}) {
   document.body.classList.add('detail-open');
   renderList();
   renderDetail();
-  if (state.page === 'ranking' && !preserveCategory) window.scrollTo(0, 0);
+  // 상세 탭을 바꿀 때처럼 스크롤을 건드리지 않는다. 좁은 화면은 목록 자리에 상세가
+  // 들어와 보던 위치가 다른 내용이 되므로 그때만 위로 올린다.
   if (state.page === 'ranking' && matchMedia('(max-width: 760px)').matches) {
     window.scrollTo(0, 0);
     $('pokemon-title')?.focus({ preventScroll: true });
