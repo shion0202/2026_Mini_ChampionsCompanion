@@ -3076,6 +3076,36 @@ select optgroup {
   align-items: center;
   justify-content: center;
 }
+.builds-sort {
+  flex: none;
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.builds-sort-row {
+  display: flex;
+  gap: 6px;
+}
+.builds-sort select {
+  min-height: 44px;
+  max-width: none;
+}
+/* 방향은 화살표 하나로 보인다. 글자를 붙이면 좁은 화면에서 줄이 또 넘어간다. */
+.builds-order {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 15px;
+  cursor: pointer;
+}
+.builds-order:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+}
 .builds-search {
   flex: 1 1 230px;
   display: grid;
@@ -3308,6 +3338,19 @@ select optgroup {
 }
 .builds-sub {
   color: var(--muted);
+}
+/* 수정일은 줄 끝에 붙여 이름과 포켓몬을 가리지 않는다. */
+.builds-day {
+  margin-inline-start: auto;
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.builds-day-line {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 /* 값을 넣는 곳과 결과를 보는 곳을 위아래로 나눈다. 좁은 화면에서는 여섯 칸이
    한 줄에 들어가지 않으므로 자동으로 접힌다. */

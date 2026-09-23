@@ -26,6 +26,10 @@ import {
   mergeDocs,
   searchSamples,
   searchParties,
+  sortBuilds,
+  SAMPLE_SORTS,
+  PARTY_SORTS,
+  SORT_DESCENDS,
   emptySample,
   emptyParty,
   setPoint,
@@ -131,6 +135,7 @@ const state = {
   builds: readDoc(storage),
   buildsTab: 'sample',
   buildsQuery: '',
+  buildsSort: { key: 'updated', desc: true },
   buildsEditing: null,
   buildsDrafts: {},
   buildsErrors: [],
@@ -611,6 +616,26 @@ function renderBuildsChrome(editing) {
   document.querySelectorAll('[data-builds-tab]').forEach(button => (button.disabled = !!editing));
 }
 
+const SORT_LABELS = { updated: '최신순', name: '이름순', dex: '도감번호순' };
+// 파티는 포켓몬이 여섯이라 도감번호로 줄 세울 수 없다. 탭마다 고를 수 있는 것이
+// 다르므로 목록을 그릴 때 다시 만든다. 파티에서 도감번호순이 남아 있으면 이름순으로
+// 내린다.
+function renderBuildsSort() {
+  const keys = state.buildsTab === 'sample' ? SAMPLE_SORTS : PARTY_SORTS;
+  if (!keys.includes(state.buildsSort.key))
+    state.buildsSort = { key: 'name', desc: SORT_DESCENDS.name };
+  const select = $('builds-sort');
+  const wanted = keys.map(key => `<option value="${key}">${SORT_LABELS[key]}</option>`).join('');
+  if (select.innerHTML !== wanted) select.innerHTML = wanted;
+  select.value = state.buildsSort.key;
+  const order = $('builds-order');
+  order.textContent = state.buildsSort.desc ? '↓' : '↑';
+  order.setAttribute(
+    'aria-label',
+    state.buildsSort.desc ? '내림차순, 누르면 오름차순' : '오름차순, 누르면 내림차순',
+  );
+}
+
 function renderBuilds() {
   if (state.page !== 'builds') return;
   document
@@ -624,16 +649,18 @@ function renderBuilds() {
     return;
   }
   if (state.buildsEditing) return renderBuildsEditor();
+  renderBuildsSort();
   const { samples, parties } = state.builds;
+  const sorted = list => sortBuilds(list, state.buildsSort, state.reference);
   $('builds-rows').innerHTML =
     state.buildsTab === 'sample'
       ? sampleList(
-          searchSamples(samples, state.buildsQuery, state.reference, state.locale),
+          sorted(searchSamples(samples, state.buildsQuery, state.reference, state.locale)),
           state.locale,
           state.reference,
           state.index,
         )
-      : partyList(searchParties(parties, state.buildsQuery), samples, state.locale);
+      : partyList(sorted(searchParties(parties, state.buildsQuery)), samples, state.locale);
 }
 
 function openBuilds(tab = 'sample', { navigate = true } = {}) {
@@ -1234,6 +1261,17 @@ $('builds-link').onclick = () => {
 };
 $('builds-search').addEventListener('input', event => {
   state.buildsQuery = event.target.value;
+  renderBuilds();
+});
+// 기준을 바꾸면 그 기준에 어울리는 방향에서 시작한다. 이름순을 골랐는데 ㅎ부터
+// 나오면 고른 사람이 바란 것이 아니다. 방향은 그 다음에 단추로 뒤집는다.
+$('builds-sort').addEventListener('change', event => {
+  const key = event.target.value;
+  state.buildsSort = { key, desc: SORT_DESCENDS[key] };
+  renderBuilds();
+});
+$('builds-order').addEventListener('click', () => {
+  state.buildsSort = { ...state.buildsSort, desc: !state.buildsSort.desc };
   renderBuilds();
 });
 $('builds-rows').addEventListener('click', event => {

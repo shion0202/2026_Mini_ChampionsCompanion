@@ -10,6 +10,7 @@ import {
   sampleEditor,
   partyEditor,
   pickerRows,
+  fmtDay,
 } from '../src/builds-view.js';
 
 const read = file =>
@@ -244,4 +245,13 @@ test('값과 이름을 이스케이프한다', () => {
   assert.ok(html.includes('&lt;이름&gt;'));
   assert.ok(html.includes('&lt;v&gt;'));
   assert.equal(html.includes('<이름>'), false);
+});
+
+test('수정일은 날짜만 적고, 저장한 적 없으면 그렇게 알린다', () => {
+  // 한국 시간 고정이라 돌리는 기계의 시간대와 무관하다.
+  assert.equal(fmtDay(Date.UTC(2026, 8, 24, 3)), '2026.09.24');
+  assert.equal(fmtDay(0), '저장 안 함');
+  const html = sampleList([{ ...sample, updatedAt: Date.UTC(2026, 8, 24, 3) }], locale, reference);
+  assert.ok(html.includes('2026.09.24'));
+  assert.ok(sampleEditor(sample, { reference, locale }).includes('수정일 저장 안 함'));
 });

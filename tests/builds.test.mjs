@@ -10,6 +10,9 @@ import {
   validateSample,
   validateParty,
   setMove,
+  sortBuilds,
+  SAMPLE_SORTS,
+  PARTY_SORTS,
   addAltMove,
   removeAltMove,
   setPoint,
@@ -671,4 +674,60 @@ test('내구력은 HP와 방어를 곱해 견줄 수 있는 숫자로 만든다'
   assert.equal(bulk([75, 0, 20, 0, 20, 0], 4), 3649);
   // 방어가 높을수록 커진다.
   assert.ok(bulk([75, 0, 40, 0, 20, 0], 2) > bulk([75, 0, 20, 0, 20, 0], 2));
+});
+
+// 정렬. 기본은 최신순이고, 도감번호는 샘플에만 있다.
+const sorting = [
+  { id: 'a', name: '나', pokemon: 'pikachu', updatedAt: 200 },
+  { id: 'b', name: '가', pokemon: 'salamence', updatedAt: 300 },
+  { id: 'c', name: '다', pokemon: 'charizard', updatedAt: 100 },
+];
+const dexRef = {
+  species: { pikachu: { dex: 25 }, salamence: { dex: 373 }, charizard: { dex: 6 } },
+};
+const names = rows => rows.map(r => r.name);
+
+test('기본은 최근에 저장한 것이 먼저다', () => {
+  assert.deepEqual(names(sortBuilds(sorting, undefined, dexRef)), ['가', '나', '다']);
+});
+
+test('방향을 뒤집으면 오래된 것이 먼저다', () => {
+  assert.deepEqual(names(sortBuilds(sorting, { key: 'updated', desc: false }, dexRef)), [
+    '다',
+    '나',
+    '가',
+  ]);
+});
+
+test('이름순은 가나다부터다', () => {
+  assert.deepEqual(names(sortBuilds(sorting, { key: 'name' }, dexRef)), ['가', '나', '다']);
+  assert.deepEqual(names(sortBuilds(sorting, { key: 'name', desc: true }, dexRef)), [
+    '다',
+    '나',
+    '가',
+  ]);
+});
+
+test('도감번호순은 번호가 작은 것부터다', () => {
+  assert.deepEqual(names(sortBuilds(sorting, { key: 'dex' }, dexRef)), ['다', '나', '가']);
+});
+
+test('도감 자료가 없으면 번호를 모르므로 이름으로 가른다', () => {
+  assert.deepEqual(names(sortBuilds(sorting, { key: 'dex' }, null)), ['가', '나', '다']);
+});
+
+test('저장한 적 없는 항목은 최신순의 끝으로 간다', () => {
+  const rows = [...sorting, { id: 'd', name: '라', pokemon: null, updatedAt: 0 }];
+  assert.equal(names(sortBuilds(rows, { key: 'updated' }, dexRef)).at(-1), '라');
+});
+
+test('정렬은 원본을 고치지 않는다', () => {
+  const before = names(sorting);
+  sortBuilds(sorting, { key: 'name' }, dexRef);
+  assert.deepEqual(names(sorting), before);
+});
+
+test('파티는 도감번호로 줄 세우지 않는다', () => {
+  assert.deepEqual(PARTY_SORTS, ['updated', 'name']);
+  assert.ok(SAMPLE_SORTS.includes('dex'));
 });

@@ -355,6 +355,27 @@ export const itemOptions = reference =>
     .map(item => item.name)
     .sort();
 
+// 정렬. 기본은 최근에 저장한 것이 먼저다. 파티는 포켓몬을 하나로 정할 수 없으므로
+// 도감번호로 줄 세울 수 없다. 저장한 적 없는 항목은 updatedAt이 0이라 최신순의
+// 끝으로 간다. 도감 자료가 없는 동안에는 번호를 모르므로 이름으로만 가른다.
+export const SAMPLE_SORTS = ['updated', 'name', 'dex'];
+export const PARTY_SORTS = ['updated', 'name'];
+// 이름순과 번호순은 작은 것부터 보는 것이 자연스럽고, 최신순은 그 반대다.
+export const SORT_DESCENDS = { updated: true, name: false, dex: false };
+
+export function sortBuilds(list, { key = 'updated', desc = SORT_DESCENDS[key] } = {}, reference) {
+  const byName = (a, b) => a.name.localeCompare(b.name, 'ko');
+  const dexOf = s => reference?.species?.[s.pokemon]?.dex ?? Number.MAX_SAFE_INTEGER;
+  const cmp =
+    key === 'name'
+      ? byName
+      : key === 'dex'
+        ? (a, b) => dexOf(a) - dexOf(b) || byName(a, b)
+        : (a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0) || byName(a, b);
+  const turn = desc ? -1 : 1;
+  return [...list].sort((a, b) => turn * cmp(a, b));
+}
+
 // 목록 검색. 다른 화면과 같은 matchesQuery를 써서 한국어 이름, 초성, 도감 번호가
 // 모두 같은 방식으로 걸린다. 사용자가 화면에서 보는 것은 한국어 이름이므로
 // 저장된 키만 비교하면 보이는 대로 찾을 수 없다.

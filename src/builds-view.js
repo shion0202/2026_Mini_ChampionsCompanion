@@ -25,6 +25,21 @@ const empty = (message, action, label) =>
   `<div class="empty-state"><p>${message}</p>` +
   `<button class="text-button" data-builds-new="${action}">${label}</button></div>`;
 
+// 수정일. 저장할 때마다 updatedAt을 덮어쓰므로 한 번도 고치지 않았으면 이 값이
+// 곧 작성일이다. 따로 작성일을 둘 이유가 없다. 시각까지는 필요 없어 날짜만 적는다.
+export const fmtDay = ms =>
+  ms
+    ? new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .format(new Date(ms))
+        .replace(/\s/g, '')
+        .replace(/\.$/, '')
+    : '저장 안 함';
+
 const speciesLabel = (locale, reference, id) => {
   const species = reference?.species?.[id];
   return species ? locale.pokemon(species.name).label : (id ?? '포켓몬 선택');
@@ -93,7 +108,7 @@ export function sampleList(samples, locale, reference = null, index = null) {
         `<span class="builds-text">` +
         `<span class="builds-name">${esc(s.name)}</span>` +
         `<small class="builds-sub">${esc(speciesLabel(locale, reference, s.pokemon))}</small>` +
-        `</span></button></li>`,
+        `</span><small class="builds-day">${fmtDay(s.updatedAt)}</small></button></li>`,
     )
     .join('')}</ul>`;
 }
@@ -281,6 +296,7 @@ export function sampleEditor(
     `<form class="builds-editor" data-builds-form="sample">` +
     `${resumeNote(resumed)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="샘플명 (예: 스카프 한카리아스)"></label>` +
+    `<p class="builds-day-line">수정일 ${fmtDay(sample.updatedAt)}</p>` +
     `<div class="builds-hero">` +
     `${portrait({ sprite: speciesSprite(reference, index, sample.pokemon) }, 'builds-hero-art')}` +
     `<button type="button" class="builds-pick builds-species" data-builds-species>` +
