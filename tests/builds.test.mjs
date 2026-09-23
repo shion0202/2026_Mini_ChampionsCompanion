@@ -11,6 +11,7 @@ import {
   validateParty,
   setMove,
   keepsItem,
+  setSpecies,
   sortBuilds,
   filterSamples,
   filterParties,
@@ -853,4 +854,48 @@ test('세대로도 거른다. 랭킹과 같이 도감 번호로 가른다', () =
     picks(filterSamples(typed, { generation: ['1'], type: ['Electric'] }, reference)),
     ['피카츄'],
   );
+});
+
+test('포켓몬을 바꾸면 특성과 기술과 후보 기술을 비운다', () => {
+  const before = {
+    ...built(),
+    pokemon: 'charizard',
+    ability: 'Blaze',
+    item: 'Charizardite X',
+    points: [0, 32, 0, 0, 0, 32],
+    name: '리자몽',
+    note: '메모',
+  };
+  const after = setSpecies(before, 'pikachu', reference);
+  assert.equal(after.pokemon, 'pikachu');
+  assert.equal(after.ability, null);
+  assert.deepEqual(after.moves, [null, null, null, null]);
+  assert.deepEqual(after.altMoves, []);
+  // 남의 메가스톤도 내려놓는다.
+  assert.equal(after.item, null);
+  // 포켓몬과 무관하게 고른 것은 그대로 둔다.
+  assert.equal(after.name, '리자몽');
+  assert.equal(after.note, '메모');
+  assert.deepEqual(after.points, [0, 32, 0, 0, 0, 32]);
+});
+
+test('메가스톤이 아닌 도구는 포켓몬을 바꿔도 남는다', () => {
+  const after = setSpecies(
+    { ...built(), pokemon: 'charizard', item: 'Choice Scarf' },
+    'pikachu',
+    reference,
+  );
+  assert.equal(after.item, 'Choice Scarf');
+});
+
+test('같은 포켓몬을 다시 고른 것은 바꾼 것이 아니다', () => {
+  const before = { ...built(), pokemon: 'charizard', ability: 'Blaze' };
+  assert.equal(setSpecies(before, 'charizard', reference), before);
+});
+
+test('포켓몬을 바꿔도 원본은 그대로다', () => {
+  const before = { ...built(), pokemon: 'charizard' };
+  setSpecies(before, 'pikachu', reference);
+  assert.deepEqual(before.moves, ['A', 'B', 'C', 'D']);
+  assert.deepEqual(before.altMoves, ['E', 'F', 'G']);
 });

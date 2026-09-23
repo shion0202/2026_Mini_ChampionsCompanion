@@ -43,6 +43,7 @@ import {
   speciesSprite,
   itemOptions,
   keepsItem,
+  setSpecies,
   moveOptions,
   setMove,
   addAltMove,
@@ -935,16 +936,12 @@ function applyPicked(value) {
   const editing = state.buildsEditing;
   if (!editing || !picker) return;
   const draft = editing.draft;
-  if (picker.kind === 'species')
-    // 포켓몬이 바뀌면 그 포켓몬의 것이 아닌 특성과 메가스톤이 남는다. 둘은 고를
-    // 수 없는 값이 되므로 비운다. 기술은 사용자가 고른 것이므로 임의로 지우지 않는다.
-    editing.draft = {
-      ...draft,
-      pokemon: value,
-      ability: null,
-      item: keepsItem(state.reference, value, draft.item) ? draft.item : null,
-    };
-  else if (picker.kind === 'item') editing.draft = { ...draft, item: value };
+  if (picker.kind === 'species') {
+    // 비우는 규칙은 setSpecies에 있다. 지워지는 것이 적지 않으므로 알린다.
+    editing.draft = setSpecies(draft, value, state.reference);
+    if (draft.pokemon !== value && (draft.moves.some(Boolean) || draft.altMoves.length))
+      toast('포켓몬이 바뀌어 기술을 비웠습니다.');
+  } else if (picker.kind === 'item') editing.draft = { ...draft, item: value };
   else if (picker.kind === 'member')
     editing.draft = {
       ...draft,

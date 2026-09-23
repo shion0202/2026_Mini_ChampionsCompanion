@@ -374,6 +374,21 @@ export function itemOptions(reference, pokemon = null) {
 export const keepsItem = (reference, pokemon, item) =>
   !item || stoneFits(reference, pokemon, reference?.held_item?.[toId(item)]);
 
+// 포켓몬이 바뀌면 그 포켓몬의 것이 아닌 값이 남는다. 특성과 기술과 후보 기술을
+// 비우고, 남의 메가스톤도 내려놓는다. 이름과 설명과 능력 포인트는 포켓몬과 무관하게
+// 고른 것이라 그대로 둔다. 같은 포켓몬을 다시 고른 것은 바꾼 것이 아니다.
+export function setSpecies(sample, pokemon, reference) {
+  if (sample.pokemon === pokemon) return sample;
+  return {
+    ...sample,
+    pokemon,
+    ability: null,
+    item: keepsItem(reference, pokemon, sample.item) ? sample.item : null,
+    moves: [null, null, null, null],
+    altMoves: [],
+  };
+}
+
 // 정렬. 기본은 최근에 저장한 것이 먼저다. 파티는 포켓몬을 하나로 정할 수 없으므로
 // 도감번호로 줄 세울 수 없다. 저장한 적 없는 항목은 updatedAt이 0이라 최신순의
 // 끝으로 간다. 도감 자료가 없는 동안에는 번호를 모르므로 이름으로만 가른다.
