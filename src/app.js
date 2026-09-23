@@ -1217,6 +1217,16 @@ $('builds-rows').addEventListener('click', event => {
     renderBuildsEditor();
     return;
   }
+  // 32와 0은 가장 자주 쓰는 값이다. setPoint가 범위를 이미 보므로 그대로 넘긴다.
+  const toMax = event.target.closest('[data-builds-point-max]');
+  const toZero = event.target.closest('[data-builds-point-zero]');
+  if ((toMax || toZero) && state.buildsEditing) {
+    const at = Number((toMax ?? toZero).dataset[toMax ? 'buildsPointMax' : 'buildsPointZero']);
+    state.buildsEditing.draft = setPoint(state.buildsEditing.draft, at, toMax ? '32' : '0');
+    saveDraft();
+    renderBuildsEditor();
+    return;
+  }
   const comboOpen = event.target.closest('[data-builds-combo-open]');
   if (comboOpen) {
     const field = comboOpen.dataset.buildsComboOpen;

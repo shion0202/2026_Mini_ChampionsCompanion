@@ -3304,7 +3304,7 @@ select optgroup {
   gap: 8px;
 }
 .builds-actual-head {
-  margin: 0;
+  margin: 0 0 8px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -3329,12 +3329,22 @@ select optgroup {
 .builds-point {
   display: grid;
   gap: 5px;
-  justify-items: center;
   color: var(--muted);
   font-size: 12px;
 }
+.builds-point-name {
+  text-align: center;
+}
+/* 입력칸과 단추를 나란히 두되 단추를 칸 밖에 둔다. 칸 안에 넣으면 단추가 있는
+   줄과 없는 줄의 가운데가 어긋난다. */
+.builds-point-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
 .builds-point input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -3344,6 +3354,58 @@ select optgroup {
   font: inherit;
   font-size: 14px;
   text-align: center;
+}
+.builds-point-steps {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  flex: none;
+}
+.builds-point-step {
+  width: 26px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.builds-point-step:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+/* 합계가 딱 맞는지 모자라는지 넘치는지 한눈에 보여야 한다. */
+.builds-total.is-exact {
+  color: var(--teal);
+  font-weight: 700;
+}
+.builds-total.is-under {
+  color: #b07d1a;
+}
+.builds-total.is-over {
+  color: #c0392b;
+  font-weight: 700;
+}
+.builds-bulk {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+/* 후보도 채용 기술과 같은 칸으로 보인다. 빼기는 오른쪽 ×다. */
+.builds-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.builds-alt-name {
+  flex: 1;
+  min-width: 0;
+}
+.builds-alt-remove {
+  flex: none;
 }
 .builds-status {
   color: var(--muted);

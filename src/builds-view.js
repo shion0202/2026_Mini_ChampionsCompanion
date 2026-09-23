@@ -2,7 +2,7 @@
 // 않으므로 브라우저 없이 스냅샷으로 비교한다.
 import { esc } from './html.js';
 import { toId, STAT_LABELS, matchesQuery } from './data.js';
-import { portrait } from './app-view.js';
+import { portrait, typeBadges } from './app-view.js';
 import { spreadLabel } from './reference.js';
 import {
   NATURES,
@@ -114,20 +114,51 @@ export function partyList(parties, samples, locale) {
 }
 
 // 기술은 영문 이름으로 담고 한국어로 보여준다. locale을 받지 않으면 저장된
-// 영문이 그대로 화면에 나온다.
+// 영문이 그대로 화면에 나온다. 타입은 랭킹·도감이 쓰는 배지를 그대로 쓴다.
+// 이름 자체를 물들이면 읽기 어려워지므로 작은 배지로 구분만 준다.
+const moveTypeBadge = (reference, move) => {
+  const type = reference?.move?.[toId(move)]?.type;
+  return type ? typeBadges([type]) : '';
+};
+
 const moveSlot = (reference, locale) => (move, slot) =>
   `<li><span class="builds-slot">${slot + 1}</span>` +
-  `<button class="builds-pick" data-builds-move="${slot}">` +
-  `${move ? esc(refLabel(reference, locale, 'move', move)) : '기술 선택'}</button></li>`;
+  `<button class="builds-pick builds-move" data-builds-move="${slot}">` +
+  `${move ? `${esc(refLabel(reference, locale, 'move', move))}${moveTypeBadge(reference, move)}` : '기술 선택'}` +
+  `</button></li>`;
+
+// 후보도 채용 기술과 같은 칸으로 보여야 한눈에 견준다. 빼기는 글자 대신 ×로.
+const altRow = (reference, locale) => move =>
+  `<li><span class="builds-pick builds-move builds-alt-name">` +
+  `${esc(refLabel(reference, locale, 'move', move))}${moveTypeBadge(reference, move)}</span>` +
+  `<button type="button" class="icon-button builds-alt-remove"` +
+  ` data-builds-alt-remove="${esc(move)}"` +
+  ` aria-label="${esc(refLabel(reference, locale, 'move', move))} 후보에서 빼기">×</button></li>`;
 
 // 도감 화면과 같은 능력 이름을 쓴다(STAT_LABELS). H·A·B 한 글자는 익숙한 사람만
 // 읽는다. 값을 넣는 곳과 결과를 보는 곳을 나누어, 고치면서 실수치를 바로 본다.
+// 32와 0은 가장 자주 쓰는 값이라 한 번에 가도록 단추를 둔다. 단추를 입력칸 밖에
+// 따로 두어야 단추가 없는 칸과도 나란히 선다.
 const pointRow = (value, index) =>
-  `<label class="builds-point"><span>${STAT_LABELS[index]}</span>` +
-  `<input type="number" min="0" max="32" step="1" value="${value}" data-builds-point="${index}"></label>`;
+  `<div class="builds-point">` +
+  `<span class="builds-point-name">${STAT_LABELS[index]}</span>` +
+  `<div class="builds-point-row">` +
+  `<input type="number" min="0" max="32" step="1" value="${value}"` +
+  ` data-builds-point="${index}" aria-label="${STAT_LABELS[index]} 능력 포인트">` +
+  `<span class="builds-point-steps">` +
+  `<button type="button" class="builds-point-step" data-builds-point-max="${index}"` +
+  ` aria-label="${STAT_LABELS[index]} 최대">▲</button>` +
+  `<button type="button" class="builds-point-step" data-builds-point-zero="${index}"` +
+  ` aria-label="${STAT_LABELS[index]} 0">▼</button>` +
+  `</span></div></div>`;
 
 const actualCard = (index, value) =>
   `<div class="builds-actual"><small>${STAT_LABELS[index]}</small><strong>${value}</strong></div>`;
+
+// 내구력은 HP와 방어(또는 특수방어)를 곱해 견디는 정도를 한 숫자로 나타낸 것이다.
+// 0.411은 데미지 계산식에서 온 상수로, 다른 배치와 견주기 쉬우라고 나눈다.
+export const bulk = (actual, defenseIndex) =>
+  Math.floor((actual[0] * actual[defenseIndex]) / 0.411);
 
 // 도구 166개와 성격 25개는 고를 때 찾을 수 있어야 한다. 네이티브 select는 검색이
 // 안 되고, 모달 창은 편집기 위에 또 겹친다. 그래서 자리에서 펼쳐지는 목록을 둔다.
@@ -232,26 +263,26 @@ export function sampleEditor(
       query: combos?.query,
       search: '능력 보정 검색',
     })}` +
-    `<fieldset class="builds-points"><legend>능력 포인트 <small>합계 ${total} / 66</small></legend>` +
+    `<fieldset class="builds-points"><legend>능력 포인트 ` +
+    `<small class="builds-total ${total === 66 ? 'is-exact' : total > 66 ? 'is-over' : 'is-under'}">` +
+    `합계 ${total} / 66</small></legend>` +
     `<div class="builds-point-grid">${sample.points.map(pointRow).join('')}</div>` +
     `<div class="builds-actuals">` +
     `${
       actual
-        ? `<p class="builds-actual-head">실수치 <small>Lv.50</small></p>` +
-          `<div class="builds-actual-grid">${actual.map((v, i) => actualCard(i, v)).join('')}</div>`
+        ? `<p class="builds-actual-head">실수치</p>` +
+          `<div class="builds-actual-grid">${actual.map((v, i) => actualCard(i, v)).join('')}</div>` +
+          `<div class="builds-bulk">` +
+          `<div class="builds-actual"><small>물리 내구력</small><strong>${bulk(actual, 2)}</strong></div>` +
+          `<div class="builds-actual"><small>특수 내구력</small><strong>${bulk(actual, 4)}</strong></div>` +
+          `</div>`
         : '<p class="builds-resume">포켓몬을 선택하면 실수치를 함께 보여줍니다.</p>'
     }` +
     `</div></fieldset>` +
     `<fieldset class="builds-moves"><legend>채용 기술</legend>` +
     `<ul>${sample.moves.map(moveSlot(reference, locale)).join('')}</ul></fieldset>` +
     `<fieldset class="builds-alts"><legend>후보 기술</legend>` +
-    `<ul>${sample.altMoves
-      .map(
-        m =>
-          `<li><span class="builds-alt-name">${esc(refLabel(reference, locale, 'move', m))}</span>` +
-          `<button type="button" class="text-button" data-builds-alt-remove="${esc(m)}">빼기</button></li>`,
-      )
-      .join('')}</ul>` +
+    `<ul>${sample.altMoves.map(altRow(reference, locale)).join('')}</ul>` +
     `<button type="button" class="text-button" data-builds-alt-add>후보 기술 추가</button></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유 등">${esc(sample.note)}</textarea></label>` +
     `${editorActions(existing)}` +

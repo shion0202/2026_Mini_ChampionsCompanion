@@ -38,6 +38,7 @@ import {
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
 import { createLocale } from '../src/locale.js';
 import { SPEED_SPECIES } from '../src/speed-catalog.js';
+import { bulk } from '../src/builds-view.js';
 
 const reference = JSON.parse(
   await readFile(new URL('../public/data/reference.json', import.meta.url)),
@@ -650,4 +651,12 @@ test('고를 수 있는 도구는 모두 챔피언스 수록 도구다', () => {
   const names = new Set(itemOptions(reference));
   const outside = Object.values(reference.held_item).filter(i => names.has(i.name) && !i.champions);
   assert.deepEqual(outside, []);
+});
+
+test('내구력은 HP와 방어를 곱해 견줄 수 있는 숫자로 만든다', () => {
+  // 다른 앱의 표기와 맞춘 값: HP 75, 방어 20이면 3649다.
+  assert.equal(bulk([75, 0, 20, 0, 20, 0], 2), 3649);
+  assert.equal(bulk([75, 0, 20, 0, 20, 0], 4), 3649);
+  // 방어가 높을수록 커진다.
+  assert.ok(bulk([75, 0, 40, 0, 20, 0], 2) > bulk([75, 0, 20, 0, 20, 0], 2));
 });
