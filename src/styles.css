@@ -303,11 +303,15 @@ select {
   overflow: hidden;
   padding: 23px 20px 12px;
 }
+/* 제목과 그 아래 보기 전환 사이 간격. 스피드 랭킹, 상성표, 도감이 같은 값을 쓴다. */
+:root {
+  --heading-gap: 17px;
+}
 .list-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 17px;
+  margin-bottom: var(--heading-gap);
 }
 h2 {
   margin: 0;
@@ -1173,8 +1177,8 @@ dialog .icon-button {
     padding: 19px 15px 12px;
     border-radius: 16px;
   }
-  .list-heading {
-    margin-bottom: 15px;
+  :root {
+    --heading-gap: 15px;
   }
   .list-heading h2 {
     font-size: 16px;
@@ -2644,6 +2648,10 @@ select optgroup {
   align-content: start;
   padding: 17px 0 24px;
 }
+/* 그리드라 제목 아래에도 gap 12px이 붙는다. 다른 화면과 같은 간격이 되도록 뺀다. */
+.dex-panel .list-heading {
+  margin-bottom: calc(var(--heading-gap) - 12px);
+}
 .dex-panel #dex-kinds .segmented {
   width: 100%;
 }
@@ -2746,8 +2754,9 @@ select optgroup {
   padding: 17px 0 24px;
   min-width: 0;
 }
+/* 위 여백은 제목 쪽 --heading-gap이 담당한다. 여기서 더하면 스피드 랭킹보다 벌어진다. */
 .type-chart-switch {
-  margin: 12px 0;
+  margin: 0 0 12px;
 }
 .type-chart-switch button {
   min-height: 44px;
