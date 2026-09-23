@@ -3170,11 +3170,55 @@ select optgroup {
   display: grid;
   gap: 0.5rem;
 }
+/* 랭킹과 같은 이미지를 이름 옆에 둔다. 자료가 없으면 portrait가 자리 표시를
+   내놓으므로 줄이 흔들리지 않는다. */
+.builds-portrait,
+.picker-portrait {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  object-fit: contain;
+}
+.builds-open .no-portrait,
+.picker-row .no-portrait {
+  width: 40px;
+  flex: none;
+  text-align: center;
+  color: var(--muted);
+}
+.builds-text,
+.picker-text {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.builds-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.builds-hero .builds-pick {
+  flex: 1;
+}
+.builds-hero-art {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  object-fit: contain;
+}
+.builds-hero .no-portrait {
+  width: 64px;
+  flex: none;
+  text-align: center;
+  font-size: 28px;
+  color: var(--muted);
+}
 .builds-open {
   width: 100%;
   text-align: left;
-  display: grid;
-  gap: 0.15rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 0.85rem 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -3255,8 +3299,9 @@ select optgroup {
 .picker-row {
   width: 100%;
   text-align: left;
-  display: grid;
-  gap: 0.1rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 12px;

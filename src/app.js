@@ -612,6 +612,7 @@ function renderBuilds() {
           searchSamples(samples, state.buildsQuery, state.reference, state.locale),
           state.locale,
           state.reference,
+          state.index,
         )
       : partyList(searchParties(parties, state.buildsQuery), samples, state.locale);
 }
@@ -648,6 +649,7 @@ function renderBuildsEditor() {
   if (!editing || state.page !== 'builds' || !state.locale || !state.reference) return;
   const shared = {
     locale: state.locale,
+    index: state.index,
     existing: editing.id !== null,
     resumed: state.buildsResumed,
     errors: state.buildsErrors,
@@ -708,12 +710,13 @@ function pickerSource() {
   if (picker.kind === 'species')
     // reference.species는 id(예: charizard)로 찾는다. name(예: Charizard)을 값으로
     // 쓰면 특성·기술 목록과 표시 이름이 전부 어긋난다. name은 영문 검색용으로만 남긴다.
-    return speciesOptions(state.reference, state.locale, '').map(row => ({
+    return speciesOptions(state.reference, state.locale, '', state.index).map(row => ({
       value: row.id,
       label: row.label,
       sub: row.types.map(t => TYPE_LABELS[t] ?? t).join(' · '),
       dex: row.dex,
       name: row.name,
+      sprite: row.sprite,
     }));
   if (picker.kind === 'item')
     return itemOptions(state.reference)

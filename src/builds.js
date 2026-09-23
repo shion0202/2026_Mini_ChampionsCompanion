@@ -1,4 +1,5 @@
 import { matchesQuery } from './data.js';
+import { megaSprite } from './images.js';
 // 스피드 화면에서 먼저 쓰여 그런 이름이 붙었을 뿐 챔피언스 출전 폼 목록 그
 // 자체다. 이름을 바꾸면 speed.js, 생성 스크립트, 문서까지 번지므로 그대로 쓴다.
 import { SPEED_SPECIES } from './speed-catalog.js';
@@ -261,7 +262,7 @@ export function mergeDocs(current, incoming) {
 
 // 편집 화면에서 고를 수 있는 것들. reference.json에는 타 작품 종도 있으므로
 // 출전 목록으로 거른다. speed.js의 speedRows와 같은 자료원이다.
-export function speciesOptions(reference, locale, query = '') {
+export function speciesOptions(reference, locale, query = '', index = null) {
   return Object.entries(reference.species)
     .filter(([id]) => SPEED_SPECIES.has(id))
     .map(([id, species]) => ({
@@ -270,9 +271,21 @@ export function speciesOptions(reference, locale, query = '') {
       label: locale.pokemon(species.name).label,
       dex: species.dex,
       types: species.types,
+      sprite: speciesSprite(reference, index, id),
     }))
     .filter(row => matchesQuery(row, query))
     .sort((a, b) => (a.dex ?? 0) - (b.dex ?? 0) || a.id.localeCompare(b.id));
+}
+
+// 랭킹·스피드 화면과 같은 이미지를 쓴다. 메가 폼은 앱이 들고 있는 자료로 찾고
+// 나머지는 통계 인덱스에서 찾는다. 통계를 불러오지 못했으면 null이며, 그때는
+// 화면이 자리 표시만 남긴다. 이미지 때문에 편집이 막히지는 않는다.
+export function speciesSprite(reference, index, pokemon) {
+  const species = reference?.species?.[pokemon];
+  if (!species) return null;
+  return /(^|-)Mega($|-)/.test(species.forme ?? '')
+    ? megaSprite(species.name)
+    : (index?.pokemon?.[species.name]?.sprite ?? null);
 }
 
 export const abilityOptions = (reference, pokemon) => reference.species[pokemon]?.abilities ?? [];

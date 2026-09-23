@@ -2,8 +2,9 @@
 // 않으므로 브라우저 없이 스냅샷으로 비교한다.
 import { esc } from './html.js';
 import { toId } from './data.js';
+import { portrait } from './app-view.js';
 import { spreadLabel, POINT_LETTERS } from './reference.js';
-import { NATURES, natureAdjust, abilityOptions } from './builds.js';
+import { NATURES, natureAdjust, abilityOptions, speciesSprite } from './builds.js';
 import { STAT_NAMES } from './locale.js';
 
 // 도감 화면과 같은 규칙이다(app-view.js). reference가 기술·특성·도구 모두의
@@ -84,16 +85,18 @@ const resumeNote = resumed =>
 
 // reference가 null이면 포켓몬 이름 자리에 저장된 id가 나온다. 도감을 아직
 // 불러오지 않은 상태에서도 목록은 떠야 한다.
-export function sampleList(samples, locale, reference = null) {
+export function sampleList(samples, locale, reference = null, index = null) {
   if (!samples.length) return empty('저장한 샘플이 없습니다.', 'sample', '샘플 만들기');
   return `<ul class="builds-list">${samples
     .map(
       s =>
         `<li class="builds-row"><button class="builds-open" data-builds-sample="${esc(s.id)}">` +
+        `${portrait({ sprite: speciesSprite(reference, index, s.pokemon) }, 'builds-portrait')}` +
+        `<span class="builds-text">` +
         `<span class="builds-name">${esc(s.name)}</span>` +
         `<small class="builds-sub">${esc(speciesLabel(locale, reference, s.pokemon))}` +
         ` · ${esc(spreadLabel(s.points))}</small>` +
-        `</button></li>`,
+        `</span></button></li>`,
     )
     .join('')}</ul>`;
 }
@@ -128,7 +131,7 @@ const pointRow = (value, index) =>
 
 export function sampleEditor(
   sample,
-  { reference, locale, existing = false, resumed = false, errors = [] },
+  { reference, locale, index = null, existing = false, resumed = false, errors = [] },
 ) {
   const total = sample.points.reduce((a, b) => a + b, 0);
   const abilities = abilityOptions(reference, sample.pokemon).map(name => ({
@@ -139,8 +142,10 @@ export function sampleEditor(
     `<form class="builds-editor" data-builds-form="sample">` +
     `${resumeNote(resumed)}${errorList(errors)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="샘플명 (예: 스카프 한카리아스)"></label>` +
+    `<div class="builds-hero">` +
+    `${portrait({ sprite: speciesSprite(reference, index, sample.pokemon) }, 'builds-hero-art')}` +
     `<button type="button" class="builds-pick builds-species" data-builds-species>` +
-    `${esc(speciesLabel(locale, reference, sample.pokemon))}</button>` +
+    `${esc(speciesLabel(locale, reference, sample.pokemon))}</button></div>` +
     `<button type="button" class="builds-pick" data-builds-item>` +
     `${sample.item ? esc(refLabel(reference, locale, 'held_item', sample.item)) : '도구 선택'}</button>` +
     `<label class="builds-field">특성<select data-builds-field="ability"${abilities.length ? '' : ' disabled'}>` +
@@ -201,9 +206,11 @@ export function pickerRows(rows, limit) {
     .map(
       row =>
         `<li><button type="button" class="picker-row" data-picker-value="${esc(row.value)}">` +
+        `${'sprite' in row ? portrait({ sprite: row.sprite }, 'picker-portrait') : ''}` +
+        `<span class="picker-text">` +
         `<span class="picker-name">${esc(row.label)}</span>` +
         `${row.sub ? `<small class="picker-sub">${esc(row.sub)}</small>` : ''}` +
-        `</button></li>`,
+        `</span></button></li>`,
     )
     .join('')}</ul>`;
 }
