@@ -37,6 +37,7 @@ import {
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
 import { createLocale } from '../src/locale.js';
+import { SPEED_SPECIES } from '../src/speed-catalog.js';
 
 const reference = JSON.parse(
   await readFile(new URL('../public/data/reference.json', import.meta.url)),
@@ -619,4 +620,34 @@ test('종족값을 모르면 실수치를 만들지 않는다', () => {
   assert.equal(actualStats(reference, 'nope', [0, 0, 0, 0, 0, 0], null), null);
   assert.equal(actualStats(reference, null, [0, 0, 0, 0, 0, 0], null), null);
   assert.equal(actualStats(null, 'salamence', [0, 0, 0, 0, 0, 0], null), null);
+});
+
+test('메가 폼은 원종의 배우는 기술을 쓴다', () => {
+  // 메가냐오닉스 둘만 자료가 비어 있다. 냐오닉스는 암수의 기술이 다르므로
+  // 성별이 같은 원종에서 가져와야 한다.
+  assert.deepEqual(moveOptions(reference, 'meowsticfmega'), reference.species.meowsticf.learnset);
+  assert.deepEqual(moveOptions(reference, 'meowsticmmega'), reference.species.meowstic.learnset);
+  assert.notEqual(
+    reference.species.meowsticf.learnset.length,
+    reference.species.meowstic.learnset.length,
+  );
+  // 자료가 있는 메가 폼은 제 것을 그대로 쓴다.
+  assert.equal(moveOptions(reference, 'absolmega'), reference.species.absolmega.learnset);
+});
+
+test('출전 폼은 모두 배우는 기술을 안다', () => {
+  const missing = [...SPEED_SPECIES].filter(id => !moveOptions(reference, id));
+  assert.deepEqual(missing, []);
+});
+
+test('배우는 기술은 모두 챔피언스 수록 기술이다', () => {
+  const all = new Set([...SPEED_SPECIES].flatMap(id => moveOptions(reference, id) ?? []));
+  const outside = [...all].filter(id => reference.move[id] && !reference.move[id].champions);
+  assert.deepEqual(outside, []);
+});
+
+test('고를 수 있는 도구는 모두 챔피언스 수록 도구다', () => {
+  const names = new Set(itemOptions(reference));
+  const outside = Object.values(reference.held_item).filter(i => names.has(i.name) && !i.champions);
+  assert.deepEqual(outside, []);
 });

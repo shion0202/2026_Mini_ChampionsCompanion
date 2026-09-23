@@ -739,7 +739,11 @@ function pickerSource() {
     const learnable = moveOptions(state.reference, draft.pokemon);
     const names = learnable
       ? learnable.map(id => state.reference.move[id]?.name ?? id)
-      : Object.values(state.reference.move).map(m => m.name);
+      : // 여기까지 오는 폼은 현재 없다. 그래도 도감 전체를 그대로 내주지는 않는다.
+        // champions가 거짓인 기술 323개는 이 작품에 없으므로 고를 수 없어야 한다.
+        Object.values(state.reference.move)
+          .filter(m => m.champions)
+          .map(m => m.name);
     return names
       .map(name => ({ value: name, label: buildLabel('move', name), sub: '', name }))
       .sort(byLabel);

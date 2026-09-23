@@ -1,4 +1,4 @@
-import { matchesQuery } from './data.js';
+import { matchesQuery, toId } from './data.js';
 import { megaSprite } from './images.js';
 import { STAT_KEYS } from './reference.js';
 // 스피드 화면에서 먼저 쓰여 그런 이름이 붙었을 뿐 챔피언스 출전 폼 목록 그
@@ -318,7 +318,27 @@ export const abilityOptions = (reference, pokemon) => reference.species[pokemon]
 
 // null은 그 폼의 배우는 기술 자료가 없다는 뜻이다. 다른 세대 기술로 대체하지
 // 않는다. 화면이 미제공을 알리고 도감 전체에서 고르게 한다.
-export const moveOptions = (reference, pokemon) => reference.species[pokemon]?.learnset ?? null;
+// 메가 폼은 원종과 배우는 기술이 같다. 실제로 자료가 있는 메가 폼 80개 모두
+// 원종과 글자 그대로 같은 목록이다. 메가냐오닉스 둘만 자료가 비어 있으므로
+// 원종에서 가져온다. 냐오닉스는 암수의 기술 수가 다르므로(수컷 59, 암컷 56)
+// 성별이 같은 원종을 먼저 보고, 없으면 baseSpecies로 물러선다.
+const megaBases = name => {
+  const gendered = name.match(/^(.*)-([FM])-Mega$/);
+  if (gendered) return [`${gendered[1]}-${gendered[2]}`, gendered[1]];
+  const plain = name.match(/^(.*)-Mega(?:-[XYZ])?$/);
+  return plain ? [plain[1]] : [];
+};
+
+export function moveOptions(reference, pokemon) {
+  const species = reference?.species?.[pokemon];
+  if (!species) return null;
+  if (species.learnset) return species.learnset;
+  for (const name of [...megaBases(species.name ?? ''), species.baseSpecies].filter(Boolean)) {
+    const base = reference.species[toId(name)];
+    if (base?.learnset) return base.learnset;
+  }
+  return null;
+}
 
 // 도구는 포켓몬과 무관하게 고르므로 종족을 받지 않는다. champions가 거짓인 도구는
 // 이 작품에 수록되지 않았으므로 배치에 넣을 수 없다. 도감 화면과 같은 기준이다.
