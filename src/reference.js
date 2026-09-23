@@ -69,10 +69,11 @@ export function defenseChart(
   );
 }
 // 능력 포인트는 한 능력에 32까지, 합계 66까지 준다. 그래서 보통 두 능력에 몰아주고
-// 남는 몇 점을 다른 곳에 둔다. 2점 이하는 배분의 성격을 바꾸지 않으므로 이름에서
+// 남는 몇 점을 다른 곳에 둔다. 3점 이하는 배분의 성격을 바꾸지 않으므로 이름에서
 // 빼고, 10점 이상은 주요 투자로 보아 대문자, 그 사이는 소량 조정으로 보아 소문자로
 // 적는다. H32 B30 C4가 HBc, H32 B20 C14가 HBC가 되는 기준이다.
-const TRIVIAL_POINTS = 2;
+// 3까지 빼는 것은 체력을 홀수로 맞추느라 3이 남는 배분이 흔하기 때문이다.
+const TRIVIAL_POINTS = 3;
 const MAJOR_POINTS = 10;
 
 function spreadParts(points) {

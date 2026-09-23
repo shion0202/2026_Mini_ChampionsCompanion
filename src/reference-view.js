@@ -312,6 +312,6 @@ export function renderSpreads(rows, mode) {
     switches +
     `<div class="spread-groups">${groupSpreads(rows).map(group).join('')}</div>` +
     `<p class="category-tip grouping-rule">제공된 상위 배분 중 주요 투자 능력치가 같은 배분을 합산합니다.` +
-    ` 10포인트 이상은 대문자로 주요 투자, 3~9포인트는 소문자로 소량 조정이며, 2포인트 이하는 이름에서 뺍니다.</p>`
+    ` 10포인트 이상은 대문자로 주요 투자, 4~9포인트는 소문자로 소량 조정이며, 3포인트 이하는 이름에서 뺍니다.</p>`
   );
 }

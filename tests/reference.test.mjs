@@ -70,8 +70,11 @@ test('spread names split major investment from the leftover points', () => {
   assert.equal(spreadLabel([32, 0, 20, 14, 0, 0]), 'HBC');
   assert.equal(spreadLabel([32, 0, 24, 0, 0, 10]), 'HBS');
   assert.equal(spreadLabel([32, 0, 30, 4, 0, 0]), 'HBc');
-  // 2포인트 이하는 배분의 성격을 바꾸지 않으므로 이름에서 뺀다.
+  // 3포인트 이하는 배분의 성격을 바꾸지 않으므로 이름에서 뺀다. 체력을 홀수로
+  // 맞추느라 3이 남는 배분이 흔하다.
   assert.equal(spreadLabel([2, 0, 0, 32, 0, 32]), 'CS');
+  assert.equal(spreadLabel([3, 0, 0, 32, 0, 32]), 'CS');
+  assert.equal(spreadLabel([4, 0, 0, 32, 0, 32]), 'CSh');
   // 하마돈처럼 한쪽에 몰아준 배분은 몰아준 쪽이 대문자로 앞에 온다.
   assert.equal(spreadLabel([32, 0, 26, 0, 8, 0]), 'HBd');
   assert.equal(spreadLabel([32, 0, 8, 0, 26, 0]), 'HDb');
