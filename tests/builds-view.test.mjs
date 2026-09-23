@@ -167,10 +167,10 @@ test('저장을 막은 이유를 모두 보여준다', () => {
   const html = sampleEditor(sample, {
     reference,
     locale,
-    errors: ['이름을 입력하세요.', '포켓몬을 고르세요.'],
+    errors: ['이름을 입력하세요.', '포켓몬을 선택하세요.'],
   });
   assert.ok(html.includes('이름을 입력하세요.'));
-  assert.ok(html.includes('포켓몬을 고르세요.'));
+  assert.ok(html.includes('포켓몬을 선택하세요.'));
   assert.equal(html.includes('data-builds-errors hidden'), false);
 });
 
@@ -180,9 +180,14 @@ test('오류가 없으면 오류 자리를 숨긴다', () => {
 
 test('초안을 이어서 고칠 때만 안내한다', () => {
   assert.ok(
-    sampleEditor(sample, { reference, locale, resumed: true }).includes('이어서 고치는 중'),
+    sampleEditor(sample, { reference, locale, resumed: true }).includes(
+      '작성 중인 항목을 이어서 작성합니다',
+    ),
   );
-  assert.equal(sampleEditor(sample, { reference, locale }).includes('이어서 고치는 중'), false);
+  assert.equal(
+    sampleEditor(sample, { reference, locale }).includes('작성 중인 항목을 이어서 작성합니다'),
+    false,
+  );
 });
 
 // type을 빼먹은 단추는 폼을 보낸다. 기술 칸을 누르면 저장되고 목록으로 나가버렸다.

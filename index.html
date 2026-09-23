@@ -98,9 +98,11 @@
       </div>
       <div id="builds-controls" class="builds-controls">
         <label class="builds-search">검색<input id="builds-search" type="search" placeholder="이름, 포켓몬" autocomplete="off"></label>
-        <button id="builds-new" class="text-button">새로 만들기</button>
-        <button id="builds-export" class="text-button">JSON 내보내기</button>
-        <label class="text-button builds-import">JSON 가져오기<input id="builds-import" type="file" accept="application/json,.json" hidden></label>
+        <div class="builds-buttons">
+          <button id="builds-new" class="text-button">새로 만들기</button>
+          <button id="builds-export" class="text-button">JSON 내보내기</button>
+          <label class="text-button builds-import">JSON 가져오기<input id="builds-import" type="file" accept="application/json,.json" hidden></label>
+        </div>
       </div>
       <p id="builds-status" class="builds-status" role="status"></p>
       <div id="builds-rows"></div>

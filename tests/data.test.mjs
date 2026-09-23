@@ -6,6 +6,7 @@ import {
   formatDate,
   percentageText,
   matchesQuery,
+  withWa,
 } from '../src/data.js';
 
 const meta = {
@@ -144,4 +145,11 @@ test('Korean full name, initial consonants, English and dex number search work',
   assert.equal(matchesQuery(p, 'SALAM'), true);
   assert.equal(matchesQuery(p, '373'), true);
   assert.equal(matchesQuery(p, '고릴타'), false);
+});
+
+test('이름 뒤의 조사는 받침에 따라 갈린다', () => {
+  assert.equal(withWa('용의춤'), '용의춤과');
+  assert.equal(withWa('드래곤클로'), '드래곤클로와');
+  assert.equal(withWa('지진'), '지진과');
+  assert.equal(withWa('Roost'), 'Roost와');
 });

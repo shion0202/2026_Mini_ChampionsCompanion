@@ -3057,7 +3057,20 @@ select optgroup {
   align-items: end;
   margin: 20px 0;
 }
-/* .builds-import는 파일 입력을 감싼 버튼이라 이름표 규칙을 적용하지 않는다. */
+/* 단추 셋은 한 덩어리로 움직인다. 좁아지면 셋이 흩어지는 대신 통째로 아랫줄로
+   내려가, 첫 줄은 검색만 남는다. */
+.builds-buttons {
+  display: flex;
+  gap: 12px;
+  flex: none;
+}
+/* .builds-import는 파일 입력을 감싼 label이다. button과 달리 글자를 스스로
+   가운데에 두지 않아 혼자 위로 떠 보였다. */
+.builds-controls .text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .builds-search {
   flex: 1 1 230px;
   display: grid;
@@ -3493,9 +3506,13 @@ select optgroup {
   color: var(--ink);
   font-size: 14px;
 }
-/* 후보를 더하는 단추는 기술 목록에서 떼어내고 칸 아래 선에는 붙인다. */
+/* 후보를 더하는 단추는 기술 목록에서 떼어내고 칸 아래 선에는 붙인다. 후보가
+   하나도 없으면 떼어낼 목록이 없으므로 칸 가운데에 놓는다. */
 .builds-alts [data-builds-alt-add] {
   margin: 16px 0 -8px;
+}
+.builds-alts ul:empty + [data-builds-alt-add] {
+  margin: 0 0 -4px;
 }
 /* 저장과 목록으로는 각각 다른 버튼 규칙을 쓴다. .primary-button은 margin-top이
    15px이라 가운데 정렬된 줄에서 혼자 내려앉는다. 여백을 지우고 높이를 맞춘다. */

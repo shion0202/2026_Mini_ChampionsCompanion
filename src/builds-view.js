@@ -66,16 +66,20 @@ const errorList = errors =>
   `<ul class="builds-errors notice" data-builds-errors${errors.length ? '' : ' hidden'}>` +
   `${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`;
 
-const editorActions = existing =>
+// 경고는 저장 단추 바로 위에 붙인다. 화면 맨 위에 두면 긴 편집기에서는 저장을
+// 누른 자리에서 보이지 않는다.
+const editorActions = (existing, errors) =>
+  errorList(errors) +
   `<div class="builds-actions">` +
   `<button type="submit" class="primary-button" data-builds-save>저장</button>` +
   `<button type="button" class="text-button" data-builds-cancel>목록으로</button>` +
+  `<button type="button" class="text-button" data-builds-reset>초기화</button>` +
   `${existing ? '<button type="button" class="text-button builds-delete" data-builds-delete>삭제</button>' : ''}` +
   `</div>`;
 
 const resumeNote = resumed =>
   resumed
-    ? '<p class="builds-resume">이어서 고치는 중입니다. 저장하지 않은 내용이 남아 있었습니다.</p>'
+    ? '<p class="builds-resume">작성 중인 항목을 이어서 작성합니다. 저장하지 않은 내용이 남아 있었습니다.</p>'
     : '';
 
 // reference가 null이면 포켓몬 이름 자리에 저장된 id가 나온다. 도감을 아직
@@ -224,7 +228,7 @@ export function sampleEditor(
   const items = comboOptions('item', forField);
   return (
     `<form class="builds-editor" data-builds-form="sample">` +
-    `${resumeNote(resumed)}${errorList(errors)}` +
+    `${resumeNote(resumed)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="샘플명 (예: 스카프 한카리아스)"></label>` +
     `<div class="builds-hero">` +
     `${portrait({ sprite: speciesSprite(reference, index, sample.pokemon) }, 'builds-hero-art')}` +
@@ -284,7 +288,7 @@ export function sampleEditor(
     `<ul>${sample.altMoves.map(altRow(reference, locale)).join('')}</ul>` +
     `<button type="button" class="text-button" data-builds-alt-add>후보 기술 추가</button></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유 등">${esc(sample.note)}</textarea></label>` +
-    `${editorActions(existing)}` +
+    `${editorActions(existing, errors)}` +
     `</form>`
   );
 }
@@ -297,7 +301,7 @@ export function partyEditor(
   const names = new Map(samples.map(s => [s.id, s.name]));
   return (
     `<form class="builds-editor" data-builds-form="party">` +
-    `${resumeNote(resumed)}${errorList(errors)}` +
+    `${resumeNote(resumed)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(party.name)}" data-builds-field="name" placeholder="예: 스카프 선공 구축"></label>` +
     `<fieldset class="builds-members"><legend>구성</legend><ul>${party.members
       .map(
@@ -308,7 +312,7 @@ export function partyEditor(
       )
       .join('')}</ul></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="왜 이런 조합인지">${esc(party.note)}</textarea></label>` +
-    `${editorActions(existing)}` +
+    `${editorActions(existing, errors)}` +
     `</form>`
   );
 }

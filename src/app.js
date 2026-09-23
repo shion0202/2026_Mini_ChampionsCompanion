@@ -5,6 +5,7 @@ import {
   CATEGORY_LABELS,
   SEASON_REGULATIONS,
   matchesQuery,
+  withWa,
   toId,
 } from './data.js';
 import { createLocale, TYPE_LABELS } from './locale.js';
@@ -799,11 +800,13 @@ function applyPicked(value) {
     };
   else if (picker.slot === 'alt') editing.draft = addAltMove(draft, value);
   else {
-    const swapped = draft.altMoves.includes(value);
+    const fromAlt = draft.altMoves.includes(value);
+    const fromSlot = draft.moves.some((m, i) => i !== picker.slot && m === value);
     const previous = draft.moves[picker.slot];
     editing.draft = setMove(draft, picker.slot, value);
-    // 후보와 자리를 맞바꾼 것은 화면만 보고는 알 수 없다.
-    if (swapped && previous) toast(`후보의 ${buildLabel('move', value)}와 자리를 바꿨습니다.`);
+    // 자리를 맞바꾼 것은 화면만 보고는 알 수 없다. 빈 칸을 채운 것은 바꾼 것이 아니다.
+    if (fromSlot || (fromAlt && previous))
+      toast(`${withWa(buildLabel('move', value))} 자리를 바꿨습니다.`);
   }
   picker = null;
   $('picker-dialog').close();
@@ -843,10 +846,34 @@ function commitBuild() {
 
 let confirmAction = null;
 
-function askConfirm(message, action) {
+// 삭제 말고도 되돌릴 수 없는 일이 생겼으므로 제목과 단추 글자를 받는다. 창에
+// '삭제'가 박혀 있으면 초기화를 묻는 자리에서 무엇을 누르는지 어긋난다.
+function askConfirm(message, action, label = '삭제') {
   $('confirm-body').textContent = message;
+  $('confirm-title').textContent = label;
+  $('accept-confirm').textContent = label;
+  $('close-confirm').setAttribute('aria-label', `${label} 취소`);
   confirmAction = action;
   $('confirm-dialog').showModal();
+}
+
+// 쓰던 것을 버리고 빈 값에서 다시 시작한다. id는 남겨야 저장했던 샘플을 새 샘플로
+// 만들어버리지 않는다. 되돌릴 수 없으므로 삭제와 같이 한 번 묻는다.
+function resetBuild() {
+  const editing = state.buildsEditing;
+  if (!editing) return;
+  askConfirm(
+    '작성 중인 내용을 모두 지우고 처음 상태로 되돌립니다.',
+    () => {
+      const empty = editing.kind === 'sample' ? emptySample() : emptyParty();
+      editing.draft = { ...empty, id: editing.draft.id };
+      state.buildsErrors = [];
+      state.buildsCombo = null;
+      saveDraft();
+      renderBuildsEditor();
+    },
+    '초기화',
+  );
 }
 
 function removeBuild() {
@@ -854,11 +881,15 @@ function removeBuild() {
   if (!editing || editing.id === null) return;
   const { kind, id } = editing;
   const used = kind === 'sample' ? partiesUsing(state.builds, id).length : 0;
+  // 지우는 것은 저장된 쪽이다. 초안의 이름이 비어 있어도 빈 따옴표를 보이지 않는다.
+  const list = kind === 'sample' ? state.builds.samples : state.builds.parties;
+  const name =
+    editing.draft.name.trim() || list.find(x => x.id === id)?.name?.trim() || '이름 없음';
   const message =
     kind === 'sample'
-      ? `‘${editing.draft.name}’을 지웁니다.` +
-        (used ? ` 이 샘플을 쓰는 파티 ${used}개의 자리가 비워집니다.` : '')
-      : `‘${editing.draft.name}’을 지웁니다.`;
+      ? `‘${name}’을 삭제합니다.` +
+        (used ? ` 이 샘플을 쓰는 파티 ${used}개가 영향을 받습니다.` : '')
+      : `‘${name}’을 삭제합니다.`;
   askConfirm(message, () => {
     const previous = state.builds;
     state.builds =
@@ -870,7 +901,7 @@ function removeBuild() {
       return;
     }
     dropDraft(kind, id);
-    toast('지웠습니다.');
+    toast('삭제했습니다.');
     closeBuildsEditor();
   });
 }
@@ -1249,6 +1280,7 @@ $('builds-rows').addEventListener('click', event => {
     return;
   }
   if (event.target.closest('[data-builds-cancel]')) closeBuildsEditor();
+  if (event.target.closest('[data-builds-reset]')) return resetBuild();
   if (event.target.closest('[data-builds-delete]')) return removeBuild();
 });
 

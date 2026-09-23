@@ -100,7 +100,7 @@ test('새로 만들 때마다 다른 id가 나온다', () => {
 const filled = () => ({ ...emptySample(), name: '물리형', pokemon: 'Salamence' });
 
 test('빈 샘플은 이름과 포켓몬이 없다고 알린다', () => {
-  assert.deepEqual(validateSample(emptySample()), ['이름을 입력하세요.', '포켓몬을 고르세요.']);
+  assert.deepEqual(validateSample(emptySample()), ['이름을 입력하세요.', '포켓몬을 선택하세요.']);
 });
 
 test('공백만 있는 이름은 이름이 아니다', () => {
@@ -109,24 +109,24 @@ test('공백만 있는 이름은 이름이 아니다', () => {
 
 test('능력 포인트는 각 칸 32 이하다', () => {
   assert.deepEqual(validateSample({ ...filled(), points: [0, 33, 0, 0, 0, 0] }), [
-    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+    '능력 포인트는 최대 32까지 투자할 수 있습니다.',
   ]);
   assert.deepEqual(validateSample({ ...filled(), points: [0, 32, 0, 0, 0, 0] }), []);
   assert.deepEqual(validateSample({ ...filled(), points: [0, -1, 0, 0, 0, 0] }), [
-    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+    '능력 포인트는 최대 32까지 투자할 수 있습니다.',
   ]);
   assert.deepEqual(validateSample({ ...filled(), points: [0, 1.5, 0, 0, 0, 0] }), [
-    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+    '능력 포인트는 최대 32까지 투자할 수 있습니다.',
   ]);
   assert.deepEqual(validateSample({ ...filled(), points: [0, 0, 0, 0, 0] }), [
-    '능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.',
+    '능력 포인트는 최대 32까지 투자할 수 있습니다.',
   ]);
 });
 
 test('능력 포인트 합계는 66 이하다', () => {
   assert.deepEqual(validateSample({ ...filled(), points: [32, 32, 2, 0, 0, 0] }), []);
   assert.deepEqual(validateSample({ ...filled(), points: [32, 32, 3, 0, 0, 0] }), [
-    '능력 포인트 합계는 66을 넘을 수 없습니다.',
+    '능력 포인트 합계는 66을 초과할 수 없습니다.',
   ]);
 });
 
@@ -137,11 +137,11 @@ test('같은 기술을 채용과 후보에 겹쳐 넣을 수 없다', () => {
       moves: ['Earthquake', null, null, null],
       altMoves: ['Earthquake'],
     }),
-    ['같은 기술을 두 번 넣을 수 없습니다.'],
+    ['동일한 기술은 선택할 수 없습니다.'],
   );
   assert.deepEqual(
     validateSample({ ...filled(), moves: ['Earthquake', 'Earthquake', null, null] }),
-    ['같은 기술을 두 번 넣을 수 없습니다.'],
+    ['동일한 기술은 선택할 수 없습니다.'],
   );
 });
 
@@ -156,7 +156,7 @@ test('없는 샘플을 가리키는 파티는 알린다', () => {
     name: '구축',
     members: ['aaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbb', null, null, null, null],
   };
-  assert.deepEqual(validateParty(party, samples), ['목록에 없는 샘플을 가리킵니다.']);
+  assert.deepEqual(validateParty(party, samples), ['목록에 없는 샘플입니다.']);
   assert.deepEqual(
     validateParty(
       { ...party, members: ['aaaaaaaaaaaaaaaa', null, null, null, null, null] },
@@ -200,6 +200,18 @@ test('빈 칸에 후보를 넣으면 후보에서 빠지고 되돌아오는 기�
   const next = setMove({ ...built(), moves: ['A', 'B', 'C', null] }, 3, 'E');
   assert.deepEqual(next.moves, ['A', 'B', 'C', 'E']);
   assert.deepEqual(next.altMoves, ['F', 'G']);
+});
+
+test('이미 채용한 기술을 다른 칸에 넣으면 두 칸이 자리를 바꾼다', () => {
+  const next = setMove(built(), 1, 'A');
+  assert.deepEqual(next.moves, ['B', 'A', 'C', 'D']);
+  assert.deepEqual(next.altMoves, ['E', 'F', 'G']);
+});
+
+test('빈 칸에 채용 기술을 옮기면 원래 칸이 빈다', () => {
+  const next = setMove({ ...built(), moves: ['A', 'B', 'C', null] }, 3, 'A');
+  assert.deepEqual(next.moves, [null, 'B', 'C', 'A']);
+  assert.deepEqual(next.altMoves, ['E', 'F', 'G']);
 });
 
 test('기술을 비우면 후보는 그대로다', () => {
@@ -381,7 +393,7 @@ test('범위를 벗어난 능력 포인트는 형식 문제가 아니라 저장 
     'champions:builds': JSON.stringify({ samples: [over], parties: [], version: 0 }),
   };
   assert.equal(readDoc(store(entries)).samples.length, 1);
-  assert.deepEqual(validateSample(over), ['능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.']);
+  assert.deepEqual(validateSample(over), ['능력 포인트는 최대 32까지 투자할 수 있습니다.']);
 });
 
 test('포켓몬 목록은 챔피언스 출전 폼만 준다', () => {

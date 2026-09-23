@@ -184,6 +184,14 @@ const initials = text =>
         : c;
     })
     .join('');
+// '용의춤과'는 맞지만 '드래곤클로과'는 틀린다. 받침이 있으면 과, 없으면 와다.
+// 기술 이름처럼 문장에 끼워넣을 수밖에 없는 이름에만 쓴다. 한글이 아닌 이름은
+// 와로 둔다(한국어 이름이 없어 영문이 그대로 나오는 경우).
+export function withWa(word) {
+  const n = word.charCodeAt(word.length - 1) - 0xac00;
+  return `${word}${n >= 0 && n <= 11171 && n % 28 !== 0 ? '과' : '와'}`;
+}
+
 export function matchesQuery(entry, query) {
   const clean = s =>
     String(s ?? '')

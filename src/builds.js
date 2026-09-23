@@ -80,19 +80,19 @@ export const emptyParty = () => ({
 export function validateSample(sample) {
   const errors = [];
   if (!sample.name?.trim()) errors.push('이름을 입력하세요.');
-  if (!sample.pokemon) errors.push('포켓몬을 고르세요.');
+  if (!sample.pokemon) errors.push('포켓몬을 선택하세요.');
   const points = sample.points;
   if (
     !Array.isArray(points) ||
     points.length !== 6 ||
     !points.every(p => Number.isInteger(p) && p >= 0 && p <= 32)
   )
-    errors.push('능력 포인트는 0 이상 32 이하의 정수 여섯 개입니다.');
+    errors.push('능력 포인트는 최대 32까지 투자할 수 있습니다.');
   else if (points.reduce((a, b) => a + b, 0) > 66)
-    errors.push('능력 포인트 합계는 66을 넘을 수 없습니다.');
+    errors.push('능력 포인트 합계는 66을 초과할 수 없습니다.');
   // 빈 칸은 여러 개여도 중복이 아니다.
   const moves = [...(sample.moves ?? []), ...(sample.altMoves ?? [])].filter(Boolean);
-  if (new Set(moves).size !== moves.length) errors.push('같은 기술을 두 번 넣을 수 없습니다.');
+  if (new Set(moves).size !== moves.length) errors.push('동일한 기술은 선택할 수 없습니다.');
   return errors;
 }
 
@@ -101,8 +101,7 @@ export function validateParty(party, samples) {
   const errors = [];
   if (!party.name?.trim()) errors.push('이름을 입력하세요.');
   const ids = new Set(samples.map(s => s.id));
-  if (party.members.some(id => id !== null && !ids.has(id)))
-    errors.push('목록에 없는 샘플을 가리킵니다.');
+  if (party.members.some(id => id !== null && !ids.has(id))) errors.push('목록에 없는 샘플입니다.');
   return errors;
 }
 
@@ -112,6 +111,14 @@ export function validateParty(party, samples) {
 // 후보가 자동으로 늘어나면 목록이 의도와 무관하게 불어난다.
 export function setMove(sample, slot, move) {
   const previous = sample.moves[slot] ?? null;
+  // 이미 채용한 기술을 다른 칸에 넣으면 두 칸이 자리를 바꾼다. 그대로 두면 같은
+  // 기술이 두 칸에 남아 저장할 수 없는 상태가 된다.
+  const twin = move === null ? -1 : sample.moves.findIndex((m, i) => i !== slot && m === move);
+  if (twin !== -1)
+    return {
+      ...sample,
+      moves: sample.moves.map((m, i) => (i === slot ? move : i === twin ? previous : m)),
+    };
   const moves = sample.moves.map((m, i) => (i === slot ? move : m));
   const at = move === null ? -1 : sample.altMoves.indexOf(move);
   const altMoves =
