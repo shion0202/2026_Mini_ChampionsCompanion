@@ -65,7 +65,7 @@ test('빈 샘플 편집 화면은 통계 값을 미리 채우지 않는다', t =
 });
 
 test('파티 편집 화면은 빈 자리를 빈 자리로 보여준다', t => {
-  t.assert.snapshot(partyEditor(party, [sample], { locale }));
+  t.assert.snapshot(partyEditor(party, [sample], { locale, reference }));
 });
 
 test('설명의 따옴표와 꺾쇠는 이스케이프된다', () => {
@@ -194,7 +194,7 @@ test('초안을 이어서 고칠 때만 안내한다', () => {
 test('편집기 안에서 폼을 보내는 단추는 저장뿐이다', () => {
   for (const html of [
     sampleEditor(sample, { reference, locale, existing: true }),
-    partyEditor(party, [sample], { locale, existing: true }),
+    partyEditor(party, [sample], { locale, reference, existing: true }),
   ]) {
     const submits = [...html.matchAll(/<button(?![^>]*type="button")[^>]*>/g)].map(m => m[0]);
     assert.equal(submits.length, 1, submits.join('\n'));
@@ -204,7 +204,12 @@ test('편집기 안에서 폼을 보내는 단추는 저장뿐이다', () => {
 
 test('파티 편집기도 같은 인자 모양을 쓴다', t => {
   t.assert.snapshot(
-    partyEditor(party, [sample], { locale, existing: true, errors: ['이름을 입력하세요.'] }),
+    partyEditor(party, [sample], {
+      locale,
+      reference,
+      existing: true,
+      errors: ['이름을 입력하세요.'],
+    }),
   );
 });
 

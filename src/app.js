@@ -34,6 +34,7 @@ import {
   draftKey,
   pruneDrafts,
   speciesOptions,
+  speciesSprite,
   itemOptions,
   moveOptions,
   setMove,
@@ -134,6 +135,7 @@ const state = {
   buildsDrafts: {},
   buildsErrors: [],
   buildsResumed: false,
+  buildsReturn: null,
   buildsCombo: null,
   speed: { mode: 'base', query: '', type: '', includeMega: true, ascending: false },
   speedLimit: 80,
@@ -635,6 +637,7 @@ function renderBuilds() {
 }
 
 function openBuilds(tab = 'sample', { navigate = true } = {}) {
+  state.buildsReturn = null;
   state.buildsTab = BUILDS_TABS.includes(tab) ? tab : 'sample';
   showPage('builds');
   if (navigate) history.pushState({ builds: state.buildsTab }, '', `#builds=${state.buildsTab}`);
@@ -665,6 +668,7 @@ function renderBuildsEditor() {
   if (!editing || state.page !== 'builds' || !state.locale || !state.reference) return;
   const shared = {
     locale: state.locale,
+    reference: state.reference,
     index: state.index,
     combos: state.buildsCombo,
     existing: editing.id !== null,
@@ -673,11 +677,14 @@ function renderBuildsEditor() {
   };
   $('builds-rows').innerHTML =
     editing.kind === 'sample'
-      ? sampleEditor(editing.draft, { reference: state.reference, ...shared })
+      ? sampleEditor(editing.draft, shared)
       : partyEditor(editing.draft, state.builds.samples, shared);
 }
 
-function openBuildsEditor(kind, id, { navigate = true } = {}) {
+// from은 파티 편집기에서 구성원 샘플로 건너뛸 때만 넘어온다. 다른 모든 경로는
+// null로 덮어써서, 뒤로 가기로 파티에 돌아온 뒤 목록으로를 눌렀을 때 그 파티를
+// 다시 열어버리지 않게 한다.
+function openBuildsEditor(kind, id, { navigate = true, from = null } = {}) {
   const list = kind === 'sample' ? state.builds.samples : state.builds.parties;
   const saved = id === null ? null : (list.find(x => x.id === id) ?? null);
   // 주소로 들어왔는데 그 id가 없으면 목록으로 돌려보낸다.
@@ -690,6 +697,7 @@ function openBuildsEditor(kind, id, { navigate = true } = {}) {
   state.buildsResumed = !!kept;
   state.buildsErrors = [];
   state.buildsEditing = { kind, id, draft: kept ?? base };
+  state.buildsReturn = from;
   state.buildsTab = kind;
   showPage('builds');
   if (navigate)
@@ -762,6 +770,7 @@ function pickerSource() {
       ? state.locale.pokemon(state.reference?.species?.[s.pokemon]?.name ?? s.pokemon).label
       : '',
     name: s.name,
+    sprite: speciesSprite(state.reference, state.index, s.pokemon),
   }));
 }
 
@@ -913,10 +922,16 @@ function removeBuild() {
 }
 
 function closeBuildsEditor({ navigate = true } = {}) {
+  const back = state.buildsReturn;
   state.buildsEditing = null;
   state.buildsErrors = [];
   state.buildsResumed = false;
-  openBuilds(state.buildsTab, { navigate });
+  // 파티에서 건너온 샘플이면 목록이 아니라 그 파티로 돌아간다. 파티의 초안은
+  // 남아 있으므로 고치던 내용 그대로에 방금 저장한 샘플이 반영돼 보인다. 아직
+  // 저장하지 않은 파티는 id가 없으므로 'new'로 구분한다. 그 사이 파티가 사라졌으면
+  // openBuildsEditor가 스스로 목록으로 돌려보낸다.
+  if (back !== null) openBuildsEditor('party', back === 'new' ? null : back, { navigate });
+  else openBuilds(state.buildsTab, { navigate });
 }
 
 function renderTypeChart() {
@@ -1242,6 +1257,16 @@ $('builds-rows').addEventListener('click', event => {
   if (event.target.closest('[data-builds-alt-add]')) return openPicker('move', 'alt');
   const moveSlot = event.target.closest('[data-builds-move]');
   if (moveSlot) return openPicker('move', Number(moveSlot.dataset.buildsMove));
+  // 구성원의 샘플을 그 자리에서 고치러 간다. 저장하거나 목록으로를 누르면 이
+  // 파티로 돌아온다. 건너뛰기 전에 파티의 초안을 남겨야 고치던 내용이 살아남는다.
+  const memberEdit = event.target.closest('[data-builds-member-edit]');
+  if (memberEdit && state.buildsEditing) {
+    const editing = state.buildsEditing;
+    saveDraft();
+    return openBuildsEditor('sample', memberEdit.dataset.buildsMemberEdit, {
+      from: editing.id ?? 'new',
+    });
+  }
   const memberSlot = event.target.closest('[data-builds-member]');
   if (memberSlot) return openPicker('member', Number(memberSlot.dataset.buildsMember));
   const altRemove = event.target.closest('[data-builds-alt-remove]');

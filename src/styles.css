@@ -3501,6 +3501,76 @@ select optgroup {
 #picker-more {
   margin-top: 12px;
 }
+/* 구성원은 한 줄이 아니라 머리줄과 상세로 이루어진다. fieldset li의 가로 배치를
+   덮어야 상세가 옆으로 붙지 않는다. */
+.builds-editor fieldset.builds-members li {
+  display: grid;
+  gap: 6px;
+}
+.builds-member-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.builds-member-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: start;
+}
+.builds-member-pick .builds-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.builds-member-edit {
+  flex: none;
+}
+.builds-member-more {
+  margin-inline-start: 26px;
+}
+.builds-member-more summary {
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.builds-member-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px 12px;
+  margin: 4px 0 8px;
+}
+.builds-member-facts div {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+.builds-member-facts dt {
+  color: var(--muted);
+  flex: none;
+}
+.builds-member-facts dd {
+  margin: 0;
+  color: var(--ink);
+}
+.builds-member-moves {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px;
+}
+.builds-member-moves li {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 13px;
+}
 /* 후보 기술은 줄이 많아지므로 촘촘하게 둔다. */
 /* .builds-editor fieldset ul보다 명시도가 높아야 gap이 실제로 좁아진다. */
 .builds-editor fieldset.builds-alts ul {

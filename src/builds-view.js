@@ -153,6 +153,61 @@ const pointRow = (value, index) =>
   ` aria-label="${STAT_LABELS[index]} 0">0</button>` +
   `</div></div>`;
 
+// 파티를 보는 까닭이 여기 있다. 어느 샘플을 넣었는지만으로는 그 자리가 무엇을
+// 하는지 알 수 없어, 도구·특성·보정·포인트·기술을 자리에서 펼쳐 본다. 여닫는 일은
+// <details>가 한다. 직접 상태를 들고 있을 이유가 없다.
+const memberFacts = (sample, reference, locale) => {
+  const spent = sample.points
+    .map((p, i) => (p ? `${STAT_LABELS[i]} ${p}` : null))
+    .filter(Boolean)
+    .join(' · ');
+  const facts = [
+    ['도구', sample.item ? refLabel(reference, locale, 'held_item', sample.item) : '없음'],
+    ['특성', sample.ability ? refLabel(reference, locale, 'ability', sample.ability) : '없음'],
+    ['능력 보정', sample.nature ? natureLabel(locale, sample.nature) : '없음'],
+    ['능력 포인트', spent || '없음'],
+  ];
+  const moves = sample.moves.filter(Boolean);
+  return (
+    `<dl class="builds-member-facts">` +
+    facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('') +
+    `</dl>` +
+    (moves.length
+      ? `<ul class="builds-member-moves">${moves
+          .map(
+            m =>
+              `<li class="builds-move">${esc(refLabel(reference, locale, 'move', m))}` +
+              `${moveTypeBadge(reference, m)}</li>`,
+          )
+          .join('')}</ul>`
+      : `<p class="builds-sub">채용한 기술이 없습니다.</p>`)
+  );
+};
+
+const memberRow = (byId, reference, locale, index) => (id, slot) => {
+  const sample = id ? byId.get(id) : null;
+  const name = sample ? sample.name : id ? '없는 샘플' : '빈 자리';
+  const species = sample ? speciesLabel(locale, reference, sample.pokemon) : '';
+  return (
+    `<li class="builds-member"><div class="builds-member-head">` +
+    `<span class="builds-slot">${slot + 1}</span>` +
+    `<button type="button" class="builds-pick builds-member-pick" data-builds-member="${slot}">` +
+    `${portrait({ sprite: speciesSprite(reference, index, sample?.pokemon ?? null) }, 'builds-portrait')}` +
+    `<span class="builds-text"><span class="builds-name">${esc(name)}</span>` +
+    `${species ? `<small class="builds-sub">${esc(species)}</small>` : ''}</span></button>` +
+    `${
+      sample
+        ? `<button type="button" class="icon-button builds-member-edit"` +
+          ` data-builds-member-edit="${esc(sample.id)}"` +
+          ` aria-label="${esc(sample.name)} 샘플 편집">✎</button>`
+        : ''
+    }` +
+    `</div>` +
+    `${sample ? `<details class="builds-member-more"><summary>상세</summary>${memberFacts(sample, reference, locale)}</details>` : ''}` +
+    `</li>`
+  );
+};
+
 const actualCard = (index, value) =>
   `<div class="builds-actual"><small>${STAT_LABELS[index]}</small><strong>${value}</strong></div>`;
 
@@ -294,22 +349,17 @@ export function sampleEditor(
 export function partyEditor(
   party,
   samples,
-  { locale, existing = false, resumed = false, errors = [] },
+  { locale, reference = null, index = null, existing = false, resumed = false, errors = [] },
 ) {
-  const names = new Map(samples.map(s => [s.id, s.name]));
+  const byId = new Map(samples.map(s => [s.id, s]));
   return (
     `<form class="builds-editor" data-builds-form="party">` +
     `${resumeNote(resumed)}` +
-    `<label class="builds-field">이름<input type="text" value="${esc(party.name)}" data-builds-field="name" placeholder="예: 스카프 선공 구축"></label>` +
+    `<label class="builds-field">이름<input type="text" value="${esc(party.name)}" data-builds-field="name" placeholder="파티명"></label>` +
     `<fieldset class="builds-members"><legend>구성</legend><ul>${party.members
-      .map(
-        (id, slot) =>
-          `<li><span class="builds-slot">${slot + 1}</span>` +
-          `<button type="button" class="builds-pick" data-builds-member="${slot}">` +
-          `${id ? esc(names.get(id) ?? '없는 샘플') : '빈 자리'}</button></li>`,
-      )
+      .map(memberRow(byId, reference, locale, index))
       .join('')}</ul></fieldset>` +
-    `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="왜 이런 조합인지">${esc(party.note)}</textarea></label>` +
+    `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="특정 포켓몬을 파티에 채용한 이유 등">${esc(party.note)}</textarea></label>` +
     `${editorActions(existing, errors)}` +
     `</form>`
   );
