@@ -1190,7 +1190,7 @@ syncOnOpen();
 
 - [ ] **Step 7: 서비스 워커에 새 파일을 넣는다**
 
-`sw.js`의 `CACHE` 번호를 하나 올리고(`'champions-shell-v23'` → `'champions-shell-v24'`, 현재 값에서 1 증가), `APP_FILES`의 `'./src/builds-view.js',` 다음 줄에 넣는다.
+`sw.js`의 `CACHE` 번호를 하나 올리고(`'champions-shell-v24'` → `'champions-shell-v25'`, 현재 값에서 1 증가), `APP_FILES`의 `'./src/builds-view.js',` 다음 줄에 넣는다.
 
 ```js
   './src/sync.js',
