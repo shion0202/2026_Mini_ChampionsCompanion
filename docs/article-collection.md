@@ -11,7 +11,7 @@
 
 | 단계 | 수행 주체 | 산출물 |
 | --- | --- | --- |
-| 1 수집 | `scripts/collect-articles.mjs` | `.cache/articles/<sha1>.html`, 이미지 |
+| 1 수집 | `scripts/collect-articles.mjs` | 리드(기사 주소) → `.cache/articles/<sha1>.html` |
 | 2 추출 | `scripts/article-parse.mjs` | `.cache/article-queue.json` (기사당 약 2KB) |
 | 3 판정 | Claude Code 세션 | 최종 6마리와 근거문을 `pending`으로 기록 |
 | 4 승격 | 사람 | `articles.json`의 `pending` → `reviewed` |
@@ -35,9 +35,69 @@
 
 ## 1단계 · 수집
 
-`npm run articles -- --season M5 --format singles`
+```
+npm run articles -- --season M5 --format singles
+npm run articles -- --season M5 --urls leads.txt --no-search
+npm run articles -- --season M5 --from https://example.com/top-teams --no-search --no-feeds
+```
 
 `--season`은 필수다. `--format`을 생략하면 싱글과 더블을 모두 찾는다.
+
+### 리드 채널 (2026-09-25 재설계)
+
+첫 버전은 검색 두 곳(하테나 북마크, 구글)에만 기댔고 기사가 두 건에서 늘지 않았다.
+원인은 셋이다.
+
+- 하테나 북마크는 누군가 북마크한 글만 들어 있다. M-5 실측에서 300건 중 21건.
+- 구글 Custom Search JSON API는 2025년에 새 가입을 닫았고, 새 검색 엔진은 전체 웹
+  검색을 켤 수 없으며, API 자체가 2027-01-01에 끝난다. 사실상 새로 쓸 수 없다.
+- 기사를 가장 잘 모아 둔 포케DB와 야쿤은 robots.txt로 AI 수집을 막는다.
+
+그래서 **검색은 여러 리드 채널 중 하나**로 내리고, 기사 주소를 얻는 경로를 넷으로
+나눴다. 채널마다 켜고 끌 수 있고, 어느 채널에서 왔는지는 큐의 `source`에 남는다.
+
+| 채널 | 인자 | `source` | 제목 검사 |
+| --- | --- | --- | --- |
+| 주소 목록 | `--urls <파일>` (여러 번) | `manual` | 하지 않음 |
+| 기사 모음 페이지 | `--from <주소>` (여러 번) | `index` | 하지 않음 |
+| 작성자 피드 | 기본 켜짐, `--no-feeds` | `feed` | 함 |
+| 검색 | 기본 켜짐, `--no-search` | `hatena`, `google` | 함 |
+
+**주소 목록**이 가장 확실하다. 포케DB의 기사 목록, X, 디스코드처럼 이 도구가 받지
+않는 곳에서 사람이 본 주소를 텍스트 파일에 한 줄씩 붙여 넣는다. 주소 뒤에 적은
+글은 힌트로 읽는다. 제목에 순위가 없는 기사라도 `最終12位`를 적어 두면 순위가
+채워지고 `rank-from-hint` 플래그가 붙는다. 브라우저로 저장한 목록 페이지 HTML을
+넘겨도 된다. 그때는 기사처럼 보이는 링크만 쓴다.
+
+```
+https://note.com/someone/n/n1234 最終12位
+https://someone.hatenablog.com/entry/2026/09/10/000000
+```
+
+**기사 모음 페이지**는 공략 사이트의 상위 구축 모음처럼 원문 링크를 모아 둔 곳이다.
+링크만 거두고 그 페이지의 본문은 큐에 넣지 않는다. 같은 사이트 안의 링크(메뉴, 다른
+공략)는 버리고, 알려진 블로그 기사 주소이거나 같은 표 행·목록 항목에 최종 순위가
+적힌 링크만 남긴다. 페이지 자체도 robots.txt를 확인한다.
+
+**작성자 피드**는 상위 랭커가 시즌마다 같은 블로그에 쓴다는 점을 쓴다.
+`articles.json`에 등록했거나 큐에 올랐던 기사의 주소에서 블로그 피드를 되짚는다.
+주소만으로 피드가 정해지는 서비스만 다룬다.
+
+| 서비스 | 피드 |
+| --- | --- |
+| 하테나 블로그 | `<블로그>/feed` |
+| note | `https://note.com/<작성자>/rss` |
+| 아메바 블로그 | `https://rssblog.ameba.jp/<작성자>/rss20.xml` |
+| FC2 | `<블로그>/?xml` |
+| 라이브도어, seesaa | `<블로그>/index.rdf` |
+
+pokesol은 공개된 작성자 피드를 찾지 못했다. 그 외에 따로 볼 피드나 기사 주소는
+`scripts/article-feeds.json`의 `feeds`에 적는다. 기사 주소를 적으면 피드로 바꿔 본다.
+피드에는 지난 시즌 기사도 있으므로 제목의 시즌이 다르면 받기 전에 버린다.
+
+큐는 이제 **합친다**. 검색 한 번, 주소 목록 한 번처럼 나눠 돌려도 앞의 결과가
+지워지지 않는다. 다시 본 주소는 새 결과로 바꾸고, 그사이 `articles.json`에 등록된
+주소는 뺀다.
 
 ### 검색어
 
@@ -70,8 +130,16 @@
 
 ### 받아오지 않는 곳
 
-`robots.txt`로 AI 목적 수집을 금지한 사이트는 받지 않는다. 검색 결과에 섞여
-들어오므로 기억에 맡기지 않고 `isFetchable`이 코드로 막는다.
+`robots.txt`로 AI 목적 수집을 금지한 사이트는 받지 않는다. 목록 페이지와 작성자
+피드로 처음 보는 호스트가 계속 들어오므로, 알려진 곳을 적어 둔 `isFetchable`에 더해
+**호스트마다 robots.txt를 받아** `robotsAllows`로 판정한다(RFC 9309: 이름이 맞는
+묶음 우선, 가장 긴 규칙 우선, 같으면 Allow).
+
+판정에 쓰는 에이전트는 우리 User-Agent, `ClaudeBot`, `Claude-User`,
+`Claude-SearchBot`, `ChatGPT-User`, `Perplexity-User`다. 하나라도 막히면 받지 않는다.
+수집한 본문을 3단계에서 AI가 읽기 때문이다. `GPTBot`, `Google-Extended`처럼 학습
+전용 표기만 막은 곳은 이 용도와 무관해 보지 않는다. robots.txt가 4xx면 파일이 없는
+것으로 보고 허용하고, 5xx나 시간 초과로 읽지 못하면 받지 않는다.
 
 | 호스트 | robots.txt |
 | --- | --- |
@@ -91,13 +159,12 @@ User-Agent를 바꾸면 기술적으로는 받아진다. 하지 않는다. 사�
 기사 주소는 받아도 된다. `yakkun.com`은 `ChatGPT-User`를 막는다. Claude를
 지목하지는 않았으나 사용자 요청형 에이전트를 막은 곳이라 쓰지 않는다.
 
-### 소스
+### 검색 채널
 
-두 채널을 쓴다. 한쪽이 죽어도 다른 쪽으로 돈다.
-
-**구글 Custom Search JSON API** — 색인이 북마크 여부와 무관해 재현율이 높다.
-`GOOGLE_API_KEY`와 `GOOGLE_CSE_ID` 환경변수가 있을 때만 돈다. 없으면 이 채널만
-건너뛴다. 무료 한도가 하루 100건이라 쿼리당 두 쪽(20건)까지만 본다.
+**구글 Custom Search JSON API** — 2027-01-01에 끝나고 새 가입이 닫혀 있다. 이미 키와
+전체 웹 검색 엔진이 있는 경우만 쓴다. `GOOGLE_API_KEY`와 `GOOGLE_CSE_ID` 환경변수가
+있을 때만 돌고, 없으면 이 채널만 건너뛴다. 무료 한도가 하루 100건이라 쿼리당 두
+쪽(20건)까지만 본다.
 
 - 키: Google Cloud Console에서 **Custom Search API**를 켜고 API 키를 만든다
 - 엔진 ID: Programmable Search Engine에서 엔진을 만들고 **전체 웹 검색**을 켠 뒤
@@ -263,8 +330,12 @@ M-5로 돌리면 한 건도 안 나온다. 시즌이 끝난 지 얼마 안 되�
 
 ## 하지 않는 것
 
+- 포케DB, 야쿤, 네이버 목록의 자동 수집 — robots.txt가 막는다. 사람이 본 주소를
+  `--urls`로 넘기는 것만 받는다
+- 유료 검색 API 대체(Brave, SerpAPI 등) — 채널을 더하기는 쉽지만 키 관리 비용이 있다.
+  주소 목록과 작성자 피드로 부족할 때 다시 본다
 - OCR — 이미지는 판정 단계에서 AI가 본다
 - X(트위터) 수집 — 무료 경로가 없다
-- 하테나 외 소스 어댑터 — 측정상 필요가 확인되지 않았다
+- 사이트별 본문 어댑터 — 측정상 필요가 확인되지 않았다. 리드 채널만 늘렸다
 - 서버, DB, 예약 실행 — 파서가 몇 시즌 안정된 뒤 GitHub Actions로 올린다
 - 원문 텍스트와 이미지의 저장, 재배포 — 기존 방침 그대로다

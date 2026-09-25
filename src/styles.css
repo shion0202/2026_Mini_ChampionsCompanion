@@ -2835,6 +2835,40 @@ select optgroup {
   gap: 12px;
   flex-wrap: wrap;
 }
+.article-pokemon-filter > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.article-chip {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.article-chip:hover {
+  border-color: var(--teal);
+}
+.article-chip-selected {
+  color: var(--teal);
+  background: var(--teal-soft);
+  border-color: var(--teal);
+}
+.article-usage {
+  margin: 0 0 18px;
+}
+.article-usage h3 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+.article-usage-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .article-list {
   display: grid;
   gap: 18px;

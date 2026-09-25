@@ -1,5 +1,7 @@
-// 빌드 도구. 검색하고 받아오고 캐시하고 큐를 쓴다. 판단은 article-parse.mjs가 한다.
+// 빌드 도구. 기사 주소(리드)를 모으고, 받아오고, 캐시하고, 큐를 쓴다. 판단은
+// article-parse.mjs가 한다.
 // 사용: node scripts/collect-articles.mjs --season M5 [--format singles]
+//        [--urls 주소목록.txt ...] [--from 목록페이지주소 ...] [--no-search] [--no-feeds]
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import {
@@ -10,7 +12,11 @@ import {
   isFetchable,
   looksRelevant,
   searchQueries,
-  rssLinks,
+  feedLinks,
+  feedUrlFor,
+  extractLinks,
+  isLeadLink,
+  robotsAllows,
   googleLinks,
 } from './article-parse.mjs';
 
@@ -22,17 +28,24 @@ const PAUSE = 1000;
 const FEED_PAUSE = 5000;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+const args = process.argv.slice(2);
 const argument = name => {
-  const at = process.argv.indexOf(`--${name}`);
-  return at < 0 ? null : process.argv[at + 1];
+  const at = args.indexOf(`--${name}`);
+  return at < 0 ? null : args[at + 1];
 };
+const every = name => args.flatMap((value, at) => (args[at - 1] === `--${name}` ? [value] : []));
 const season = argument('season');
 if (!season) {
-  console.error('사용: node scripts/collect-articles.mjs --season M5 [--format singles|doubles]');
+  console.error(
+    '사용: node scripts/collect-articles.mjs --season M5 [--format singles|doubles]\n' +
+      '      [--urls 주소목록.txt] [--from 목록페이지주소] [--no-search] [--no-feeds]',
+  );
   process.exit(1);
 }
 const format = argument('format');
 const wanted = format ? (format.toLowerCase().startsWith('d') ? 'Doubles' : 'Singles') : null;
+const useSearch = !args.includes('--no-search');
+const useFeeds = !args.includes('--no-feeds');
 
 // 하테나 북마크는 note, pokesol, fc2, 개인 도메인 기사를 모두 색인한다. users 기본값이
 // 3이라 그대로 두면 북마크가 적은 개인 구축 기사가 거의 전부 빠진다. 다만 누군가
@@ -40,8 +53,8 @@ const wanted = format ? (format.toLowerCase().startsWith('d') ? 'Doubles' : 'Sin
 const feedUrl = query =>
   `https://b.hatena.ne.jp/q/${encodeURIComponent(query)}?mode=rss&target=text&users=1&sort=recent`;
 
-// 구글 색인은 북마크 여부와 무관해 재현율이 훨씬 높다. 키가 없으면 이 채널만
-// 건너뛰고 하테나로 계속 돈다.
+// 구글 Custom Search는 2025년에 새 가입을 닫았고 2027-01-01에 끝난다. 기존 키가
+// 있는 사람만 쓰도록 남겨 둔다. 키가 없으면 이 채널만 건너뛴다.
 const GOOGLE_KEY = process.env.GOOGLE_API_KEY;
 const GOOGLE_CSE = process.env.GOOGLE_CSE_ID;
 const googleUrl = (query, start) =>
@@ -53,8 +66,27 @@ async function fetchText(url) {
     headers: { 'user-agent': AGENT },
     signal: AbortSignal.timeout(30000),
   });
-  if (!response.ok) throw Error(`${response.status}: ${url}`);
+  if (!response.ok)
+    throw Object.assign(Error(`${response.status}: ${url}`), { status: response.status });
   return response.text();
+}
+
+// 처음 보는 호스트가 목록 페이지와 피드로 계속 들어온다. 호스트마다 robots.txt를
+// 한 번 받아 둔다. 4xx는 파일이 없다는 뜻이라 허용하고, 받지 못한 경우(5xx, 시간
+// 초과)는 판단할 수 없으므로 받지 않는다.
+const robotsCache = new Map();
+async function allowed(url) {
+  if (!isFetchable(url)) return false;
+  const origin = new URL(url).origin;
+  if (!robotsCache.has(origin))
+    robotsCache.set(
+      origin,
+      fetchText(`${origin}/robots.txt`).catch(error =>
+        error.status >= 400 && error.status < 500 ? '' : null,
+      ),
+    );
+  const robots = await robotsCache.get(origin);
+  return robots !== null && robotsAllows(robots, url);
 }
 
 const cacheDir = new URL('.cache/articles/', root);
@@ -73,64 +105,140 @@ async function fetchArticle(url) {
   }
 }
 
-const [reference, ko, existing] = await Promise.all(
-  ['reference', 'ko', 'articles'].map(name =>
-    readFile(new URL(`public/data/${name}.json`, root), 'utf8').then(JSON.parse),
-  ),
-);
+const readJson = (path, fallback) =>
+  readFile(new URL(path, root), 'utf8')
+    .then(JSON.parse)
+    .catch(error => {
+      if (fallback !== undefined && error.code === 'ENOENT') return fallback;
+      throw error;
+    });
+const [reference, ko, existing, feedList, previous] = await Promise.all([
+  readJson('public/data/reference.json'),
+  readJson('public/data/ko.json'),
+  readJson('public/data/articles.json'),
+  readJson('scripts/article-feeds.json', { feeds: [] }),
+  readJson('.cache/article-queue.json', { entries: [] }),
+]);
 const index = buildIndex(reference, ko);
 const known = new Set(existing.articles.map(article => article.url));
 
+// 리드: 아직 받지 않은 기사 주소. source는 어디서 왔는지, manual은 사람이 고른
+// 주소라 제목 검사를 건너뛴다는 뜻이다.
 const found = new Map();
-let forbidden = 0;
-const take = link => {
+const counts = {};
+const take = (link, source, manual = false) => {
   if (!link.url || known.has(link.url) || found.has(link.url)) return;
-  if (!isFetchable(link.url)) {
-    forbidden++;
-    return;
+  const hint = `${link.title ?? ''} ${link.context ?? ''}`;
+  if (!manual) {
+    if (!looksRelevant(hint)) return;
+    // 받아오기 전에 제목이 밝힌 시즌이 다르면 버린다. 작성자 피드에는 지난 시즌
+    // 기사가 함께 있다.
+    const titled = parseTitle(hint).season;
+    if (titled && titled !== season.toUpperCase()) return;
   }
-  if (looksRelevant(link.title)) found.set(link.url, link);
+  found.set(link.url, { ...link, source });
+  counts[source] = (counts[source] ?? 0) + 1;
 };
-
-const queries = searchQueries({ season });
 const channels = [];
 
-if (GOOGLE_KEY && GOOGLE_CSE) {
-  let hits = 0;
-  for (const query of queries) {
-    // 무료 한도가 하루 100건이라 쿼리당 두 쪽(20건)까지만 본다.
-    for (const start of [1, 11]) {
-      try {
-        const links = googleLinks(await fetchText(googleUrl(query, start)));
-        links.forEach(take);
-        hits += links.length;
-        if (links.length < 10) break;
-      } catch (error) {
-        console.error(`구글 검색 실패 (${query}): ${error.message}`);
-        break;
-      }
-      await wait(PAUSE);
-    }
-  }
-  channels.push(`구글 ${queries.length}쿼리 ${hits}건`);
-} else {
-  channels.push('구글 건너뜀 (GOOGLE_API_KEY, GOOGLE_CSE_ID 없음)');
+// 1. 사람이 넘긴 주소. 포케DB 목록처럼 AI 수집을 막은 곳에서 사람이 직접 본 주소나,
+// 저장한 목록 페이지 HTML을 받는다. 텍스트면 모든 주소를, HTML이면 기사처럼 보이는
+// 링크만 쓴다.
+for (const file of every('urls')) {
+  const body = await readFile(file, 'utf8');
+  const links = extractLinks(body);
+  const html = /<a\b/i.test(body);
+  links.filter(link => !html || isLeadLink(link)).forEach(link => take(link, 'manual', true));
+  channels.push(`주소 목록 ${file} ${links.length}건`);
 }
 
-let feeds = 0;
-for (const query of queries) {
+// 2. 기사 모음 페이지. 공략 사이트의 상위 구축 모음처럼 원문 링크를 모아 둔 곳에서
+// 링크만 거둔다. 그 페이지의 본문은 큐에 넣지 않는다.
+for (const page of every('from')) {
   try {
-    rssLinks(await fetchText(feedUrl(query))).forEach(take);
-    feeds++;
+    if (!(await allowed(page))) {
+      console.error(`목록 페이지 건너뜀 (robots.txt): ${page}`);
+      continue;
+    }
+    const links = extractLinks(await fetchText(page), page).filter(link => isLeadLink(link, page));
+    links.forEach(link => take(link, 'index', true));
+    channels.push(`목록 ${new URL(page).host} ${links.length}건`);
   } catch (error) {
-    console.error(`하테나 검색 실패 (${query}): ${error.message}`);
+    console.error(`목록 페이지 실패 (${page}): ${error.message}`);
   }
-  await wait(FEED_PAUSE);
+  await wait(PAUSE);
 }
-channels.push(`하테나 ${feeds}쿼리`);
+
+// 3. 작성자 피드. 등록했거나 큐에 올랐던 기사의 블로그와 article-feeds.json에 적은
+// 피드를 본다. 상위 랭커는 시즌마다 같은 곳에 쓰므로 검색보다 확실하다.
+if (useFeeds) {
+  const feeds = new Set(
+    [
+      ...existing.articles.map(article => feedUrlFor(article.url)),
+      ...previous.entries.map(entry => feedUrlFor(entry.url)),
+      ...feedList.feeds.map(value => feedUrlFor(value) ?? value),
+    ].filter(Boolean),
+  );
+  let read = 0;
+  for (const feed of feeds) {
+    try {
+      if (!(await allowed(feed))) continue;
+      feedLinks(await fetchText(feed)).forEach(link => take(link, 'feed'));
+      read++;
+    } catch (error) {
+      console.error(`피드 실패 (${feed}): ${error.message}`);
+    }
+    await wait(PAUSE);
+  }
+  channels.push(`작성자 피드 ${read}/${feeds.size}`);
+}
+
+// 4. 검색. 구글(키가 있을 때)과 하테나 북마크.
+if (useSearch) {
+  const queries = searchQueries({ season });
+  if (GOOGLE_KEY && GOOGLE_CSE) {
+    let hits = 0;
+    for (const query of queries) {
+      // 무료 한도가 하루 100건이라 쿼리당 두 쪽(20건)까지만 본다.
+      for (const start of [1, 11]) {
+        try {
+          const links = googleLinks(await fetchText(googleUrl(query, start)));
+          links.forEach(link => take(link, 'google'));
+          hits += links.length;
+          if (links.length < 10) break;
+        } catch (error) {
+          console.error(`구글 검색 실패 (${query}): ${error.message}`);
+          break;
+        }
+        await wait(PAUSE);
+      }
+    }
+    channels.push(`구글 ${queries.length}쿼리 ${hits}건`);
+  } else {
+    channels.push('구글 건너뜀 (GOOGLE_API_KEY, GOOGLE_CSE_ID 없음)');
+  }
+
+  let feeds = 0;
+  for (const query of queries) {
+    try {
+      feedLinks(await fetchText(feedUrl(query))).forEach(link => take(link, 'hatena'));
+      feeds++;
+    } catch (error) {
+      console.error(`하테나 검색 실패 (${query}): ${error.message}`);
+    }
+    await wait(FEED_PAUSE);
+  }
+  channels.push(`하테나 ${feeds}쿼리`);
+}
 
 console.log(channels.join(' | '));
-console.log(`후보 ${found.size}건` + (forbidden ? `, 수집 금지 호스트 ${forbidden}건 제외` : ''));
+console.log(
+  `후보 ${found.size}건 (` +
+    Object.entries(counts)
+      .map(([source, count]) => `${source} ${count}`)
+      .join(', ') +
+    ')',
+);
 
 const slug = value =>
   (value ?? '')
@@ -141,8 +249,12 @@ const slug = value =>
 
 const entries = [];
 // 왜 걸렀는지 세어 둔다. 한 건도 안 남을 때 검색어 탓인지 필터 탓인지 알아야 한다.
-const skipped = { fetch: 0, 'not-an-article': 0, season: 0, format: 0 };
+const skipped = { robots: 0, fetch: 0, 'not-an-article': 0, season: 0, format: 0 };
 for (const [url, link] of found) {
+  if (!(await allowed(url))) {
+    skipped.robots++;
+    continue;
+  }
   let html;
   try {
     html = await fetchArticle(url);
@@ -152,29 +264,35 @@ for (const [url, link] of found) {
     continue;
   }
   const page = readPage(html);
+  // 사람이 넘긴 주소는 제목이 아니라 옆에 적은 힌트에 순위가 있을 수 있다.
   const title = parseTitle(page.title || link.title);
+  const hint = parseTitle(`${link.title ?? ''} ${link.context ?? ''}`);
+  const rank = title.rank ?? hint.rank;
+  const titledSeason = title.season ?? hint.season;
+  const titledFormat = title.format ?? hint.format;
   const { candidates, flags } = digest(page, index);
   // 제목에 최종 순위가 없으면 구축 기사가 아닐 확률이 높다. 챔피언스 후보가 여섯
   // 미만인 글까지 큐에 넣으면 판정 비용만 늘어난다.
-  if (title.rank === null && candidates.filter(c => c.champions).length < 6) {
+  if (rank === null && candidates.filter(c => c.champions).length < 6) {
     skipped['not-an-article']++;
     continue;
   }
   // 제목이 밝힌 시즌과 형식이 요청과 다르면 거른다. 밝히지 않은 글은 통과시켜
   // 3단계가 본문과 이미지로 판단하게 둔다.
-  if (title.season && title.season !== season.toUpperCase()) {
+  if (titledSeason && titledSeason !== season.toUpperCase()) {
     skipped.season++;
     continue;
   }
-  if (wanted && title.format && title.format !== wanted) {
+  if (wanted && titledFormat && titledFormat !== wanted) {
     skipped.format++;
     continue;
   }
   entries.push({
     url,
+    source: link.source,
     id: [
-      String(title.season ?? season).toLowerCase(),
-      (title.format ?? wanted ?? '').toLowerCase(),
+      String(titledSeason ?? season).toLowerCase(),
+      (titledFormat ?? wanted ?? '').toLowerCase(),
       slug(page.siteName),
     ]
       .filter(Boolean)
@@ -182,32 +300,44 @@ for (const [url, link] of found) {
     title: page.title || link.title,
     author: null,
     siteName: page.siteName,
-    publishedAt: page.publishedAt ?? link.date,
-    rank: title.rank,
-    season: title.season,
-    format: title.format,
-    monthly: title.monthly,
+    publishedAt: page.publishedAt ?? link.date ?? null,
+    rank,
+    season: titledSeason,
+    format: titledFormat,
+    monthly: title.monthly || hint.monthly,
     images: page.images,
     excerpt: page.excerpt,
     candidates,
     flags: [
       ...flags,
-      ...(title.rank === null ? ['rank-missing'] : []),
-      ...(title.season === null ? ['season-missing'] : []),
-      ...(title.format === null ? ['format-missing'] : []),
-      ...(title.monthly ? ['monthly-challenge'] : []),
+      ...(rank === null ? ['rank-missing'] : []),
+      ...(title.rank === null && hint.rank !== null ? ['rank-from-hint'] : []),
+      ...(titledSeason === null ? ['season-missing'] : []),
+      ...(titledFormat === null ? ['format-missing'] : []),
+      ...(title.monthly || hint.monthly ? ['monthly-challenge'] : []),
     ],
   });
 }
 
+// 큐는 여러 번에 나눠 채운다(검색 한 번, 주소 목록 한 번). 이번에 다시 본 주소는
+// 새 결과로 바꾸고, 그사이 articles.json에 등록된 주소는 뺀다.
+const fresh = new Set(entries.map(entry => entry.url));
+const kept = previous.entries.filter(entry => !fresh.has(entry.url) && !known.has(entry.url));
 const out = new URL('.cache/article-queue.json', root);
-await writeFile(out, JSON.stringify({ generatedAt: new Date().toISOString(), entries }, null, 2));
-console.log(`큐에 ${entries.length}건`);
+await writeFile(
+  out,
+  JSON.stringify(
+    { generatedAt: new Date().toISOString(), entries: [...kept, ...entries] },
+    null,
+    2,
+  ),
+);
+console.log(`큐에 새로 ${entries.length}건, 이전 ${kept.length}건 유지`);
 console.log(
   '거른 것: ' +
-    Object.entries(skipped)
+    (Object.entries(skipped)
       .filter(([, count]) => count)
       .map(([reason, count]) => `${reason} ${count}`)
-      .join(', '),
+      .join(', ') || '없음'),
 );
 console.log(`플래그가 붙은 건: ${entries.filter(e => e.flags.length).length}`);

@@ -264,18 +264,142 @@ export const looksLikeArticle = url => {
   }
 };
 
-export function rssLinks(body) {
-  return [...body.matchAll(/<item\s[^]*?<\/item>/g)].map(match => {
-    const item = match[0];
-    const field = tag => item.match(new RegExp(`<${tag}[^>]*>([^]*?)</${tag}>`))?.[1] ?? null;
-    const date = field('dc:date');
+const feedDate = value => {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(value.trim())) return value.trim().slice(0, 10);
+  // RSS 2.0의 pubDate는 RFC 822 꼴이다. 시간대를 지키려고 문자열을 자르지 않고 읽는다.
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+};
+const cdata = value => value.replace(/^\s*<!\[CDATA\[([^]*?)\]\]>\s*$/, '$1');
+
+// 하테나 북마크 검색(RSS 1.0), 블로그 RSS 2.0, Atom을 한 함수로 읽는다. 작성자
+// 블로그의 피드가 서비스마다 형식이 달라서다. channel의 link는 항목이 아니다.
+export function feedLinks(body) {
+  const blocks = [...body.matchAll(/<(item|entry)\b[^>]*>[^]*?<\/\1>/g)];
+  return blocks.map(([block, kind]) => {
+    const field = tag =>
+      block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([^]*?)</${tag}>`))?.[1] ?? null;
+    const url =
+      kind === 'entry'
+        ? (block.match(/<link\b(?=[^>]*rel=["']alternate["'])[^>]*href=["']([^"']+)["']/)?.[1] ??
+          block.match(/<link\b[^>]*href=["']([^"']+)["']/)?.[1] ??
+          '')
+        : cdata(field('link') ?? '');
     return {
-      title: flatten(field('title') ?? ''),
-      url: (field('link') ?? '').trim(),
-      date: date ? date.slice(0, 10) : null,
+      title: flatten(cdata(field('title') ?? '')),
+      url: decode(url.trim()),
+      date: feedDate(
+        field('dc:date') ?? field('pubDate') ?? field('published') ?? field('updated'),
+      ),
     };
   });
 }
+export const rssLinks = feedLinks;
+
+// 작성자는 시즌마다 같은 블로그에 쓴다. 한 번 등록한 기사의 주소에서 그 블로그의
+// 피드를 되짚어 다음 시즌 기사를 검색 없이 찾는다. 피드 주소가 정해진 서비스만 다루고
+// 나머지는 null을 돌려준다. pokesol은 공개된 작성자 피드를 찾지 못했다.
+export function feedUrlFor(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  const host = url.host;
+  if (/(^|\.)(hatenablog\.(com|jp)|hateblo\.jp|hatenadiary\.(com|jp|org))$/.test(host))
+    return `${url.origin}/feed`;
+  if (host === 'note.com') {
+    const user = url.pathname.match(/^\/([^/]+)\/n\//)?.[1];
+    return user ? `https://note.com/${user}/rss` : null;
+  }
+  if (host === 'ameblo.jp') {
+    const user = url.pathname.match(/^\/([^/]+)\//)?.[1];
+    return user ? `https://rssblog.ameba.jp/${user}/rss20.xml` : null;
+  }
+  if (/\.blog\.fc2\.com$/.test(host)) return `${url.origin}/?xml`;
+  if (/\.(livedoor\.blog|blog\.jp|seesaa\.net)$/.test(host)) return `${url.origin}/index.rdf`;
+  return null;
+}
+
+// 개인 구축 기사가 올라가는 곳이다. 목록 페이지에서 링크를 거둘 때 사이트 안내
+// 링크와 기사를 가르는 데 쓴다. 이 패턴 밖이라도 링크 문구에 최종 순위가 있으면 받는다.
+const BLOG_POST = [
+  /(^|\.)(hatenablog\.(com|jp)|hateblo\.jp|hatenadiary\.(com|jp|org))\/entry\//,
+  /^note\.com\/[^/]+\/n\//,
+  /^pokesol\.app\/u\/[^/]+\/articles\//,
+  /^ameblo\.jp\/[^/]+\/entry-/,
+  /\.blog\.fc2\.com\/blog-entry-/,
+  /\.(livedoor\.blog|blog\.jp)\/archives\//,
+  /\.seesaa\.net\/article\//,
+];
+export const isBlogPost = value => {
+  try {
+    const url = new URL(value);
+    return BLOG_POST.some(pattern => pattern.test(url.host + url.pathname));
+  } catch {
+    return false;
+  }
+};
+
+const TRACKING = /^(utm_|fbclid$|gclid$|ref$|ref_src$)/;
+const cleanUrl = (value, base) => {
+  try {
+    const url = new URL(decode(value.trim()), base);
+    if (!/^https?:$/.test(url.protocol)) return null;
+    url.hash = '';
+    for (const key of [...url.searchParams.keys()])
+      if (TRACKING.test(key)) url.searchParams.delete(key);
+    return url.href;
+  } catch {
+    return null;
+  }
+};
+
+// 사람이 넘긴 주소 목록이나 기사 모음 페이지에서 링크를 꺼낸다. HTML이면 a 태그의
+// 문구와 앞뒤 글을, 일반 텍스트면 줄에 적힌 나머지 글을 순위 힌트로 함께 넘긴다.
+// 같은 주소는 한 번만 돌려준다.
+export function extractLinks(body, base) {
+  const found = new Map();
+  const add = (href, title, context) => {
+    const url = cleanUrl(href, base);
+    if (!url || found.has(url)) return;
+    found.set(url, { url, title: flatten(title), context: flatten(context) });
+  };
+  const anchors = [...body.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([^]*?)<\/a>/gi)];
+  if (anchors.length) {
+    // 순위는 보통 같은 표 행이나 목록 항목에 링크와 함께 있다. 앞뒤 글을 같은 블록
+    // 안에서만 잘라야 옆 행의 순위가 메뉴 링크에 붙지 않는다.
+    const BLOCK_START = /<(tr|li|p|h\d|div|dt|dd|nav|section|article)\b[^>]*>|<br\s*\/?>/gi;
+    const BLOCK_END = /<\/(tr|li|p|h\d|div|dd|nav|section|article)>|<br\s*\/?>/i;
+    for (const match of anchors) {
+      const before = body.slice(Math.max(0, match.index - 300), match.index);
+      const starts = [...before.matchAll(BLOCK_START)];
+      const head = starts.length ? before.slice(starts.at(-1).index) : before;
+      const after = body.slice(match.index + match[0].length, match.index + match[0].length + 300);
+      const end = after.search(BLOCK_END);
+      add(match[1], match[2], `${head} ${end < 0 ? after : after.slice(0, end)}`);
+    }
+    return [...found.values()];
+  }
+  for (const line of body.split(/\r?\n/))
+    for (const match of line.matchAll(/https?:\/\/[^\s"'<>]+/g))
+      add(match[0], '', line.replace(match[0], ' '));
+  return [...found.values()];
+}
+
+// 목록 페이지의 수백 개 링크 중 기사로 보이는 것만 남긴다. 같은 사이트 안의 링크는
+// 메뉴와 다른 공략 글이므로 버린다.
+export const isLeadLink = (link, pageUrl) => {
+  if (!looksLikeArticle(link.url)) return false;
+  try {
+    if (pageUrl && new URL(link.url).host === new URL(pageUrl).host) return false;
+  } catch {
+    return false;
+  }
+  return isBlogPost(link.url) || parseTitle(`${link.title} ${link.context}`).rank !== null;
+};
 
 // 競馬의 チャンピオンズカップ와 最終予想이 같은 검색어에 걸린다. 측정한 회차에서
 // 고유 URL 44건 중 35건이 경마 예상 글이었다. 최종 N위나 포켓몬 표기가 제목에
@@ -305,6 +429,85 @@ export const isFetchable = url => {
   const host = new URL(url).host.replace(/^www\./, '');
   return !FORBIDDEN_HOSTS.some(blocked => host === blocked || host.endsWith(`.${blocked}`));
 };
+
+// 위 목록은 이미 알고 있는 곳이다. 목록 페이지와 작성자 피드로 처음 보는 호스트가
+// 계속 들어오므로 robots.txt를 받아 같은 기준을 코드로 적용한다.
+// 수집 결과는 3단계에서 AI가 읽으므로 AI 크롤러와 사용자 요청형 AI 에이전트를
+// 막은 곳은 받지 않는다. 학습 전용 표기(GPTBot, Google-Extended)는 이 용도와
+// 무관해 보지 않는다. 우리 User-Agent가 막힌 곳도 물론 받지 않는다.
+export const ROBOT_AGENTS = [
+  'championscompanion',
+  'claudebot',
+  'claude-user',
+  'claude-searchbot',
+  'chatgpt-user',
+  'perplexity-user',
+];
+
+// 규칙과 주소를 같은 형태로 비교하려고 퍼센트 인코딩을 양쪽 모두 푼다.
+const safeDecode = value => {
+  try {
+    return decodeURI(value);
+  } catch {
+    return value;
+  }
+};
+
+function robotsGroups(robots) {
+  const groups = [];
+  let current = null;
+  for (const raw of robots.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, '').trim();
+    const match = line.match(/^([a-z-]+)\s*:\s*(.*)$/i);
+    if (!match) continue;
+    const [, field, value] = match;
+    const key = field.toLowerCase();
+    if (key === 'user-agent') {
+      // 규칙 없이 이어진 user-agent 줄은 한 묶음이다.
+      if (!current || current.rules.length) groups.push((current = { agents: [], rules: [] }));
+      current.agents.push(value.toLowerCase());
+    } else if (current && (key === 'allow' || key === 'disallow')) {
+      current.rules.push({ allow: key === 'allow', path: safeDecode(value) });
+    }
+  }
+  return groups;
+}
+
+// *는 아무 글자, 끝의 $는 경로 끝이다. 빈 Disallow는 아무것도 막지 않는다.
+const ruleMatches = (rule, path) => {
+  if (!rule.path) return false;
+  const anchored = rule.path.endsWith('$');
+  const pattern = (anchored ? rule.path.slice(0, -1) : rule.path)
+    .split('*')
+    .map(part => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.*');
+  return new RegExp(`^${pattern}${anchored ? '$' : ''}`).test(path);
+};
+
+// RFC 9309: 이름이 맞는 묶음이 있으면 그것만, 없으면 *를 본다. 가장 긴 규칙이
+// 이기고 길이가 같으면 Allow가 이긴다. 넘긴 에이전트 중 하나라도 막히면 거부한다.
+export function robotsAllows(robots, value, agents = ROBOT_AGENTS) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  const path = safeDecode(url.pathname + url.search);
+  const groups = robotsGroups(robots ?? '');
+  return agents.every(agent => {
+    const named = groups.filter(group =>
+      group.agents.some(name => name !== '*' && agent.includes(name)),
+    );
+    const rules = (
+      named.length ? named : groups.filter(group => group.agents.includes('*'))
+    ).flatMap(group => group.rules);
+    const hit = rules
+      .filter(rule => ruleMatches(rule, path))
+      .sort((a, b) => b.path.length - a.path.length || Number(b.allow) - Number(a.allow))[0];
+    return !hit || hit.allow;
+  });
+}
 
 export function googleLinks(body) {
   const payload = JSON.parse(body);

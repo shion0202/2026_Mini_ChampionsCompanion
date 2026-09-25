@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { reviewedArticles, selectArticles, usesPokemon } from '../src/articles.js';
-import { renderArticleCards } from '../src/articles-view.js';
+import { articleUsage, reviewedArticles, selectArticles, usesPokemon } from '../src/articles.js';
+import { renderArticleCards, renderArticleUsage } from '../src/articles-view.js';
 import { createLocale } from '../src/locale.js';
 
 const read = name =>
@@ -88,4 +88,57 @@ test('cards escape external text, retain item details and mark original links', 
   assert.ok(markup.includes('화염레오나이트'));
   assert.ok(markup.includes('data-effect-type="held_item"'));
   assert.ok(renderArticleCards([], reference, locale).includes('확인한 구축 기사가 없습니다'));
+});
+
+test('several picked Pokemon keep only the parties that use all of them', () => {
+  const rows = reviewedArticles(data, reference);
+  const pick = pokemons => selectArticles(rows, { pokemons }, reference, locale).map(a => a.author);
+  assert.deepEqual(pick(['garchomp', 'primarina']), ['シグマ', 'rebo®']);
+  assert.deepEqual(pick(['garchomp', 'lucario']), ['rebo®'], '메가루카리오도 루카리오로 찾는다');
+  assert.deepEqual(pick(['gengar', 'lucario']), []);
+  // 상세 탭이 넘기는 pokemon 하나와 함께 써도 같은 규칙이다.
+  assert.deepEqual(
+    selectArticles(rows, { pokemon: 'gengar', pokemons: ['garchomp'] }, reference, locale).map(
+      a => a.author,
+    ),
+    ['シグマ'],
+  );
+});
+
+test('search words must all match, and the rank limit and sort apply', () => {
+  const rows = reviewedArticles(data, reference);
+  const authors = filters => selectArticles(rows, filters, reference, locale).map(a => a.author);
+  assert.deepEqual(authors({ query: '한카리아스 팬텀' }), ['シグマ']);
+  assert.deepEqual(authors({ query: '  한카리아스   누리레느 ' }), ['シグマ', 'rebo®']);
+  assert.deepEqual(authors({ maxRank: '1' }), ['シグマ']);
+  assert.deepEqual(authors({ maxRank: '' }), ['シグマ', 'rebo®']);
+  assert.deepEqual(authors({ sort: 'recent' }), ['シグマ', 'rebo®']);
+  const older = rows.map(a => (a.author === 'シグマ' ? { ...a, publishedAt: '2026-09-01' } : a));
+  assert.deepEqual(
+    selectArticles(older, { sort: 'recent' }, reference, locale).map(a => a.author),
+    ['rebo®', 'シグマ'],
+  );
+});
+
+test('usage counts megas under their base and leaves out what is already picked', () => {
+  const rows = reviewedArticles(data, reference);
+  const usage = articleUsage(rows, reference);
+  assert.deepEqual(usage.slice(0, 2), [
+    { pokemon: 'garchomp', count: 2 },
+    { pokemon: 'primarina', count: 2 },
+  ]);
+  assert.ok(
+    usage.some(row => row.pokemon === 'lucario'),
+    '메가루카리오는 루카리오로 센다',
+  );
+  assert.ok(!usage.some(row => row.pokemon === 'lucariomega'));
+  assert.ok(!articleUsage(rows, reference, ['garchomp']).some(row => row.pokemon === 'garchomp'));
+  const markup = renderArticleUsage(usage, rows.length, reference, locale, ['garchomp']);
+  assert.ok(markup.includes('함께 채용된 포켓몬'));
+  assert.ok(markup.includes('data-article-add-pokemon="primarina"'));
+  assert.equal(
+    renderArticleUsage(usage, 1, reference, locale),
+    '',
+    '파티 하나로는 집계하지 않는다',
+  );
 });

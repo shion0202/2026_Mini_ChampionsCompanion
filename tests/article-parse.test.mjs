@@ -5,7 +5,13 @@ import { readFile } from 'node:fs/promises';
 import {
   buildIndex,
   digest,
+  extractLinks,
+  feedLinks,
+  feedUrlFor,
   googleLinks,
+  isBlogPost,
+  isLeadLink,
+  robotsAllows,
   isFetchable,
   normalize,
   parseTitle,
@@ -369,4 +375,96 @@ test('googleLinks reads the custom search payload', () => {
 test('googleLinks surfaces the quota error instead of returning nothing', () => {
   const payload = JSON.stringify({ error: { code: 429, message: 'Quota exceeded' } });
   assert.throws(() => googleLinks(payload), /Quota exceeded/);
+});
+
+test('feedLinks reads RSS 2.0 and Atom as well as the Hatena bookmark feed', () => {
+  const rss2 = `<rss version="2.0"><channel><title>블로그</title><link>https://note.com/x</link>
+<item><title><![CDATA[【M-6】最終12位 ハッサム]]></title><link>https://note.com/x/n/n123</link>
+<pubDate>Sun, 12 Oct 2026 23:30:00 +0900</pubDate></item></channel></rss>`;
+  assert.deepEqual(feedLinks(rss2), [
+    { title: '【M-6】最終12位 ハッサム', url: 'https://note.com/x/n/n123', date: '2026-10-12' },
+  ]);
+  const atom = `<feed xmlns="http://www.w3.org/2005/Atom"><link rel="alternate" href="https://a.hatenablog.com/"/>
+<entry><title>シーズンM-6 最終3位</title><link rel="alternate" href="https://a.hatenablog.com/entry/2026/10/12/1"/>
+<published>2026-10-12T10:00:00+09:00</published></entry></feed>`;
+  const [entry] = feedLinks(atom);
+  assert.equal(entry.url, 'https://a.hatenablog.com/entry/2026/10/12/1');
+  assert.equal(entry.date, '2026-10-12');
+});
+
+test('feedUrlFor finds the author feed on services with a fixed feed address', () => {
+  assert.equal(
+    feedUrlFor('https://reboiona.hatenablog.com/entry/2026/09/10/174818'),
+    'https://reboiona.hatenablog.com/feed',
+  );
+  assert.equal(
+    feedUrlFor('https://note.com/sazanami_373/n/nf8906dd66238'),
+    'https://note.com/sazanami_373/rss',
+  );
+  assert.equal(
+    feedUrlFor('https://ameblo.jp/marron9339/entry-12975046373.html'),
+    'https://rssblog.ameba.jp/marron9339/rss20.xml',
+  );
+  assert.equal(feedUrlFor('https://pokesol.app/u/sigma573/articles/bbe27ed18e7cccb3'), null);
+  assert.equal(feedUrlFor('주소 아님'), null);
+});
+
+test('extractLinks takes pasted lines with their hint text, once per address', () => {
+  const pasted = `https://note.com/a/n/n1 最終12位
+https://note.com/a/n/n1?utm_source=x
+https://b.hatenablog.com/entry/2026/10/01/1#top M-6 シングル`;
+  const links = extractLinks(pasted);
+  assert.equal(links.length, 2, '추적 인자와 해시를 떼면 같은 주소다');
+  assert.equal(links[0].url, 'https://note.com/a/n/n1');
+  assert.equal(links[0].context, '最終12位');
+  assert.equal(links[1].url, 'https://b.hatenablog.com/entry/2026/10/01/1');
+});
+
+test('an index page yields the article links and drops its own navigation', () => {
+  const page = `<nav><a href="/pokemon-champions/1">トップ</a><a href="https://x.com/share">共有</a></nav>
+<table><tr><td>最終8位</td><td><a href="https://note.com/a/n/n1">構築記事</a></td></tr>
+<tr><td><a href="https://someone.example/posts/2">【M-6最終40位】雨パ</a></td></tr>
+<tr><td><a href="javascript:void(0)">x</a></td></tr></table>`;
+  const base = 'https://guide.example/pokemon-champions/560474';
+  const leads = extractLinks(page, base).filter(link => isLeadLink(link, base));
+  assert.deepEqual(
+    leads.map(link => link.url),
+    ['https://note.com/a/n/n1', 'https://someone.example/posts/2'],
+  );
+  assert.match(leads[0].context, /最終8位/, '같은 행의 순위가 힌트로 붙는다');
+  assert.ok(isBlogPost('https://pokesol.app/u/sigma573/articles/bbe27ed18e7cccb3'));
+  assert.ok(!isBlogPost('https://note.com/sazanami_373'));
+});
+
+test('robotsAllows applies the named group over *, longest rule first', () => {
+  const pokedb = `User-agent: *
+Allow: /
+
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+Disallow: /`;
+  assert.equal(robotsAllows(pokedb, 'https://champs.pokedb.tokyo/article/search'), false);
+
+  const note = `User-agent: *
+Disallow: /api/
+Disallow: /search
+Allow: /api/v2/oembed$`;
+  assert.equal(robotsAllows(note, 'https://note.com/a/n/n1'), true);
+  assert.equal(robotsAllows(note, 'https://note.com/search?q=x'), false);
+  assert.equal(robotsAllows(note, 'https://note.com/api/v2/oembed'), true);
+  assert.equal(robotsAllows(note, 'https://note.com/api/v2/oembed/x'), false);
+
+  // 사용자 요청형 에이전트만 막은 곳도 받지 않는다.
+  const yakkun = `User-agent: ChatGPT-User
+Disallow: /`;
+  assert.equal(robotsAllows(yakkun, 'https://yakkun.com/bbs/party/n1'), false);
+
+  // 학습 전용 크롤러만 막은 곳은 이 용도와 무관하다.
+  const trainingOnly = `User-agent: GPTBot
+Disallow: /
+User-agent: Google-Extended
+Disallow: /`;
+  assert.equal(robotsAllows(trainingOnly, 'https://blog.example/entry/1'), true);
+  assert.equal(robotsAllows('', 'https://blog.example/entry/1'), true, 'robots.txt가 없으면 허용');
+  assert.equal(robotsAllows('User-agent: *\nDisallow: /*.pdf$', 'https://a.example/x.pdf'), false);
 });

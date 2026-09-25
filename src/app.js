@@ -56,8 +56,14 @@ import {
 } from './damage-view.js';
 import { NFE_SPECIES } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
-import { reviewedArticles, selectArticles } from './articles.js';
-import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
+import { articleUsage, reviewedArticles, selectArticles, selectedPokemon } from './articles.js';
+import {
+  articleControls,
+  articleSeasonLabel,
+  renderArticleCards,
+  renderArticleUsage,
+  renderSelectedPokemon,
+} from './articles-view.js';
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
 import { speedRows, battleSpeedRows } from './speed.js';
 import { renderSpeedRows, renderSpeedLines } from './speed-view.js';
@@ -259,7 +265,15 @@ const state = {
   speedLimit: 80,
   articleData: null,
   articleError: false,
-  articleFilters: { season: null, format: 'Singles', query: '', pokemon: '' },
+  articleFilters: {
+    season: null,
+    format: 'Singles',
+    query: '',
+    pokemon: '',
+    pokemons: [],
+    maxRank: '',
+    sort: 'rank',
+  },
   typeChartMode: 'defense',
   defenseTypes: [],
   format: saved.format,
@@ -606,7 +620,7 @@ function showPage(page) {
   $('notice').hidden = page !== 'ranking' || !$('notice').textContent;
 }
 
-function articleContent(filters) {
+function articleContent(filters, { usage = false } = {}) {
   if (state.articleError)
     return '<div class="empty-state"><p>구축 기사를 불러오지 못했습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
   if (!state.articleData) return loadingState('구축 기사를 불러오는 중');
@@ -619,9 +633,25 @@ function articleContent(filters) {
     state.reference,
     state.locale,
   );
+  const picked = selectedPokemon(filters);
+  const order =
+    filters.sort === 'recent'
+      ? '최근 게시순'
+      : filters.season
+        ? '최종 순위순'
+        : '최근 시즌부터, 최종 순위순';
   return (
-    `<p class="article-count" role="status">${rows.length}건${filters.season ? ' (최종 순위순)' : ' (최근 시즌부터, 최종 순위순)'}</p>` +
-    renderArticleCards(rows, state.reference, state.locale, filters.pokemon)
+    `<p class="article-count" role="status">${rows.length}건 (${order})</p>` +
+    (usage
+      ? renderArticleUsage(
+          articleUsage(rows, state.reference, picked),
+          rows.length,
+          state.reference,
+          state.locale,
+          picked,
+        )
+      : '') +
+    renderArticleCards(rows, state.reference, state.locale, picked)
   );
 }
 
@@ -629,12 +659,23 @@ function renderArticles() {
   if (state.page !== 'articles') return;
   const filters = state.articleFilters;
   $('article-controls').innerHTML = articleControls(state.articleData?.articles ?? [], filters);
-  const species = state.reference?.species[filters.pokemon];
-  $('article-pokemon-filter').innerHTML = species
-    ? `<span>${esc(state.locale?.pokemon(species.name).label ?? species.name)} 채용 파티</span><button class="text-button" id="clear-article-pokemon">선택 해제</button>`
-    : '';
-  $('article-pokemon-filter').hidden = !species;
-  $('article-rows').innerHTML = articleContent(filters);
+  renderArticleRows();
+}
+
+// 목록과 고른 포켓몬 칩만 다시 그린다. 조절 칸을 다시 그리면 검색 입력의 커서가 튄다.
+function renderArticleRows() {
+  const filters = state.articleFilters;
+  const picked =
+    state.reference && state.locale
+      ? selectedPokemon(filters).filter(id => state.reference.species[id])
+      : [];
+  $('article-pokemon-filter').innerHTML = renderSelectedPokemon(
+    picked,
+    state.reference,
+    state.locale,
+  );
+  $('article-pokemon-filter').hidden = !picked.length;
+  $('article-rows').innerHTML = articleContent(filters, { usage: true });
 }
 
 function openArticles({ navigate = true } = {}) {
@@ -2776,12 +2817,14 @@ $('articles-link').onclick = () => {
 $('articles').addEventListener('change', event => {
   if (event.target.id === 'article-season') state.articleFilters.season = event.target.value;
   if (event.target.id === 'article-format') state.articleFilters.format = event.target.value;
-  $('article-rows').innerHTML = articleContent(state.articleFilters);
+  if (event.target.id === 'article-rank') state.articleFilters.maxRank = event.target.value;
+  if (event.target.id === 'article-sort') state.articleFilters.sort = event.target.value;
+  renderArticleRows();
 });
 $('articles').addEventListener('input', event => {
   if (event.target.id !== 'article-search') return;
   state.articleFilters.query = event.target.value;
-  $('article-rows').innerHTML = articleContent(state.articleFilters);
+  renderArticleRows();
 });
 document.addEventListener('click', event => {
   if (event.target.closest('[data-retry-articles]')) {
@@ -2792,16 +2835,39 @@ document.addEventListener('click', event => {
   const button = event.target.closest('[data-article-pokemon]');
   if (button) {
     state.articleFilters = {
+      ...state.articleFilters,
       season: '',
       format: state.format,
       query: '',
-      pokemon: button.dataset.articlePokemon,
+      maxRank: '',
+      pokemon: '',
+      pokemons: [button.dataset.articlePokemon],
     };
     openArticles();
   }
+  const add = event.target.closest('[data-article-add-pokemon]');
+  if (add) {
+    const filters = state.articleFilters;
+    filters.pokemons = selectedPokemon({
+      ...filters,
+      pokemons: [...filters.pokemons, add.dataset.articleAddPokemon],
+    });
+    filters.pokemon = '';
+    renderArticleRows();
+  }
+  const remove = event.target.closest('[data-article-remove-pokemon]');
+  if (remove) {
+    const filters = state.articleFilters;
+    filters.pokemons = selectedPokemon(filters).filter(
+      id => id !== remove.dataset.articleRemovePokemon,
+    );
+    filters.pokemon = '';
+    renderArticleRows();
+  }
   if (event.target.closest('#clear-article-pokemon')) {
     state.articleFilters.pokemon = '';
-    renderArticles();
+    state.articleFilters.pokemons = [];
+    renderArticleRows();
   }
 });
 $('types-link').onclick = () => {

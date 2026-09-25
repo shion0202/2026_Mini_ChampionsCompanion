@@ -46,24 +46,60 @@ export function usesPokemon(article, id, reference) {
   });
 }
 
+// 상세 탭은 포켓몬 하나(pokemon)를, 기사 화면은 여러 마리(pokemons)를 넘긴다.
+// 여러 마리는 모두 채용한 파티만 남긴다.
+export const selectedPokemon = filters => [
+  ...new Set([...(filters.pokemons ?? []), filters.pokemon].filter(Boolean)),
+];
+
+const bySeasonThenRank = (a, b) =>
+  Number(b.season.slice(1)) - Number(a.season.slice(1)) ||
+  a.rank - b.rank ||
+  a.id.localeCompare(b.id);
+const SORTS = {
+  rank: bySeasonThenRank,
+  recent: (a, b) =>
+    (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '') || bySeasonThenRank(a, b),
+};
+
 export function selectArticles(articles, filters, reference, locale) {
-  const query = (filters.query ?? '').trim().toLocaleLowerCase();
+  // 공백으로 나눈 낱말을 모두 포함해야 한다. '한카리아스 팬텀'은 둘 다 있는 파티다.
+  const words = (filters.query ?? '').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const pokemon = selectedPokemon(filters);
+  const maxRank = Number(filters.maxRank) || Infinity;
   return articles
     .filter(a => {
       if (filters.season && a.season !== filters.season) return false;
       if (filters.format && a.format !== filters.format) return false;
-      if (filters.pokemon && !usesPokemon(a, filters.pokemon, reference)) return false;
-      if (!query) return true;
+      if (a.rank > maxRank) return false;
+      if (!pokemon.every(id => usesPokemon(a, id, reference))) return false;
+      if (!words.length) return true;
       const names = a.team.flatMap(m => {
         const name = reference.species[m.pokemon].name;
         return [name, locale.pokemon(name).label, locale.pokemonJapanese(name)];
       });
-      return [a.author, a.title, ...names].join(' ').toLocaleLowerCase().includes(query);
+      const haystack = [a.author, a.title, ...names].join(' ').toLocaleLowerCase();
+      return words.every(word => haystack.includes(word));
     })
-    .sort(
-      (a, b) =>
-        Number(b.season.slice(1)) - Number(a.season.slice(1)) ||
-        a.rank - b.rank ||
-        a.id.localeCompare(b.id),
-    );
+    .sort(SORTS[filters.sort] ?? SORTS.rank);
+}
+
+// 목록에 든 파티에서 포켓몬별 채용 수를 센다. 메가는 기본 종족으로 묶는다. 필터가
+// 기본 종족으로 찾을 때 메가까지 포함하므로 같은 단위로 세야 누른 뒤 건수가 맞는다.
+// 이미 고른 포켓몬은 빼서 '함께 채용된 포켓몬'으로 읽히게 한다.
+export function articleUsage(articles, reference, exclude = []) {
+  const counts = new Map();
+  for (const article of articles)
+    for (const id of new Set(article.team.map(m => usageKey(m.pokemon, reference))))
+      if (!exclude.includes(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts]
+    .map(([pokemon, count]) => ({ pokemon, count }))
+    .sort((a, b) => b.count - a.count || a.pokemon.localeCompare(b.pokemon));
+}
+
+function usageKey(id, reference) {
+  const species = reference.species[id];
+  if (!isMegaForme(species?.forme)) return id;
+  const base = toId(species.baseSpecies);
+  return reference.species[base] ? base : id;
 }
