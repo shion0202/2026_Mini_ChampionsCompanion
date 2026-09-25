@@ -96,6 +96,39 @@ const cacheDir = new URL('.cache/articles/', root);
 await mkdir(cacheDir, { recursive: true });
 const cachePath = url => new URL(`${createHash('sha1').update(url).digest('hex')}.html`, cacheDir);
 
+// 판정은 팀 이미지를 보고 한다. 판정하는 세션이 따로 받지 않도록 본문 이미지를 캐시에
+// 둔다. robots.txt를 같은 기준으로 보고, 이미지가 아니거나 너무 크면 받지 않는다.
+const IMAGE_TYPES = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+const IMAGE_LIMIT = 5 * 1024 * 1024;
+async function cacheImage(url) {
+  const name = createHash('sha1').update(url).digest('hex');
+  const cached = (await readdir(cacheDir)).find(
+    file => file.startsWith(`${name}.`) && !file.endsWith('.html'),
+  );
+  if (cached) return `.cache/articles/${cached}`;
+  if (!(await allowed(url))) return null;
+  try {
+    const response = await fetch(url, {
+      headers: { 'user-agent': AGENT },
+      signal: AbortSignal.timeout(30000),
+    });
+    const type = response.headers.get('content-type')?.split(';')[0].trim();
+    const body = Buffer.from(await response.arrayBuffer());
+    if (!response.ok || !IMAGE_TYPES[type] || body.length > IMAGE_LIMIT) return null;
+    const file = `${name}.${IMAGE_TYPES[type]}`;
+    await writeFile(new URL(file, cacheDir), body);
+    await wait(PAUSE);
+    return `.cache/articles/${file}`;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchArticle(url) {
   const path = cachePath(url);
   try {
@@ -122,16 +155,21 @@ const queueName = `article-queue-${season.toLowerCase()}.json`;
 const queueNames = (await readdir(new URL('.cache/', root))).filter(name =>
   /^article-queue(-[a-z0-9]+)?\.json$/.test(name),
 );
-const [reference, ko, existing, feedList, queues] = await Promise.all([
+const [reference, ko, existing, feedList, skipList, queues] = await Promise.all([
   readJson('public/data/reference.json'),
   readJson('public/data/ko.json'),
   readJson('public/data/articles.json'),
   readJson('scripts/article-feeds.json', { feeds: [] }),
+  readJson('scripts/article-skip.json', { skipped: [] }),
   Promise.all(queueNames.map(name => readJson(`.cache/${name}`))),
 ]);
 const previous = queues[queueNames.indexOf(queueName)] ?? { entries: [] };
 const index = buildIndex(reference, ko);
-const known = new Set(existing.articles.map(article => article.url));
+// 등록한 기사와 판정에서 파티 기사가 아니라고 본 주소는 다시 큐에 올리지 않는다.
+const known = new Set([
+  ...existing.articles.map(article => article.url),
+  ...skipList.skipped.map(entry => entry.url),
+]);
 
 // 리드: 아직 받지 않은 기사 주소. source는 어디서 왔는지, manual은 사람이 고른
 // 주소라 제목 검사를 건너뛴다는 뜻이다.
@@ -311,6 +349,8 @@ for (const [url, link] of found) {
     continue;
   }
   const page = readPage(html);
+  const imageFiles = [];
+  for (const image of page.images) imageFiles.push(await cacheImage(image));
   // 사람이 넘긴 주소는 제목이 아니라 옆에 적은 힌트에 순위가 있을 수 있다.
   const title = parseTitle(page.title || link.title);
   const hint = parseTitle(`${link.title ?? ''} ${link.context ?? ''}`);
@@ -353,10 +393,13 @@ for (const [url, link] of found) {
     format: titledFormat,
     monthly: title.monthly || hint.monthly,
     images: page.images,
+    // images와 같은 순서. 받지 못한 이미지는 null이다.
+    imageFiles,
     excerpt: page.excerpt,
     candidates,
     flags: [
       ...flags,
+      ...(page.images.length && !imageFiles.some(Boolean) ? ['image-not-cached'] : []),
       ...(rank === null ? ['rank-missing'] : []),
       ...(title.rank === null && rank !== null ? ['rank-from-hint'] : []),
       ...(titledSeason === null ? ['season-missing'] : []),

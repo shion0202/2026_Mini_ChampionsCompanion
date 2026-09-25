@@ -5,6 +5,7 @@
 첫 번째 파티 이미지가 작성자의 최종 사용 파티라는 보장은 없다.
 후보 수집과 1차 추출은 `npm run articles`가 맡는다([docs/article-collection.md](article-collection.md)).
 그 결과는 `pending`으로만 들어오며, 아래 기준으로 사람이 확인해야 공개된다.
+큐를 판정하는 순서는 [article-judging.md](article-judging.md)에 있다.
 서버 DB와 순위의 공식 인증은 제공하지 않는다.
 
 ## 기사 추가

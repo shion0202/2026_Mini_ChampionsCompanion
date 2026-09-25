@@ -308,6 +308,10 @@ OCR은 하지 않는다. 3단계에서 AI가 직접 본다.
 
 ## 3단계 · 판정
 
+절차는 [article-judging.md](article-judging.md)에 있다. 수집기가 본문 이미지(최대 세 장)를
+`.cache/articles/`에 받아 두고 큐의 `imageFiles`에 적는다. 파티 기사가 아니라고 판정한
+주소는 `scripts/article-skip.json`에 넣어 다시 큐에 올리지 않는다.
+
 Claude Code 세션이 큐와 캐시된 이미지를 읽고 최종 여섯 마리를 확정한 뒤
 `teamEvidence`와 `rankEvidence`를 쓴다. 이미지 한 장은 1~1.5k 토큰으로,
 `docs/articles.md` 2번 규칙인 본문과 이미지 대조를 원문 전문 없이 지킨다.
