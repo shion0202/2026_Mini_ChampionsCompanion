@@ -44,6 +44,7 @@ import {
   isSpreadMove,
   powerOf as damagePower,
   hitRange,
+  itemPowerOf,
 } from './damage-calc.js';
 import {
   damageCalcView,
@@ -2447,7 +2448,7 @@ function damageContext() {
   const spread =
     attacker.spread ??
     isSpreadMove(move, dmg.field, attackerSpecies ? grounded(attackerSpecies, attacker) : true);
-  const conditions = conditionsOf(move?.id, attacker.ability, attacker.pokemon);
+  const conditions = conditionsOf(move?.id, attacker.ability, attacker.pokemon, attacker.item);
   const input = move && {
     reference: state.reference,
     attacker,
@@ -2482,6 +2483,7 @@ function damageContext() {
     stab: quickStab,
     crit: !!attacker.crit,
     parentalBond: false,
+    itemPower: itemPowerOf(attacker),
   };
   const quickPower =
     quickAttack && quickBase ? { ...quickInput, power: damagePower(quickInput) } : null;
@@ -2589,12 +2591,16 @@ const DAMAGE_NUMBERS = {
   boostTotal: text => countValue(text, 42),
   stockpile: text => countValue(text, 3),
   damageTaken: text => countValue(text, 9999),
+  metronome: text => countValue(text, 6, 1),
+  toxicTurn: text => countValue(text, 15, 1),
+  helmetHits: text => countValue(text, 9),
+  roughSkinHits: text => countValue(text, 9),
 };
 // 세는 칸(맞은 횟수 등). 비우면 0.
-function countValue(text, max) {
-  if (text.trim() === '') return 0;
+function countValue(text, max, min = 0) {
+  if (text.trim() === '') return min;
   const value = Number(text);
-  return Number.isInteger(value) && value >= 0 ? Math.min(max, value) : undefined;
+  return Number.isInteger(value) && value >= min ? Math.min(max, value) : undefined;
 }
 
 // 숫자 칸 하나를 상태에 넣는다. 숫자 칸이 아니면 false.

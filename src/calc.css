@@ -467,3 +467,26 @@
 .calc-group.is-conditional legend {
   color: var(--teal);
 }
+/* 계산기의 고르기 칸. 브라우저 화살표는 칸 끝에 붙어 보여 직접 그리고 안쪽으로 들인다.
+   두 삼각형(선형 그라디언트)으로 그려 글자색(currentColor)을 따른다. */
+.calc-panel select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) 50%,
+    calc(100% - 17px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+/* 턴 종료 데미지를 포함한 KO 정보. 공격만의 KO 정보와 구분한다. */
+.dmg-box.is-residual {
+  margin-top: 8px;
+  border: 1px dashed var(--line);
+}
+.dmg-sub-end {
+  text-align: right;
+}

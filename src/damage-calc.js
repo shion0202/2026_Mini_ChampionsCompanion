@@ -146,8 +146,15 @@ export const MOVE_CONDITIONS = {
   lowkick: { weight: 'defender' },
   grassknot: { weight: 'defender' },
 };
+// 도구의 조건. 메트로놈은 같은 기술을 몇 번째 잇달아 쓰는지 묻는다(1이면 보정 없음).
+export const ITEM_CONDITIONS = {
+  metronome: { count: 'metronome' },
+};
 // 특성의 조건. 위와 같은 모양이다.
 export const ABILITY_CONDITIONS = {
+  flashfire: { toggle: 'flashFire' },
+  plus: { toggle: 'plusMinus' },
+  minus: { toggle: 'plusMinus' },
   analytic: { toggle: 'movesLast' },
   stakeout: { toggle: 'targetSwitched' },
   supremeoverlord: { count: 'fainted' },
@@ -239,7 +246,8 @@ export function basePowerMods(ctx) {
     (a === 'technician' && ctx.basePower <= 60) ||
     (a === 'megalauncher' && traits.includes('pulse')) ||
     (a === 'strongjaw' && traits.includes('bite')) ||
-    (a === 'sharpness' && traits.includes('slicing'))
+    (a === 'sharpness' && traits.includes('slicing')) ||
+    (a === 'steelyspirit' && move.type === 'Steel')
   )
     mods.push(MOD.x1_5);
   if (attacker.charge && move.type === 'Electric') mods.push(MOD.x2);
@@ -291,6 +299,9 @@ export function attackMods(ctx) {
   if (physical && a === 'guts' && attacker.status) mods.push(MOD.x1_5);
   if (!physical && a === 'solarpower' && field.weather === 'sun') mods.push(MOD.x1_5);
   if (physical && a === 'gorillatactics') mods.push(MOD.x1_5);
+  // 타오르는불꽃이 발동한 뒤의 불꽃 기술, 아군이 플러스·마이너스일 때의 특수 기술.
+  if (a === 'flashfire' && attacker.flashFire && type === 'Fire') mods.push(MOD.x1_5);
+  if (!physical && (a === 'plus' || a === 'minus') && attacker.plusMinus) mods.push(MOD.x1_5);
   const pinch = { overgrow: 'Grass', blaze: 'Fire', torrent: 'Water', swarm: 'Bug' }[a];
   if (pinch === type && ctx.attackerHp <= ctx.attackerHpMax / 3) mods.push(MOD.x1_5);
   if (a === 'defeatist' && ctx.attackerHp <= ctx.attackerHpMax / 2) mods.push(MOD.x0_5);
@@ -339,9 +350,17 @@ const weatherDefense = (weather, types, usesDef) =>
     ? MOD.x1_5
     : 0;
 
+// 메트로놈. 같은 기술을 잇달아 쓴 횟수(첫 번째는 0)에 따라 최대 2배.
+export const METRONOME = [4096, 4915, 5734, 6553, 7372, 8192];
+export const metronomeMod = (attacker, turn = 1) =>
+  attacker.item === 'metronome'
+    ? METRONOME[clamp((attacker.metronome ?? 1) - 1 + (turn - 1), 0, 5)]
+    : 4096;
+
 // 마지막 배율(onModifyDamage). full은 방어 측 HP가 가득인지(멀티스케일),
-// fresh는 싸움의 첫 타격인지(반감 열매는 한 번 먹으면 없다)다.
-export function finalMods(ctx, full = true, fresh = true) {
+// fresh는 싸움의 첫 타격인지(반감 열매는 한 번 먹으면 없다), turn은 몇 번째 공격인지
+// (메트로놈은 한 턴마다 한 단계 오른다)다.
+export function finalMods(ctx, full = true, fresh = true, turn = 1) {
   const { attacker, defender, field, move, effectiveness, crit, physical } = ctx;
   const mods = [];
   const doubles = field.format === 'doubles';
@@ -357,7 +376,8 @@ export function finalMods(ctx, full = true, fresh = true) {
   if (attacker.ability === 'sniper' && crit) mods.push(MOD.x1_5);
   if (attacker.ability === 'tintedlens' && effectiveness < 1) mods.push(MOD.x2);
   if (full && ['multiscale', 'shadowshield'].includes(defender.ability)) mods.push(MOD.x0_5);
-  if (defender.ability === 'fluffy' && ctx.contact) mods.push(MOD.x0_5);
+  // 복슬복슬·파동의방호는 접촉 기술을 절반으로 받는다.
+  if (['fluffy', 'auraguard'].includes(defender.ability) && ctx.contact) mods.push(MOD.x0_5);
   else if (defender.ability === 'punkrock' && (move.traits ?? []).includes('sound'))
     mods.push(MOD.x0_5);
   if (['filter', 'solidrock', 'prismarmor'].includes(defender.ability) && effectiveness > 1)
@@ -367,9 +387,17 @@ export function finalMods(ctx, full = true, fresh = true) {
   if (defender.ability === 'fluffy' && move.type === 'Fire') mods.push(MOD.x2);
   if (attacker.item === 'expertbelt' && effectiveness > 1) mods.push(MOD.x1_2);
   if (attacker.item === 'lifeorb') mods.push(MOD.lifeOrb);
+  const metronome = metronomeMod(attacker, turn);
+  if (metronome !== 4096) mods.push(metronome);
   // 반감 열매. 노말은 치리열매(chilanberry)가 효과가 평범해도 발동한다. 숙성은 한 번 더 줄인다.
+  // 긴장감이 있으면 상대는 열매를 먹지 못한다.
   const berry = RESIST_BERRIES[defender.item];
-  if (fresh && berry === move.type && (effectiveness > 1 || berry === 'Normal'))
+  if (
+    fresh &&
+    attacker.ability !== 'unnerve' &&
+    berry === move.type &&
+    (effectiveness > 1 || berry === 'Normal')
+  )
     mods.push(defender.ability === 'ripen' ? MOD.x0_25 : MOD.x0_5);
   return mods;
 }
@@ -664,12 +692,15 @@ export function damageRolls(input) {
   const defenderSpecies = reference.species[input.defender.pokemon];
   if (!attackerSpecies || !defenderSpecies || !rawMove) return null;
   if (rawMove.category === 'Status') return { status: true };
-  const attacker = input.attacker;
+  // 서투름은 지닌 도구를 쓰지 못한다.
+  const withoutItem = side => (side.ability === 'klutz' ? { ...side, item: '' } : side);
+  const attacker = withoutItem(input.attacker);
   // 틀깨기류는 방어 측 특성 가운데 막을 수 있는 것을 없는 셈 친다.
-  const defender =
+  const defender = withoutItem(
     MOLD_BREAKERS.has(attacker.ability) && BREAKABLE_ABILITIES.has(input.defender.ability)
       ? { ...input.defender, ability: '' }
-      : input.defender;
+      : input.defender,
+  );
   const suppressed = [attacker.ability, defender.ability].some(a => WEATHER_SUPPRESSORS.has(a));
   const field = { ...input.field, weather: suppressed ? '' : (input.field.weather ?? '') };
   // 메가솔라는 자신의 기술에 늘 쾌청을 적용한다(날씨 배율·웨더볼·솔라빔).
@@ -712,8 +743,20 @@ export function damageRolls(input) {
   }
   const physical = move.category === 'Physical';
   // 펀치글러브를 끼면 펀치 기술이 접촉하지 않는다.
+  // 펀치글러브를 낀 펀치 기술과 원격 특성은 접촉하지 않는다.
   const contact =
-    traits.includes('contact') && !(attacker.item === 'punchingglove' && traits.includes('punch'));
+    traits.includes('contact') &&
+    attacker.ability !== 'longreach' &&
+    !(attacker.item === 'punchingglove' && traits.includes('punch'));
+  // 우선도. 질풍날개는 HP가 가득일 때 비행 기술, 그래스슬라이더는 그래스필드에서 +1.
+  const priority =
+    (move.priority ?? 0) +
+    ((attacker.ability === 'galewings' &&
+      move.type === 'Flying' &&
+      env.attackerHp >= attackerHpMax) ||
+    (move.id === 'grassyglide' && field.terrain === 'grassy' && attackerGrounded)
+      ? 1
+      : 0);
   const special = MOVE_STATS[move.id] ?? {};
   const usesDef = special.defense ? special.defense === 'def' : physical;
   const attackerTypes = attackerSpecies.types;
@@ -744,8 +787,9 @@ export function damageRolls(input) {
     )
       return { immune: true, byAbility: d };
     // 사이코필드에서는 땅에 붙은 상대에게 선제기가 막힌다.
-    if (field.terrain === 'psychic' && move.priority > 0 && defenderGrounded)
-      return { blocked: true };
+    // 여왕의위엄·테일아머도 선제기를 막는다.
+    if (priority > 0 && ['queenlymajesty', 'armortail'].includes(d)) return { blocked: true };
+    if (field.terrain === 'psychic' && priority > 0 && defenderGrounded) return { blocked: true };
     if (NEEDS_TERRAIN.has(move.id) && !field.terrain) return { blocked: true };
     // 폴터가이스트는 도구가 없는 상대에게 실패한다.
     if (move.id === 'poltergeist' && !defender.item) return { blocked: true };
@@ -791,8 +835,12 @@ export function damageRolls(input) {
     };
   }
 
+  // 무도한행동은 독 상태인 상대에게 늘 급소다.
   const crit =
-    (!!input.crit || ALWAYS_CRIT.has(move.id)) && !['shellarmor', 'battlearmor'].includes(d);
+    (!!input.crit ||
+      ALWAYS_CRIT.has(move.id) ||
+      (attacker.ability === 'merciless' && ['psn', 'tox'].includes(defender.status))) &&
+    !['shellarmor', 'battlearmor'].includes(d);
   const speedsNeeded = MOVE_CONDITIONS[move.id]?.speed;
   env.speeds = speedsNeeded && {
     attacker: speedOf(attacker, attackerSpecies, field),
@@ -804,9 +852,10 @@ export function damageRolls(input) {
   };
 
   // 탁쳐서떨구기는 떨굴 수 있는 도구가 있으면 1.5배. 자기 메가스톤은 떨굴 수 없다.
-  const heldItem = reference.held_item?.[defender.item];
+  // 서투름이어도 도구는 지니고 있으므로 떨굴 수 있다(원래 입력의 도구를 본다).
+  const heldItem = reference.held_item?.[input.defender.item];
   const knockable =
-    !!defender.item &&
+    !!input.defender.item &&
     !(
       heldItem?.megaStone &&
       reference.species[heldItem.megaStone]?.baseSpecies === defenderSpecies.baseSpecies
@@ -896,8 +945,10 @@ export function damageRolls(input) {
 
   // 타격 하나의 난수 16개. hit는 1부터, full은 방어 측 HP가 가득인지, fresh는 싸움의 첫 타격인지.
   const cache = new Map();
-  const rollsAt = (hit, full, fresh) => {
-    const key = `${hit}|${full}|${fresh}`;
+  const rollsAt = (hit, full, fresh, rawTurn = 1) => {
+    // 턴에 따라 달라지는 것은 메트로놈뿐이라 그때만 턴을 나눠 기억한다.
+    const turn = attacker.item === 'metronome' ? rawTurn : 1;
+    const key = `${hit}|${full}|${fresh}|${turn}`;
     if (cache.has(key)) return cache.get(key);
     // 부자유친의 두 번째 타격은 첫 타격 뒤라 떨굴 도구도 먹을 열매도 이미 없다.
     const first = fresh && hit === 1;
@@ -907,7 +958,7 @@ export function damageRolls(input) {
     else if (parentalBond && hit > 1) dmg = applyMod(dmg, MOD.x0_25);
     if (weatherMod) dmg = applyMod(dmg, weatherMod);
     if (crit) dmg = Math.floor(dmg * 1.5);
-    const final = chainAll(finalMods(ctx, full, first));
+    const final = chainAll(finalMods(ctx, full, first, turn));
     const rolls = [];
     for (let r = 85; r <= 100; r++) {
       let x = Math.floor((dmg * r) / 100);
@@ -945,11 +996,40 @@ export function damageRolls(input) {
     attackStat,
     defenseStat,
     crit,
+    itemPower: itemPowerOf(attacker, effectiveness),
+    itemFolded: itemFoldedOf(attacker, move, physical, attackerSpecies),
     speeds: env.speeds || null,
     weights: env.weights || null,
     attackerHp: env.attackerHp,
     attackerHpMax,
   };
+}
+
+// 결정력에 곱하는 도구(마지막 배율): 생명의구슬, 달인의띠(효과가 굉장할 때), 메트로놈.
+export function itemPowerOf(attacker, effectiveness = 1) {
+  const mod =
+    attacker.item === 'lifeorb'
+      ? MOD.lifeOrb
+      : attacker.item === 'expertbelt' && effectiveness > 1
+        ? MOD.x1_2
+        : metronomeMod(attacker);
+  return mod === 4096 ? null : { id: attacker.item, factor: mod / 4096 };
+}
+// 위력이나 공격 실수치에 이미 들어간 도구. 결정력 식에 ‘반영’으로 알린다.
+function itemFoldedOf(attacker, move, physical, species) {
+  const item = attacker.item;
+  const traits = move.traits ?? [];
+  if (
+    TYPE_BOOST_ITEMS[item] === move.type ||
+    (item === 'muscleband' && physical) ||
+    (item === 'wiseglasses' && !physical) ||
+    (item === 'punchingglove' && traits.includes('punch')) ||
+    (item === 'choiceband' && physical) ||
+    (item === 'choicespecs' && !physical) ||
+    (item === 'lightball' && species.baseSpecies === 'Pikachu')
+  )
+    return item;
+  return null;
 }
 
 // 고정 데미지 기술. 해당하지 않으면 null.
@@ -1001,7 +1081,67 @@ export function hazardDamage(defender, species, chart, hpMax) {
   const layers = clamp(defender.spikes ?? 0, 0, 3);
   if (layers && grounded(species, defender))
     total += Math.max(1, Math.floor(([0, 3, 4, 6][layers] * hpMax) / 24));
+  // 앞서 접촉 공격으로 받은 반동. 울퉁불퉁멧 1/6, 까칠한피부·철가시 1/8씩.
+  total += clamp(defender.helmetHits ?? 0, 0, 9) * Math.max(1, Math.floor(hpMax / 6));
+  total += clamp(defender.roughSkinHits ?? 0, 0, 9) * Math.max(1, Math.floor(hpMax / 8));
   return total;
+}
+
+// ── 턴 종료 ───────────────────────────────────────────────────────
+// 턴이 끝날 때 방어 측이 받는 데미지(−)와 회복(+). Showdown의 onResidualOrder 순서다:
+// 날씨(모래바람, 젖은접시·아이스바디·건조피부·선파워) → 그래스필드 → 먹다남은음식·검은진흙 →
+// 씨뿌리기 → 독·맹독(포이즌힐) → 화상 → 바인드(조임밴드) → 소금절이.
+// turn은 1부터. 맹독은 toxicTurn번째 턴부터 1/16씩 늘어난다. 매직가드는 데미지를 받지 않는다.
+export function residualEffects({ attacker, defender, field, species, hpMax }) {
+  const part = n => Math.max(1, Math.floor(hpMax / n));
+  const types = species.types;
+  const a = defender.ability;
+  const guard = a === 'magicguard';
+  const weather = [attacker.ability, a].some(x => WEATHER_SUPPRESSORS.has(x)) ? '' : field.weather;
+  const list = [];
+  const damage = (label, amount) => !guard && list.push({ label, amount: -amount });
+  const heal = (label, amount) => list.push({ label, amount });
+  if (
+    weather === 'sand' &&
+    !types.some(t => ['Rock', 'Ground', 'Steel'].includes(t)) &&
+    !['sandveil', 'sandrush', 'sandforce', 'overcoat'].includes(a) &&
+    defender.item !== 'safetygoggles'
+  )
+    damage('모래바람', part(16));
+  if (weather === 'rain' && a === 'raindish') heal('젖은접시', part(16));
+  if (weather === 'snow' && a === 'icebody') heal('아이스바디', part(16));
+  if (weather === 'rain' && a === 'dryskin') heal('건조피부', part(8));
+  if (weather === 'sun' && (a === 'dryskin' || a === 'solarpower'))
+    damage(a === 'dryskin' ? '건조피부' : '선파워', part(8));
+  if (field.terrain === 'grassy' && grounded(species, defender)) heal('그래스필드', part(16));
+  if (defender.item === 'leftovers') heal('먹다남은음식', part(16));
+  if (defender.item === 'blacksludge')
+    types.includes('Poison') ? heal('검은진흙', part(16)) : damage('검은진흙', part(8));
+  if (defender.leechSeed) damage('씨뿌리기', part(8));
+  const status = defender.status;
+  if ((status === 'psn' || status === 'tox') && a === 'poisonheal') heal('포이즌힐', part(8));
+  else if (status === 'psn') damage('독', part(8));
+  else if (status === 'tox') list.push({ label: '맹독', toxic: true });
+  if (status === 'brn') damage('화상', part(a === 'heatproof' ? 32 : 16));
+  if (defender.bound)
+    damage(
+      attacker.item === 'bindingband' ? '바인드 (조임밴드)' : '바인드',
+      part(attacker.item === 'bindingband' ? 6 : 8),
+    );
+  if (defender.saltCure)
+    damage('소금절이', part(types.some(t => t === 'Water' || t === 'Steel') ? 4 : 8));
+  const start = clamp(defender.toxicTurn ?? 1, 1, 15);
+  // 턴마다의 목록. 맹독만 턴에 따라 커진다.
+  return turn =>
+    list
+      .map(e =>
+        e.toxic
+          ? guard
+            ? null
+            : { label: '맹독', amount: -part(16) * Math.min(15, start + turn - 1) }
+          : e,
+      )
+      .filter(Boolean);
 }
 
 // ── 결과 묶음 ─────────────────────────────────────────────────────
@@ -1031,6 +1171,8 @@ export function damageSummary(input) {
       stab: open.stab,
       crit: open.crit,
       parentalBond: open.parentalBond,
+      itemPower: open.itemPower,
+      itemFolded: open.itemFolded,
       hits: open.hits,
       speeds: open.speeds,
       weights: open.weights,
@@ -1062,6 +1204,18 @@ export function damageSummary(input) {
   const endure = full && (defender.item === 'focussash' || (d === 'sturdy' && !breaker));
   const disguise = d === 'disguise' && !breaker && !String(defender.pokemon).endsWith('busted');
   const table = koOdds({ hits, rollsAt, hp: hpStart, maxHp: hpMax, endure, disguise });
+  // 턴 종료 데미지는 공격과 따로 본다. 있으면 포함한 KO 표를 하나 더 만든다.
+  const residual = residualEffects({
+    attacker: input.attacker,
+    defender,
+    field: input.field,
+    species,
+    hpMax,
+  });
+  const residualFirst = residual(1);
+  const residualTable = residualFirst.length
+    ? koOdds({ hits, rollsAt, hp: hpStart, maxHp: hpMax, endure, disguise, residual })
+    : null;
   const bulkOf = key => {
     const value = stat(
       species.stats[key],
@@ -1083,6 +1237,9 @@ export function damageSummary(input) {
     maxPercent: (max / hpMax) * 100,
     table,
     verdict: koVerdict(table),
+    residual: residualFirst,
+    residualTable,
+    residualVerdict: residualTable ? koVerdict(residualTable) : null,
     power: result.fixed ? null : powerOf(result),
     bulk: result.fixed ? null : Math.floor((hpMax * result.defenseStat) / 0.411),
     bulks: { def: bulkOf('def'), spd: bulkOf('spd') },
@@ -1091,11 +1248,12 @@ export function damageSummary(input) {
 
 // 결정력 = 공격 실수치 × 위력 × 자속 보정 × 급소(1.5)를 타격마다 더한 값.
 // 부자유친의 두 번째 타격은 1/4이다. 트리플악셀은 20·40·60을 모두 더한다.
-export function powerOf({ attackStat, hitPowers, stab, crit, parentalBond }) {
+// 생명의구슬·달인의띠·메트로놈처럼 마지막에 곱하는 도구도 넣는다(itemPower).
+export function powerOf({ attackStat, hitPowers, stab, crit, parentalBond, itemPower }) {
   const perHit = hitPowers.map(
     (bp, i) => attackStat * bp * stab * (crit ? 1.5 : 1) * (parentalBond && i > 0 ? 0.25 : 1),
   );
-  return Math.floor(perHit.reduce((sum, value) => sum + value, 0));
+  return Math.floor(perHit.reduce((sum, value) => sum + value, 0) * (itemPower?.factor ?? 1));
 }
 
 // ── 몇 번에 쓰러지는가 ─────────────────────────────────────────────
@@ -1104,12 +1262,22 @@ export function powerOf({ attackStat, hitPowers, stab, crit, parentalBond }) {
 //  endure    HP가 가득일 때 쓰러질 데미지를 1 남기고 버틴다(기합의띠·옹골참).
 //  disguise  첫 타격을 막고 최대 HP의 1/8을 받는다(탈).
 // 반환: 1~maxTurns번 공격했을 때 각각 쓰러뜨렸을 확률.
-export function koOdds({ hits, rollsAt, hp, maxHp = Infinity, endure, disguise, maxTurns = 4 }) {
+//  residual  턴마다의 턴 종료 목록(residualEffects). 공격 뒤 차례로 적용한다.
+export function koOdds({
+  hits,
+  rollsAt,
+  hp,
+  maxHp = Infinity,
+  endure,
+  disguise,
+  residual,
+  maxTurns = 4,
+}) {
   if (!hits || hp <= 0) return [];
   const dist = new Map();
-  const distOf = (hit, full, fresh) => {
-    const key = `${hit}|${full}|${fresh}`;
-    if (!dist.has(key)) dist.set(key, distribution(rollsAt(hit, full, fresh)));
+  const distOf = (hit, full, fresh, turn) => {
+    const key = `${hit}|${full}|${fresh}|${turn}`;
+    if (!dist.has(key)) dist.set(key, distribution(rollsAt(hit, full, fresh, turn)));
     return dist.get(key);
   };
   let states = new Map([[stateKey(hp, !!disguise), 1]]);
@@ -1129,11 +1297,26 @@ export function koOdds({ hits, rollsAt, hp, maxHp = Infinity, endure, disguise, 
           continue;
         }
         const isFull = h >= maxHp;
-        for (const [damage, q] of distOf(hit, isFull, turn === 1)) {
+        for (const [damage, q] of distOf(hit, isFull, turn === 1, turn)) {
           let left = h - damage;
           if (left <= 0 && endure && isFull) left = 1;
           add(left, false, p * q);
         }
+      }
+      states = next;
+    }
+    // 턴 종료. 데미지로 쓰러지면 그 턴에 쓰러진 것으로 센다. 회복은 최대 HP까지.
+    const effects = residual?.(turn) ?? [];
+    if (effects.length) {
+      const next = new Map();
+      for (const [key, p] of states) {
+        let [h, masked] = parseState(key);
+        for (const { amount } of effects) {
+          h = Math.min(maxHp, h + amount);
+          if (h <= 0) break;
+        }
+        if (h <= 0) fainted += p;
+        else next.set(stateKey(h, masked), (next.get(stateKey(h, masked)) ?? 0) + p);
       }
       states = next;
     }

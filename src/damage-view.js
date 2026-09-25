@@ -6,12 +6,13 @@ import { portrait, typeBadges } from './app-view.js';
 import { speciesSprite } from './images.js';
 import { TYPE_LABELS } from './locale.js';
 import { CATEGORY_NAMES } from './reference-view.js';
-import { WEATHERS, TERRAINS, STATUSES, NATURE_FACTORS } from './speed-calc.js';
+import { WEATHERS, TERRAINS, NATURE_FACTORS } from './speed-calc.js';
 import {
   MOVE_STATS,
   MOVE_CONDITIONS,
   ABILITY_CONDITIONS,
   FIXED_DAMAGE_MOVES,
+  ITEM_CONDITIONS,
 } from './damage-calc.js';
 
 // 조사를 이름에 붙여 만들지 않는다. ‘방어으로’처럼 틀린다.
@@ -37,6 +38,8 @@ const TOGGLE_LABELS = {
   fickle: '위력 두 배가 발동함 (30%)',
   targetSwitched: '상대가 이번 턴에 교체해 나옴',
   hangry: '배고픈 모습 (악 타입)',
+  flashFire: '타오르는불꽃 발동 (불꽃 기술 ×1.5)',
+  plusMinus: '아군이 플러스·마이너스 (특수 기술 ×1.5)',
 };
 const COUNT_FIELDS = {
   timesHit: { label: '공격받은 횟수', max: 6 },
@@ -44,7 +47,18 @@ const COUNT_FIELDS = {
   boostTotal: { label: '올라간 랭크 합계', max: 42 },
   stockpile: { label: '비축하기 횟수', max: 3 },
   damageTaken: { label: '받은 데미지', max: 9999 },
+  metronome: { label: '메트로놈 연속 사용 (N번째)', min: 1, max: 6 },
 };
+// 상태이상. 데미지 계산기는 독과 맹독을 나눈다(턴 종료 데미지가 다르다).
+const DAMAGE_STATUSES = [
+  ['', '없음'],
+  ['par', '마비'],
+  ['brn', '화상'],
+  ['psn', '독'],
+  ['tox', '맹독'],
+  ['slp', '잠듦'],
+  ['frz', '얼음'],
+];
 const SPIKES = [
   ['0', '없음'],
   ['1', '1중첩'],
@@ -54,8 +68,8 @@ const SPIKES = [
 
 // 이 기술과 특성이 묻는 조건. 둘이 같은 것을 물으면 한 번만 보인다. species가 붙은 조건은
 // 그 포켓몬일 때만 묻는다(오라휠의 배고픈 모습은 모르페코만).
-export function conditionsOf(moveId, ability, pokemon = '') {
-  const list = [MOVE_CONDITIONS[moveId], ABILITY_CONDITIONS[ability]].filter(
+export function conditionsOf(moveId, ability, pokemon = '', item = '') {
+  const list = [MOVE_CONDITIONS[moveId], ABILITY_CONDITIONS[ability], ITEM_CONDITIONS[item]].filter(
     c => c && (!c.species || String(pokemon).startsWith(c.species)),
   );
   return {
@@ -253,7 +267,7 @@ function attackerPanel(state, context) {
     (fixed ? '' : attackGroups()) +
     abilityItemGroup(side, reference) +
     `<fieldset class="calc-group"><legend>상태 · 날씨 · 필드</legend><div class="calc-grid">` +
-    `<label class="calc-field">상태이상<select data-dmg-field="status">${options(Object.entries(STATUSES), side.status)}</select></label>` +
+    `<label class="calc-field">상태이상<select data-dmg-field="status">${options(DAMAGE_STATUSES, side.status)}</select></label>` +
     `<label class="calc-field">날씨<select data-dmg-field="weather">${options(Object.entries(WEATHERS), state.field.weather)}</select></label>` +
     `<label class="calc-field">필드<select data-dmg-field="terrain">${options(Object.entries(TERRAINS), state.field.terrain)}</select></label>` +
     `</div>` +
@@ -278,7 +292,7 @@ function conditionGroup(side, conditions, stats) {
       .map(
         key =>
           `<div class="calc-line"><span>${COUNT_FIELDS[key].label}</span>` +
-          `<input type="number" min="0" max="${COUNT_FIELDS[key].max}" step="1" value="${side[key] ?? 0}" data-dmg-number="${key}" aria-label="${COUNT_FIELDS[key].label}"></div>`,
+          `<input type="number" min="${COUNT_FIELDS[key].min ?? 0}" max="${COUNT_FIELDS[key].max}" step="1" value="${side[key] ?? COUNT_FIELDS[key].min ?? 0}" data-dmg-number="${key}" aria-label="${COUNT_FIELDS[key].label}"></div>`,
       )
       .join('') +
     toggles.map(key => check(key, side[key], TOGGLE_LABELS[key])).join('') +
@@ -328,11 +342,28 @@ function defenderPanel(state, context) {
     abilityItemGroup(side, reference) +
     // 방어 측 상태이상은 병상첨병·베놈쇼크 같은 기술과 이상한비늘이 본다.
     // 설치 기술은 교체해 나올 때 받으므로 남은 HP에서 먼저 뺀다.
-    `<fieldset class="calc-group"><legend>상태 · 벽 · 설치 기술</legend><div class="calc-grid">` +
-    `<label class="calc-field">상태이상<select data-dmg-field="status">${options(Object.entries(STATUSES), side.status ?? '')}</select></label>` +
+    // 날씨·필드는 공격 측 칸과 같은 값이다. 좁은 화면에서 두 칸이 세로로 쌓여도 고칠 수 있다.
+    `<fieldset class="calc-group"><legend>상태 · 날씨 · 필드</legend><div class="calc-grid">` +
+    `<label class="calc-field">상태이상<select data-dmg-field="status">${options(DAMAGE_STATUSES, side.status ?? '')}</select></label>` +
+    `<label class="calc-field">날씨<select data-dmg-field="weather">${options(Object.entries(WEATHERS), state.field.weather)}</select></label>` +
+    `<label class="calc-field">필드<select data-dmg-field="terrain">${options(Object.entries(TERRAINS), state.field.terrain)}</select></label>` +
+    `</div></fieldset>` +
+    // 턴 종료 데미지. 공격 데미지와 따로 보인다(결과의 ‘턴 종료 포함’).
+    `<fieldset class="calc-group"><legend>턴 종료 데미지</legend>` +
+    (side.status === 'tox'
+      ? `<div class="calc-line"><span>맹독 (N턴째)</span><input type="number" min="1" max="15" step="1" value="${side.toxicTurn ?? 1}" data-dmg-number="toxicTurn" aria-label="맹독 경과 턴"></div>`
+      : '') +
+    check('bound', side.bound, '바인드 (김밥말이 등, 공격 측이 조임밴드면 1/6)') +
+    check('leechSeed', side.leechSeed, '씨뿌리기') +
+    check('saltCure', side.saltCure, '소금절이') +
+    `<p class="calc-note">상태이상, 날씨, 그래스필드, 먹다남은음식·검은진흙은 고른 값으로 자동 반영합니다.</p>` +
+    `</fieldset>` +
+    `<fieldset class="calc-group"><legend>벽 · 설치 기술 · 반동</legend><div class="calc-grid">` +
     `<label class="calc-field">압정뿌리기<select data-dmg-field="spikes">${options(SPIKES, String(side.spikes ?? 0))}</select></label>` +
     `</div>` +
     check('stealthRock', side.stealthRock, '스텔스록') +
+    `<div class="calc-line"><span>울퉁불퉁멧 (1/6)</span><input type="number" min="0" max="9" step="1" value="${side.helmetHits ?? 0}" data-dmg-number="helmetHits" aria-label="울퉁불퉁멧 데미지를 받은 횟수"><small class="calc-note">받은 횟수</small></div>` +
+    `<div class="calc-line"><span>까칠한피부·철가시 (1/8)</span><input type="number" min="0" max="9" step="1" value="${side.roughSkinHits ?? 0}" data-dmg-number="roughSkinHits" aria-label="까칠한피부·철가시 데미지를 받은 횟수"><small class="calc-note">받은 횟수</small></div>` +
     check('reflect', side.reflect, '리플렉터') +
     check('lightScreen', side.lightScreen, '빛의장막') +
     check('auroraVeil', side.auroraVeil, '오로라베일') +
@@ -390,12 +421,7 @@ export function damageResult(summary, context) {
     `</div>`;
   if (!summary || summary.reason) return `<div class="dmg-result">${head}</div>`;
   const hits = summary.hits;
-  const ko = summary.table
-    .map(row => {
-      const text = row.chance >= 1 ? '확정' : row.chance > 0 ? percent(row.chance * 100) : '불가';
-      return `<span class="dmg-chip${row.chance >= 1 ? ' is-sure' : row.chance > 0 ? ' is-maybe' : ''}">${row.turns}타 ${text}</span>`;
-    })
-    .join('');
+  const ko = koChips(summary.table);
   // 난수 16개는 데미지 범위 아래 ‘상세 보기’를 눌러야 보인다. 타격마다 다르면(부자유친,
   // 트리플악셀, 멀티스케일) 타격마다 한 줄씩.
   const chips = rolls => rolls.map(r => `<span class="dmg-chip">${r}</span>`).join('');
@@ -408,9 +434,20 @@ export function damageResult(summary, context) {
             `<small>난수 데미지 (${i + 1}타째)</small><div class="dmg-chips">${chips(r)}</div>`,
         )
         .join('');
+  // 턴 종료 데미지는 공격 데미지와 따로 보인다. 포함한 KO 정보를 한 줄 더 둔다.
+  const residualText = summary.residual
+    .map(e => `${e.label} ${e.amount > 0 ? '+' : '−'}${Math.abs(e.amount)}`)
+    .join(' · ');
+  const residualNet = summary.residual.reduce((sum, e) => sum + e.amount, 0);
+  const residualBlock = summary.residualTable
+    ? `<div class="dmg-row"><span>턴 종료</span><strong>${esc(residualText)}</strong></div>` +
+      `<small class="dmg-sub dmg-sub-end">1턴째 합계 ${residualNet > 0 ? '+' : residualNet < 0 ? '−' : ''}${Math.abs(residualNet)} (최대 HP의 ${percent((Math.abs(residualNet) / summary.hpMax) * 100)})</small>` +
+      `<div class="dmg-box is-residual"><small>KO 정보 (턴 종료 데미지 포함) · ${esc(summary.residualVerdict.chance < 1 && summary.residualVerdict.turns ? `${summary.residualVerdict.text} (${percent(summary.residualVerdict.chance * 100)})` : summary.residualVerdict.text)}</small>` +
+      `<div class="dmg-chips">${koChips(summary.residualTable)}</div></div>`
+    : '';
   const notes = [
     summary.hazard
-      ? `설치 기술로 ${summary.hazard} 데미지를 먼저 받습니다 (남은 HP ${summary.hpStart}/${summary.hpMax}).`
+      ? `설치 기술·반동으로 ${summary.hazard} 데미지를 먼저 받습니다 (남은 HP ${summary.hpStart}/${summary.hpMax}).`
       : '',
     summary.endure ? '기합의띠·옹골참: HP가 가득일 때 한 번은 HP 1로 버팁니다.' : '',
     summary.disguise ? '탈: 첫 공격을 막고 최대 HP의 1/8만 받습니다.' : '',
@@ -426,11 +463,21 @@ export function damageResult(summary, context) {
     `<details class="dmg-rolls"${state.rollsOpen ? ' open' : ''}><summary>상세 보기</summary>${rolls}</details>` +
     `<div class="dmg-row"><span>결과</span><strong>${esc(verdictText)}</strong></div>` +
     `<div class="dmg-row"><span>1타 확률</span><strong>${percent((summary.table[0]?.chance ?? 0) * 100)}</strong></div>` +
-    `<div class="dmg-box"><small>KO 정보</small><div class="dmg-chips">${ko}</div></div>` +
+    `<div class="dmg-box"><small>KO 정보 (공격만)</small><div class="dmg-chips">${ko}</div></div>` +
+    residualBlock +
     noteBlock +
     `</div>`;
   return `<div class="dmg-result">${head}${detail}</div>`;
 }
+
+// KO 칩. 확정이면 청록, 난수면 주황, 불가면 색 없음.
+const koChips = table =>
+  table
+    .map(row => {
+      const text = row.chance >= 1 ? '확정' : row.chance > 0 ? percent(row.chance * 100) : '불가';
+      return `<span class="dmg-chip${row.chance >= 1 ? ' is-sure' : row.chance > 0 ? ' is-maybe' : ''}">${row.turns}타 ${text}</span>`;
+    })
+    .join('');
 
 // 결정력 칸. 기술 칸 위에 두고, 값을 바꾸면 바로 고친다(app.js의 renderDamageResult).
 // 방어 측을 고르지 않았어도 공격 실수치 × 위력 × 자속 보정으로 보인다(quickPower).
@@ -466,12 +513,17 @@ export function powerBox(summary, context) {
     `${quick.stab !== 1 ? ` × 자속 보정 ${quick.stab}` : ''}` +
     `${quick.crit ? ' × 급소 1.5' : ''}` +
     `${hits > 1 && !varies ? ` × ${hits}타` : ''}` +
-    `${quick.parentalBond ? ' (두 번째 타격 1/4)' : ''}`;
+    `${quick.parentalBond ? ' (두 번째 타격 1/4)' : ''}` +
+    // 마지막에 곱하는 도구는 곱으로, 위력·공격에 이미 들어간 도구는 ‘반영’으로 알린다.
+    `${quick.itemPower ? ` × ${itemLabel(context.reference, quick.itemPower.id)} ${Math.round(quick.itemPower.factor * 10) / 10}` : ''}` +
+    `${quick.itemFolded ? ` (${itemLabel(context.reference, quick.itemFolded)} 반영)` : ''}`;
   return (
     `<div class="dmg-quick"><span>결정력</span><strong>${quick.power.toLocaleString()}</strong>` +
     `<small>${formula}</small></div>`
   );
 }
+
+const itemLabel = (reference, id) => esc(reference?.held_item?.[id]?.label ?? id);
 
 // 내구력 칸. HP 칸 위에 두고, 물리·특수를 함께 보인다. 기술이 쓰는 쪽을 굵게 한다.
 // HP × 방어(랭크 포함) ÷ 0.411. 도구·특성의 배율은 넣지 않는다.

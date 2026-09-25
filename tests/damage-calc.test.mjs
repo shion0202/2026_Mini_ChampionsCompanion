@@ -541,3 +541,76 @@ test('fixed damage, fling, spit up and power without damage', () => {
   assert.equal(immune.reason, '효과가 없습니다.');
   assert.ok(immune.power > 0);
 });
+
+test('end-of-turn damage is shown apart and has its own KO table', () => {
+  const summary = (defender, attacker = {}, field = {}) =>
+    damageSummary({
+      reference,
+      attacker: side('garchomp', { atk: 32 }, attacker),
+      defender: side('dragonite', { hp: 32 }, { hpPercent: 100, ...defender }),
+      field: { format: 'singles', weather: '', terrain: '', ...field },
+      move: { ...reference.move.earthquake, id: 'earthquake' },
+      crit: false,
+    });
+  // 지진은 망나뇽에게 무효라 데미지가 없어 표가 없다. 한카리아스로 바꾼다.
+  const run = (defender, attacker, field) =>
+    damageSummary({
+      reference,
+      attacker: side('garchomp', { atk: 32 }, attacker),
+      defender: side('snorlax', { hp: 32 }, { hpPercent: 100, ...defender }),
+      field: { format: 'singles', weather: '', terrain: '', ...field },
+      move: { ...reference.move.dragonclaw, id: 'dragonclaw' },
+    });
+  assert.equal(summary({}).reason, '효과가 없습니다.');
+  const plain = run({});
+  assert.equal(plain.residualTable, null, '턴 종료 데미지가 없으면 표도 없다');
+  const hpMax = plain.hpMax;
+  const burned = run({ status: 'brn', hpPercent: 90 });
+  const hurt = run({ hpPercent: 90 });
+  assert.deepEqual(burned.residual, [{ label: '화상', amount: -Math.floor(hpMax / 16) }]);
+  assert.deepEqual(burned.table, hurt.table, '공격만의 KO 표는 그대로다');
+  assert.ok(burned.residualTable.some((row, i) => row.chance > hurt.table[i].chance));
+  const bound = run({ bound: true }, { item: 'bindingband' });
+  assert.equal(bound.residual[0].amount, -Math.floor(hpMax / 6), '조임밴드는 1/6');
+  assert.equal(run({ bound: true }).residual[0].amount, -Math.floor(hpMax / 8));
+  const toxic = run({ status: 'tox', toxicTurn: 3 });
+  assert.equal(toxic.residual[0].amount, -Math.floor(hpMax / 16) * 3);
+  const left = run({ item: 'leftovers', status: 'psn' }, {}, { weather: 'sand' });
+  assert.deepEqual(
+    left.residual.map(e => e.label),
+    ['모래바람', '먹다남은음식', '독'],
+    '노말 타입은 모래바람을 받고, 순서는 날씨 → 먹다남은음식 → 독',
+  );
+  assert.equal(run({ status: 'brn', ability: 'magicguard' }).residualTable, null);
+});
+
+test('rocky helmet recoil comes off the HP like hazards', () => {
+  const run = extra =>
+    damageSummary({
+      reference,
+      attacker: side('garchomp', { atk: 32 }),
+      defender: side('snorlax', {}, { hpPercent: 100, ...extra }),
+      field: { format: 'singles', weather: '', terrain: '' },
+      move: { ...reference.move.dragonclaw, id: 'dragonclaw' },
+    });
+  const hpMax = run({}).hpMax;
+  assert.equal(run({ helmetHits: 2 }).hazard, Math.floor(hpMax / 6) * 2);
+  assert.equal(run({ roughSkinHits: 1 }).hazard, Math.floor(hpMax / 8));
+});
+
+test('metronome grows one step each turn and shows in power', () => {
+  const input = n => ({
+    reference,
+    attacker: side('garchomp', { atk: 32 }, { item: 'metronome', metronome: n }),
+    defender: side('snorlax', {}, { hpPercent: 100 }),
+    field: { format: 'singles', weather: '', terrain: '' },
+    move: { ...reference.move.dragonclaw, id: 'dragonclaw' },
+  });
+  const first = damageRolls(input(1));
+  assert.deepEqual(first.rollsAt(1, true, false, 2), damageRolls(input(2)).rolls);
+  assert.equal(first.itemPower, null, '첫 번째는 보정이 없다');
+  const third = damageSummary(input(3));
+  assert.equal(third.itemPower.factor, 5734 / 4096);
+  const plain = damageSummary({ ...input(1) });
+  assert.equal(third.power, Math.floor(plain.power * (5734 / 4096)));
+});
