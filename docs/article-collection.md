@@ -68,6 +68,8 @@ npm run articles -- --season M5 --from https://example.com/top-teams --no-search
 글은 힌트로 읽는다. 제목에 순위가 없는 기사라도 `最終12位`를 적어 두면 순위가
 채워지고 `rank-from-hint` 플래그가 붙는다. 브라우저로 저장한 목록 페이지 HTML을
 넘겨도 된다. 그때는 기사처럼 보이는 링크만 쓴다.
+무엇을 쓰고 무엇을 버렸는지는 `npm run leads -- leads\목록.html`로 본다(네트워크 없음).
+버린 링크에 파티 기사가 있으면 추출 규칙을 고친다.
 
 ```
 https://note.com/someone/n/n1234 最終12位
