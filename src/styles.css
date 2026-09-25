@@ -3465,25 +3465,19 @@ body.is-dragging-move {
   grid-template-columns: 1fr 1fr;
   gap: 4px;
 }
-/* 브라우저가 칸 안에 넣는 1씩 오르내리는 화살표는 너무 작아 걷어낸다. */
-.builds-point input::-webkit-outer-spin-button,
-.builds-point input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
+/* 1씩 오르내리는 화살표를 둔다(계산기의 숫자 칸과 같다). 화살표가 오른쪽을 차지하므로
+   숫자는 가운데가 아니라 왼쪽에 둔다. */
 .builds-point input {
-  appearance: textfield;
-  -moz-appearance: textfield;
   min-width: 0;
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 9px 6px;
+  padding: 9px 6px 9px 12px;
   color: var(--ink);
   background: var(--white);
   font: inherit;
   font-size: 14px;
-  text-align: center;
+  text-align: left;
 }
 .builds-point-step {
   min-height: 36px;

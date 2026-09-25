@@ -201,8 +201,8 @@ const altRow = (reference, locale) => (move, at) =>
 
 // 도감 화면과 같은 능력 이름을 쓴다(STAT_LABELS). H·A·B 한 글자는 익숙한 사람만
 // 읽는다. 값을 넣는 곳과 결과를 보는 곳을 나누어, 고치면서 실수치를 바로 본다.
-// 32와 0은 가장 자주 쓰는 값이라 한 번에 가도록 단추를 둔다. 1씩 오르내리는 단추는
-// 손가락으로 누르기에 너무 작아 두지 않는다. 그 사이 값은 칸에 직접 적는다.
+// 32와 0은 가장 자주 쓰는 값이라 한 번에 가도록 단추를 둔다. 그 사이 값은 칸에 직접
+// 적거나 칸의 화살표로 1씩 옮긴다(계산기의 숫자 칸과 같다).
 const pointRow = (value, index) =>
   `<div class="builds-point">` +
   `<span class="builds-point-name">${STAT_LABELS[index]}</span>` +

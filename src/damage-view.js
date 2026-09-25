@@ -97,7 +97,7 @@ function statBlock(title, side, key, actual) {
             `<button type="button" data-dmg-nature="${key}:${n}" aria-pressed="${nature === n}">${NATURE_LABELS[n]}</button>`,
         ).join('') +
         `</div></div>`) +
-    `<div class="calc-line"><span>실수치</span><strong>${actual ?? '—'}</strong></div>`
+    `<div class="calc-line"><span>실수치</span><strong data-dmg-stat="${key}">${actual ?? '—'}</strong></div>`
   );
 }
 
@@ -110,7 +110,7 @@ function rankGroup(title, side, key, staged) {
     `<button type="button" class="calc-step" data-dmg-stage="${key}:-1" aria-label="${esc(title)} 랭크 내리기">−</button>` +
     `<output class="calc-stage">${stage > 0 ? '+' : ''}${stage}</output>` +
     `<button type="button" class="calc-step" data-dmg-stage="${key}:1" aria-label="${esc(title)} 랭크 올리기">+</button></div>` +
-    `<div class="calc-line"><span>랭크 적용</span><strong>${staged ?? '—'}</strong></div>` +
+    `<div class="calc-line"><span>랭크 적용</span><strong data-dmg-staged="${key}">${staged ?? '—'}</strong></div>` +
     `</fieldset>`
   );
 }
@@ -166,6 +166,7 @@ function attackerPanel(state, context) {
     `<section class="calc-side" data-dmg-side="attacker">` +
     head('공격 측', reference, index, side.pokemon, speciesLabel) +
     picks(side, reference, speciesLabel) +
+    `<div data-dmg-quick="power">${powerBox(context.summary, context)}</div>` +
     `<fieldset class="calc-group"><legend>기술</legend>` +
     // 내 샘플의 기술 칸처럼 이름은 왼쪽, 타입·분류·위력은 오른쪽에 둔다.
     `<button type="button" class="builds-pick builds-move dmg-move-pick" data-dmg-pick="move">` +
@@ -240,19 +241,33 @@ function defenderPanel(state, context) {
   const { reference, index, speciesLabel, stats, keys } = context;
   const side = state.defender;
   const doubles = state.format === 'doubles';
-  const defenseTitle = `${STAT_NAMES_KO[keys.defense]} 수치`;
+  // 방어·특수방어는 기술과 따로 골라 입력한다. 계산은 늘 기술이 쓰는 쪽으로 한다.
+  const view = side.defenseView ?? keys.defense;
+  const name = STAT_NAMES_KO[view];
   return (
     `<section class="calc-side" data-dmg-side="defender">` +
     head('방어 측', reference, index, side.pokemon, speciesLabel) +
     picks(side, reference, speciesLabel) +
+    `<div data-dmg-quick="bulk">${bulkBox(context)}</div>` +
     `<fieldset class="calc-group"><legend>HP 수치</legend>` +
     statBlock('HP', side, 'hp', stats.hp) +
     hpSlider(side, stats.hp, '방어 측 남은 HP 비율') +
     `</fieldset>` +
-    `<fieldset class="calc-group"><legend>${esc(defenseTitle)}</legend>` +
-    statBlock(STAT_NAMES_KO[keys.defense], side, keys.defense, stats.defense) +
+    `<fieldset class="calc-group"><legend>방어 수치</legend>` +
+    `<div class="calc-line"><span>입력할 능력</span><div class="calc-choices" role="group" aria-label="입력할 방어 능력">` +
+    ['def', 'spd']
+      .map(
+        key =>
+          `<button type="button" data-dmg-defense-view="${key}" aria-pressed="${view === key}">${STAT_NAMES_KO[key]}</button>`,
+      )
+      .join('') +
+    `</div></div>` +
+    statBlock(name, side, view, stats.defenses[view].actual) +
+    (view === keys.defense
+      ? ''
+      : `<p class="calc-note">지금 기술은 ${TAKEN_WITH[keys.defense]}합니다.</p>`) +
     `</fieldset>` +
-    rankGroup(STAT_NAMES_KO[keys.defense], side, keys.defense, stats.staged) +
+    rankGroup(name, side, view, stats.defenses[view].staged) +
     (keys.fromDefender
       ? `<fieldset class="calc-group"><legend>공격 수치 (속임수)</legend>${statBlock('공격', side, 'atk', stats.foul)}</fieldset>` +
         rankGroup('공격', side, 'atk', stats.foulStaged)
@@ -290,7 +305,7 @@ const hpSlider = (side, hpMax, label) =>
 export const hpText = (pct, hpMax) =>
   hpMax ? `${pct}% · ${Math.max(1, Math.floor((hpMax * pct) / 100))}/${hpMax}` : `${pct}%`;
 
-// 결과. 요약 → 결정력·내구력 → 1회 타격.
+// 결과. 요약 → 1회 타격. 결정력·내구력은 두 쪽 칸 위에 따로 둔다(powerBox, bulkBox).
 export function damageResult(summary, context) {
   const { reference, index, state, speciesLabel } = context;
   const { attacker, defender } = state;
@@ -326,25 +341,6 @@ export function damageResult(summary, context) {
     `</div>`;
   if (!summary || summary.reason) return `<div class="dmg-result">${head}</div>`;
   const hits = summary.hits;
-  // 위력을 정한 값(스피드·무게)도 함께 보인다.
-  const basis = summary.speeds
-    ? ` · 스피드 ${summary.speeds.attacker} 대 ${summary.speeds.defender}`
-    : summary.weights
-      ? ` · 무게 ${summary.weights.attacker / 10}kg 대 ${summary.weights.defender / 10}kg`
-      : '';
-  const bulkLine = `<small class="dmg-sub">물리 내구력 ${summary.bulks.def.toLocaleString()} · 특수 내구력 ${summary.bulks.spd.toLocaleString()} · HP ${summary.hpNow}/${summary.hpMax}</small>`;
-  const powerCard = summary.fixed
-    ? `<div class="dmg-card">` +
-      `<div class="dmg-row"><span>고정 데미지</span><strong>${summary.fixed}</strong></div>` +
-      `<small class="dmg-sub">능력치와 배율을 받지 않는 기술입니다.</small>` +
-      bulkLine +
-      `</div>`
-    : `<div class="dmg-card">` +
-      `<div class="dmg-row"><span>공격 측 결정력</span><strong>${summary.power.toLocaleString()}</strong></div>` +
-      `<small class="dmg-sub">${STAT_NAMES_KO[context.keys.attack]} 실수치 ${summary.attackStat} × 위력 ${summary.basePower}${summary.stab !== 1 ? ` × 자속 보정 ${summary.stab}` : ''}${hits > 1 ? ` · 타격당, ${hits}회` : ''}${basis}</small>` +
-      `<div class="dmg-row"><span>방어 측 ${STAT_NAMES_KO[context.keys.defense]} 내구력</span><strong>${summary.bulk.toLocaleString()}</strong></div>` +
-      bulkLine +
-      `</div>`;
   const ko = summary.table
     .map(row => {
       const text = row.chance >= 1 ? '확정' : row.chance > 0 ? percent(row.chance * 100) : '불가';
@@ -383,7 +379,48 @@ export function damageResult(summary, context) {
     `<div class="dmg-box"><small>KO 정보</small><div class="dmg-chips">${ko}</div></div>` +
     notes +
     `</div>`;
-  return `<div class="dmg-result">${head}${powerCard}${detail}</div>`;
+  return `<div class="dmg-result">${head}${detail}</div>`;
+}
+
+// 결정력 칸. 기술 칸 위에 두고, 값을 바꾸면 바로 고친다(app.js의 renderDamageResult).
+// 방어 측을 고르지 않았어도 공격 실수치 × 위력 × 자속 보정으로 보인다(quickPower).
+export function powerBox(summary, context) {
+  if (summary?.fixed)
+    return (
+      `<div class="dmg-quick"><span>결정력</span><strong>고정 ${summary.fixed}</strong>` +
+      `<small>능력치와 배율을 받지 않는 기술입니다.</small></div>`
+    );
+  const quick = summary?.power != null ? summary : context.quickPower;
+  if (!quick)
+    return `<div class="dmg-quick"><span>결정력</span><strong>—</strong><small>포켓몬과 기술을 선택하면 보입니다.</small></div>`;
+  const hits = summary?.hits ?? 1;
+  // 위력을 정한 값(스피드·무게)도 함께 보인다.
+  const basis = summary?.speeds
+    ? ` · 스피드 ${summary.speeds.attacker} 대 ${summary.speeds.defender}`
+    : summary?.weights
+      ? ` · 무게 ${summary.weights.attacker / 10}kg 대 ${summary.weights.defender / 10}kg`
+      : '';
+  return (
+    `<div class="dmg-quick"><span>결정력</span><strong>${quick.power.toLocaleString()}</strong>` +
+    `<small>${STAT_NAMES_KO[context.keys.attack]} ${quick.attackStat} × 위력 ${quick.basePower}` +
+    `${quick.stab !== 1 ? ` × 자속 보정 ${quick.stab}` : ''}${hits > 1 ? ` · 타격당, ${hits}회` : ''}${basis}</small></div>`
+  );
+}
+
+// 내구력 칸. HP 칸 위에 두고, 물리·특수를 함께 보인다. 기술이 쓰는 쪽을 굵게 한다.
+// HP × 방어(랭크 포함) ÷ 0.411. 도구·특성의 배율은 넣지 않는다.
+export function bulkBox(context) {
+  const { stats, keys } = context;
+  if (!stats.hp)
+    return `<div class="dmg-quick"><span>내구력</span><strong>—</strong><small>포켓몬을 선택하면 보입니다.</small></div>`;
+  const bulk = key => Math.floor((stats.hp * stats.defenses[key].staged) / 0.411);
+  const part = (key, label) =>
+    `<div class="dmg-quick-part${keys.defense === key ? ' is-used' : ''}"><span>${label}</span><strong>${bulk(key).toLocaleString()}</strong></div>`;
+  return (
+    `<div class="dmg-quick"><span>내구력</span>` +
+    `<div class="dmg-quick-pair">${part('def', '물리')}${part('spd', '특수')}</div>` +
+    `<small>HP ${stats.hp} × 방어·특수방어(랭크 포함) ÷ 0.411</small></div>`
+  );
 }
 
 export function damageCalcView(state, summary, context) {
@@ -395,10 +432,10 @@ export function damageCalcView(state, summary, context) {
     `<button type="button" data-dmg-format="doubles" aria-pressed="${state.format === 'doubles'}">더블</button></div>` +
     `<button type="button" class="text-button" data-dmg-swap>교체</button>` +
     `<button type="button" class="text-button" data-dmg-reset>초기화</button></div>` +
-    `<div data-dmg-result>${result}</div>` +
+    // 값을 바꾸면 바로 계산되므로 결과는 입력 칸 아래 한 곳에만 둔다.
     `<div class="calc-sides">` +
-    attackerPanel(state, { ...context, stats: context.attackerStats }) +
-    defenderPanel(state, { ...context, stats: context.defenderStats }) +
+    attackerPanel(state, { ...context, summary, stats: context.attackerStats }) +
+    defenderPanel(state, { ...context, summary, stats: context.defenderStats }) +
     `</div>` +
     `<div data-dmg-result>${result}</div>` +
     `<p class="speed-help">Showdown과 같은 순서로 계산합니다. 위력이 상황에 따라 바뀌는 기술과 특성은 ‘위력 조건’ 칸이 나타나고, 위력을 직접 넣으면 그 값을 씁니다. 결정력은 공격 실수치 × 위력 × 자속 보정, 내구력은 HP × 방어 ÷ 0.411입니다.</p>`

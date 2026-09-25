@@ -43,7 +43,15 @@ import {
   grounded,
   isSpreadMove,
 } from './damage-calc.js';
-import { damageCalcView, damageResult, statKeys, hpText, conditionsOf } from './damage-view.js';
+import {
+  damageCalcView,
+  damageResult,
+  statKeys,
+  hpText,
+  conditionsOf,
+  powerBox,
+  bulkBox,
+} from './damage-view.js';
 import { NFE_SPECIES } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { reviewedArticles, selectArticles } from './articles.js';
@@ -2448,7 +2456,31 @@ function damageContext() {
     crit: attacker.crit,
   };
   const summary = input && attacker.pokemon && defender.pokemon ? damageSummary(input) : null;
+  // 방어 측을 고르기 전(또는 효과가 없을 때)에도 결정력은 보인다. 도구·특성 배율은 뺀 값이다.
+  const quickAttack = keys.fromDefender ? null : staged(attacker, keys.attack);
+  const quickBase = attacker.power || move?.power || 0;
+  const quickStab = attackerSpecies?.types.includes(move?.type)
+    ? attacker.ability === 'adaptability'
+      ? 2
+      : 1.5
+    : 1;
+  const quickPower =
+    quickAttack && quickBase
+      ? {
+          power: Math.floor(quickAttack * quickBase * quickStab),
+          attackStat: quickAttack,
+          basePower: quickBase,
+          stab: quickStab,
+        }
+      : null;
+  const defenses = Object.fromEntries(
+    ['def', 'spd'].map(key => [
+      key,
+      { actual: actual(defender, key), staged: staged(defender, key) },
+    ]),
+  );
   return {
+    quickPower,
     keys,
     spread,
     conditions,
@@ -2468,8 +2500,7 @@ function damageContext() {
       hp: species(defender.pokemon)
         ? hpStat(species(defender.pokemon).stats.hp, defender.points?.hp ?? 0)
         : null,
-      defense: actual(defender, keys.defense),
-      staged: staged(defender, keys.defense),
+      defenses,
       foul: actual(defender, 'atk'),
       foulStaged: staged(defender, 'atk'),
     },
@@ -2502,6 +2533,26 @@ function renderDamageResult() {
   $('calc-body')
     .querySelectorAll('[data-dmg-result]')
     .forEach(box => (box.innerHTML = html));
+  // 칸 옆의 실수치·랭크 적용 값도 제자리에서 고친다.
+  $('calc-body')
+    .querySelectorAll('[data-dmg-stat], [data-dmg-staged]')
+    .forEach(out => {
+      const side = state.calc.damage[out.closest('[data-dmg-side]')?.dataset.dmgSide];
+      const key = out.dataset.dmgStat ?? out.dataset.dmgStaged;
+      const species = side && state.reference.species[side.pokemon];
+      if (!species) return;
+      const value =
+        key === 'hp'
+          ? hpStat(species.stats.hp, side.points?.hp ?? 0)
+          : damageStat(species.stats[key], side.points?.[key] ?? 0, side.nature?.[key] ?? 10);
+      out.textContent = out.dataset.dmgStat ? value : stageStat(value, side.stages?.[key] ?? 0);
+    });
+  // 결정력·내구력 칸도 같은 값으로 고친다.
+  const view = damageViewContext(context);
+  const power = $('calc-body').querySelector('[data-dmg-quick="power"]');
+  if (power) power.innerHTML = powerBox(context.summary, { ...view, stats: context.attackerStats });
+  const bulk = $('calc-body').querySelector('[data-dmg-quick="bulk"]');
+  if (bulk) bulk.innerHTML = bulkBox({ ...view, stats: context.defenderStats });
 }
 
 const clampNumber = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -2624,6 +2675,11 @@ $('calc-body').addEventListener('click', event => {
     if (kind === 'member' && !state.builds.samples.some(s => s.pokemon))
       return toast('샘플이 없습니다.');
     return openPicker(kind, null, { page: 'damage', side: sideKey });
+  }
+  const defenseView = target.closest('[data-dmg-defense-view]');
+  if (defenseView) {
+    dmg[sideKey] = { ...side, defenseView: defenseView.dataset.dmgDefenseView };
+    return renderDamage();
   }
   if (target.closest('[data-dmg-clear]')) {
     dmg[sideKey] = { ...side, item: '' };
