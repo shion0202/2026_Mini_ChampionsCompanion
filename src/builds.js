@@ -142,6 +142,38 @@ export const removeAltMove = (sample, move) => ({
   altMoves: sample.altMoves.filter(m => m !== move),
 });
 
+// 끌어서 놓기. from과 to는 { list: 'moves' | 'alts', index }다. 같은 목록 안에서는
+// 순서를 옮기고(채용 네 칸은 빈 칸도 자리로 친다), 목록을 건너 항목 위에 놓으면 둘을
+// 맞바꾼다. 채용 빈 칸에 후보를 놓으면 후보에서 빠져 그 칸을 채운다. 후보 목록 끝
+// (index가 후보 수와 같음)에 채용 기술을 놓으면 후보 끝으로 가고 그 칸은 빈다.
+// 빈 칸은 끌 수 없다. 두 목록은 겹치지 않으므로 옮기거나 바꿔도 중복이 생기지 않는다.
+export function dragMove(sample, from, to) {
+  const lists = { moves: [...sample.moves], alts: [...sample.altMoves] };
+  const source = lists[from.list];
+  const target = lists[to.list];
+  const value = source[from.index];
+  if (!value || !target || to.index < 0 || to.index > target.length) return sample;
+  if (from.list === to.list) {
+    // 채용 네 칸에는 ‘끝’ 자리가 없다.
+    if (from.index === to.index || (to.list === 'moves' && to.index === 4)) return sample;
+    // 빼고 나서 넣으므로, 끌어다 놓은 항목이 놓인 자리의 원래 번호를 차지한다.
+    source.splice(from.index, 1);
+    source.splice(to.index, 0, value);
+  } else if (to.index === target.length) {
+    // 목록 끝은 후보에만 있다. 채용 기술을 후보로 내린다.
+    if (to.list !== 'alts') return sample;
+    target.push(value);
+    source[from.index] = null;
+  } else {
+    const other = target[to.index];
+    target[to.index] = value;
+    if (other) source[from.index] = other;
+    else if (from.list === 'alts') source.splice(from.index, 1);
+    else source[from.index] = null;
+  }
+  return { ...sample, moves: lists.moves, altMoves: lists.alts.filter(Boolean) };
+}
+
 // 입력 칸에서 읽은 문자열을 해석한다. 빈 칸은 0이고, 정수가 아니거나 0~32 밖이면
 // 이전 값을 지킨다. 화면에서 만들 수 없는 값을 만들지 않는 편이 저장할 때
 // 거절하는 것보다 낫다. 합계 66은 여러 칸이 함께 정해지므로 validateSample이 본다.

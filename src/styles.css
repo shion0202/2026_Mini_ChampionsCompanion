@@ -3235,6 +3235,37 @@ select optgroup {
   color: var(--ink);
   font-size: 14px;
 }
+/* 끌기 손잡이. 화면을 끌어 내리는 스크롤과 겹치지 않도록 이 자리에서만 터치를
+   앱이 받는다(touch-action). 손가락 너비만큼 잡을 자리를 준다. */
+.builds-editor fieldset li .builds-grip {
+  flex: none;
+  width: 24px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.builds-grip:empty {
+  cursor: default;
+}
+/* 끄는 중인 줄은 흐리게, 놓을 자리는 테두리로 보인다. */
+.builds-editor li.is-dragging {
+  opacity: 0.45;
+}
+.builds-editor li.is-drop-target .builds-pick,
+.builds-editor fieldset.is-drop-target {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+body.is-dragging-move {
+  cursor: grabbing;
+  user-select: none;
+}
 .builds-slot {
   width: 18px;
   flex: none;

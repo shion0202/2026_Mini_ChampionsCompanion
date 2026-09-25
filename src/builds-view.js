@@ -140,15 +140,24 @@ const moveTypeBadge = (reference, move) => {
   return type ? typeBadges([type]) : '';
 };
 
+// 끌기 손잡이. 손가락으로 잡기 쉽게 줄 왼쪽 끝에 둔다. 빈 칸은 끌 것이 없어 손잡이
+// 대신 같은 너비의 빈자리를 둔다. 놓을 자리는 li의 data-drag-list·index가 알린다.
+const grip = draggable =>
+  draggable
+    ? '<span class="builds-grip" data-drag-handle aria-hidden="true">⠿</span>'
+    : '<span class="builds-grip" aria-hidden="true"></span>';
+
 const moveSlot = (reference, locale) => (move, slot) =>
-  `<li><span class="builds-slot">${slot + 1}</span>` +
+  `<li data-drag-list="moves" data-drag-index="${slot}">${grip(!!move)}` +
+  `<span class="builds-slot">${slot + 1}</span>` +
   `<button type="button" class="builds-pick builds-move" data-builds-move="${slot}">` +
   `${move ? `${esc(refLabel(reference, locale, 'move', move))}${moveTypeBadge(reference, move)}` : '기술 선택'}` +
   `</button></li>`;
 
 // 후보도 채용 기술과 같은 칸으로 보여야 한눈에 견준다. 빼기는 글자 대신 ×로.
-const altRow = (reference, locale) => move =>
-  `<li><span class="builds-pick builds-move builds-alt-name">` +
+const altRow = (reference, locale) => (move, at) =>
+  `<li data-drag-list="alts" data-drag-index="${at}">${grip(true)}` +
+  `<span class="builds-pick builds-move builds-alt-name">` +
   `${esc(refLabel(reference, locale, 'move', move))}${moveTypeBadge(reference, move)}</span>` +
   `<button type="button" class="icon-button builds-alt-remove"` +
   ` data-builds-alt-remove="${esc(move)}"` +
@@ -347,7 +356,8 @@ export function sampleEditor(
     `</div></fieldset>` +
     `<fieldset class="builds-moves"><legend>채용 기술</legend>` +
     `<ul>${sample.moves.map(moveSlot(reference, locale)).join('')}</ul></fieldset>` +
-    `<fieldset class="builds-alts"><legend>후보 기술</legend>` +
+    // 후보 칸 전체가 놓을 자리다. 기술 위가 아닌 곳에 놓으면 후보 끝으로 간다.
+    `<fieldset class="builds-alts" data-drag-zone="alts"><legend>후보 기술</legend>` +
     `<ul>${sample.altMoves.map(altRow(reference, locale)).join('')}</ul>` +
     `<button type="button" class="text-button" data-builds-alt-add>후보 기술 추가</button></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유 등">${esc(sample.note)}</textarea></label>` +

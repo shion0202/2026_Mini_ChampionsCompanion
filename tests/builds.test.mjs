@@ -19,6 +19,7 @@ import {
   PARTY_SORTS,
   addAltMove,
   removeAltMove,
+  dragMove,
   setPoint,
   partiesUsing,
   deleteSample,
@@ -959,4 +960,83 @@ test('an opened share is checked like stored data', () => {
   assert.equal(readShare({ kind: 'party', party: { id: 'p' }, samples: [] }), null);
   assert.equal(readShare({ kind: 'doc' }), null);
   assert.equal(readShare(null), null);
+});
+
+test('dragging within a list moves the item into the dropped place', () => {
+  const s = { ...emptySample(), moves: ['A', 'B', 'C', 'D'], altMoves: ['E', 'F', 'G'] };
+  const m = (from, to) =>
+    dragMove(s, { list: 'moves', index: from }, { list: 'moves', index: to }).moves;
+  assert.deepEqual(m(0, 2), ['B', 'C', 'A', 'D'], '아래로');
+  assert.deepEqual(m(3, 1), ['A', 'D', 'B', 'C'], '위로');
+  assert.equal(dragMove(s, { list: 'moves', index: 1 }, { list: 'moves', index: 1 }), s);
+  const a = (from, to) =>
+    dragMove(s, { list: 'alts', index: from }, { list: 'alts', index: to }).altMoves;
+  assert.deepEqual(a(0, 2), ['F', 'G', 'E']);
+  assert.deepEqual(a(2, 0), ['G', 'E', 'F']);
+  assert.deepEqual(a(0, 3), ['F', 'G', 'E'], '후보 목록 끝에 놓기');
+  // 빈 칸도 자리다. 네 칸은 그대로 네 칸이다.
+  const gap = { ...s, moves: ['A', null, 'C', 'D'] };
+  assert.deepEqual(dragMove(gap, { list: 'moves', index: 0 }, { list: 'moves', index: 1 }).moves, [
+    null,
+    'A',
+    'C',
+    'D',
+  ]);
+});
+
+test('dragging across lists swaps, fills an empty slot, or sends a move to the end', () => {
+  const s = { ...emptySample(), moves: ['A', null, 'C', 'D'], altMoves: ['E', 'F'] };
+  const swap = dragMove(s, { list: 'alts', index: 1 }, { list: 'moves', index: 0 });
+  assert.deepEqual(
+    [swap.moves, swap.altMoves],
+    [
+      ['F', null, 'C', 'D'],
+      ['E', 'A'],
+    ],
+    '후보를 채용 위에',
+  );
+  const back = dragMove(s, { list: 'moves', index: 2 }, { list: 'alts', index: 0 });
+  assert.deepEqual(
+    [back.moves, back.altMoves],
+    [
+      ['A', null, 'E', 'D'],
+      ['C', 'F'],
+    ],
+    '채용을 후보 위에',
+  );
+  const fill = dragMove(s, { list: 'alts', index: 0 }, { list: 'moves', index: 1 });
+  assert.deepEqual([fill.moves, fill.altMoves], [['A', 'E', 'C', 'D'], ['F']], '빈 칸 채우기');
+  const down = dragMove(s, { list: 'moves', index: 3 }, { list: 'alts', index: 2 });
+  assert.deepEqual(
+    [down.moves, down.altMoves],
+    [
+      ['A', null, 'C', null],
+      ['E', 'F', 'D'],
+    ],
+    '후보 끝으로',
+  );
+});
+
+test('empty slots cannot be dragged and bad targets change nothing', () => {
+  const s = { ...emptySample(), moves: ['A', null, 'C', 'D'], altMoves: ['E'] };
+  assert.equal(dragMove(s, { list: 'moves', index: 1 }, { list: 'moves', index: 0 }), s);
+  assert.equal(dragMove(s, { list: 'moves', index: 0 }, { list: 'moves', index: 4 }), s);
+  assert.equal(dragMove(s, { list: 'alts', index: 0 }, { list: 'alts', index: 5 }), s);
+  assert.equal(dragMove(s, { list: 'alts', index: 0 }, { list: 'nope', index: 0 }), s);
+  // 어떻게 끌어도 저장을 막는 중복이 생기지 않는다.
+  for (const [from, to] of [
+    [
+      { list: 'alts', index: 0 },
+      { list: 'moves', index: 0 },
+    ],
+    [
+      { list: 'moves', index: 0 },
+      { list: 'alts', index: 1 },
+    ],
+    [
+      { list: 'moves', index: 2 },
+      { list: 'moves', index: 0 },
+    ],
+  ])
+    assert.deepEqual(validateSample({ ...dragMove(s, from, to), name: 'x', pokemon: 'y' }), []);
 });

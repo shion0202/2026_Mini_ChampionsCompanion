@@ -44,6 +44,7 @@ import {
   setMove,
   addAltMove,
   removeAltMove,
+  dragMove,
   validateSample,
   validateParty,
   partiesUsing,
@@ -1739,6 +1740,71 @@ $('builds-rows').addEventListener('click', event => {
   if (event.target.closest('[data-builds-delete]')) return removeBuild();
   if (event.target.closest('[data-builds-share]')) return shareBuild();
 });
+
+// 기술 끌어서 놓기. 폰이 주 사용처라 HTML 기본 드래그(마우스 전용) 대신 포인터
+// 이벤트로 만든다. 손잡이만 잡을 수 있고(touch-action: none), 놓을 자리는 손가락 아래
+// 요소로 찾는다. 무엇이 어떻게 바뀌는지는 builds.js의 dragMove가 정한다.
+let moveDrag = null;
+
+function moveDropTarget(x, y) {
+  const under = document.elementFromPoint(x, y);
+  const row = under?.closest('#builds-rows [data-drag-list]');
+  if (row) return { el: row, list: row.dataset.dragList, index: Number(row.dataset.dragIndex) };
+  const zone = under?.closest('#builds-rows [data-drag-zone]');
+  if (zone)
+    return {
+      el: zone,
+      list: zone.dataset.dragZone,
+      index: state.buildsEditing.draft.altMoves.length,
+    };
+  return null;
+}
+
+function endMoveDrag(apply) {
+  const drag = moveDrag;
+  if (!drag) return;
+  moveDrag = null;
+  drag.row.classList.remove('is-dragging');
+  drag.target?.el.classList.remove('is-drop-target');
+  document.body.classList.remove('is-dragging-move');
+  if (!apply || !drag.target || !state.buildsEditing) return;
+  const draft = state.buildsEditing.draft;
+  const next = dragMove(draft, drag.from, drag.target);
+  if (next === draft) return;
+  state.buildsEditing.draft = next;
+  saveDraft();
+  renderBuildsEditor();
+}
+
+$('builds-rows').addEventListener('pointerdown', event => {
+  const handle = event.target.closest('[data-drag-handle]');
+  if (!handle || !state.buildsEditing || event.button !== 0) return;
+  const row = handle.closest('[data-drag-list]');
+  event.preventDefault();
+  handle.setPointerCapture(event.pointerId);
+  moveDrag = {
+    row,
+    from: { list: row.dataset.dragList, index: Number(row.dataset.dragIndex) },
+    target: null,
+  };
+  row.classList.add('is-dragging');
+  document.body.classList.add('is-dragging-move');
+});
+$('builds-rows').addEventListener('pointermove', event => {
+  if (!moveDrag) return;
+  const target = moveDropTarget(event.clientX, event.clientY);
+  if (target?.el !== moveDrag.target?.el) {
+    moveDrag.target?.el.classList.remove('is-drop-target');
+    if (target && target.el !== moveDrag.row) target.el.classList.add('is-drop-target');
+  }
+  moveDrag.target = target;
+  // 손잡이를 잡고 있으면 화면이 스크롤되지 않는다. 가장자리에 닿으면 앱이 대신 민다.
+  const edge = 72;
+  if (event.clientY < edge) window.scrollBy(0, -12);
+  else if (event.clientY > window.innerHeight - edge) window.scrollBy(0, 12);
+});
+$('builds-rows').addEventListener('pointerup', () => endMoveDrag(true));
+$('builds-rows').addEventListener('pointercancel', () => endMoveDrag(false));
 
 // 검색은 목록만 바꾼다. 편집기를 통째로 다시 그리면 글자마다 커서가 끝으로 튄다.
 $('builds-rows').addEventListener('input', event => {
