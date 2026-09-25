@@ -101,11 +101,10 @@
         <div class="builds-sort"><label>정렬<select id="builds-sort" aria-label="내 샘플 정렬"></select></label><span class="order-control"><button type="button" id="builds-order" class="order-button" aria-pressed="false" aria-label="오름차순·내림차순 전환">↑ 오름차순</button></span><span class="order-control"><button type="button" id="builds-filter" class="filter-button" aria-label="내 샘플 필터" aria-haspopup="dialog"></button></span></div>
         <div class="builds-buttons">
           <button id="builds-new" class="text-button">새로 만들기</button>
-          <button id="builds-export" class="text-button">JSON 내보내기</button>
-          <label class="text-button builds-import">JSON 가져오기<input id="builds-import" type="file" accept="application/json,.json" hidden></label>
+          <span id="builds-sync" class="builds-sync-actions"></span>
         </div>
       </div>
-      <div id="builds-sync" class="builds-sync"></div>
+      <p id="builds-sync-status" class="builds-sync" role="status"></p>
       <p id="builds-filter-summary" class="active-filter-summary" hidden></p>
       <p id="builds-status" class="builds-status" role="status"></p>
       <div id="builds-rows"></div>

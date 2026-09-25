@@ -30,9 +30,6 @@ import {
   writeDrafts,
   draftKey,
   pruneDrafts,
-  toJson,
-  fromJson,
-  mergeDocs,
   docFromServer,
   joinDocs,
   speciesOptions,
@@ -331,41 +328,6 @@ test('모양이 깨진 항목은 목록에서 빠진다', () => {
   assert.equal(doc.samples.length, 1);
   assert.equal(doc.parties.length, 1);
   assert.equal(doc.version, 1);
-});
-
-test('내보낸 JSON을 다시 가져오면 같은 문서가 된다', () => {
-  const doc = { samples: [built()], parties: [{ ...emptyParty(), name: '구축' }], version: 2 };
-  const result = fromJson(toJson(doc));
-  assert.equal(result.error, null);
-  assert.equal(result.skipped, 0);
-  assert.deepEqual(result.doc, doc);
-});
-
-test('JSON이 아니거나 읽을 항목이 없으면 이유를 준다', () => {
-  assert.match(fromJson('없는 파일').error, /읽을 수 없습니다/);
-  assert.match(fromJson('{"samples":[],"parties":[]}').error, /읽을 수 있는/);
-});
-
-test('가져오기는 읽지 못한 항목 수를 센다', () => {
-  const text = JSON.stringify({ samples: [built(), { id: 'x' }], parties: [], version: 0 });
-  const result = fromJson(text);
-  assert.equal(result.skipped, 1);
-  assert.equal(result.doc.samples.length, 1);
-});
-
-test('가져오기는 덮어쓰지 않고 합친다', () => {
-  const mine = { ...emptySample(), id: 'mine1mine1mine12', name: '내 것' };
-  const theirs = { ...emptySample(), id: 'their1their1thei', name: '가져온 것' };
-  const updated = { ...mine, name: '고친 것' };
-  const merged = mergeDocs(
-    { samples: [mine], parties: [], version: 5 },
-    { samples: [theirs, updated], parties: [], version: 0 },
-  );
-  assert.deepEqual(
-    merged.samples.map(s => s.name),
-    ['고친 것', '가져온 것'],
-  );
-  assert.equal(merged.version, 5);
 });
 
 test('길이는 맞고 원소 형식이 틀린 항목도 목록에서 빠진다', () => {

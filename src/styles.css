@@ -3096,15 +3096,22 @@ select optgroup {
   align-items: end;
   margin: 20px 0;
 }
-/* 단추 셋은 한 덩어리로 움직인다. 좁아지면 셋이 흩어지는 대신 통째로 아랫줄로
-   내려가, 첫 줄은 검색만 남는다. */
+/* 새로 만들기와 동기화 단추는 한 덩어리로 움직인다. 좁아지면 흩어지는 대신 통째로
+   아랫줄로 내려가, 첫 줄은 검색만 남는다. 충돌 때의 긴 단추 둘이 폭을 넘으면 덩어리
+   안에서 줄을 바꾼다. */
 .builds-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   flex: none;
+  max-width: 100%;
 }
-/* .builds-import는 파일 입력을 감싼 label이다. button과 달리 글자를 스스로
-   가운데에 두지 않아 혼자 위로 떠 보였다. */
+/* 동기화 단추는 app.js가 이 span 안에 그린다. 새로 만들기와 같은 줄의 형제처럼
+   놓이도록 상자를 만들지 않는다. */
+.builds-sync-actions {
+  display: contents;
+}
+/* 단추 글자를 세로 가운데에 둔다. */
 .builds-controls .text-button {
   display: inline-flex;
   align-items: center;
@@ -3501,19 +3508,11 @@ select optgroup {
 .builds-status:empty {
   display: none;
 }
-/* 동기화 줄. 목록 위에 한 줄로 두고 좁으면 단추가 아래로 내려간다. */
+/* 동기화 상태 문장. 단추는 위 단추 줄에 있다. */
 .builds-sync {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin: 4px 0 12px;
+  margin: -8px 0 12px;
   font-size: 13px;
   color: var(--muted);
-}
-.builds-sync p {
-  margin: 0;
-  flex: 1 1 auto;
 }
 .builds-actions {
   display: flex;

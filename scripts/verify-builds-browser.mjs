@@ -72,56 +72,18 @@ try {
     'true',
   );
 
-  // 6. 내보내기가 파일을 준다
-  const [download] = await Promise.all([
-    page.waitForEvent('download'),
-    page.locator('#builds-export').click(),
-  ]);
-  assert.match(download.suggestedFilename(), /^champions-builds-\d{4}-\d{2}-\d{2}\.json$/);
-
-  // 7. 가져오기는 덮어쓰지 않고 합친다
-  await page.locator('#builds-import').setInputFiles({
-    name: 'builds.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(
-      JSON.stringify({
-        samples: [
-          {
-            id: 'bbbbbbbbbbbbbbbb',
-            name: '가져온 샘플',
-            note: '',
-            pokemon: 'salamence',
-            form: null,
-            ability: null,
-            nature: null,
-            points: [0, 0, 0, 0, 0, 0],
-            moves: [null, null, null, null],
-            altMoves: [],
-            updatedAt: 0,
-          },
-        ],
-        parties: [],
-        version: 0,
-      }),
-    ),
-  });
-  await page.locator('#builds-status').waitFor({ state: 'visible' });
-  // 원래 있던 것이 지워지지 않았다.
-  await page.locator('#builds-rows').getByText('물리형 보만다').waitFor({ state: 'visible' });
-  await page.locator('#builds-rows').getByText('가져온 샘플').waitFor({ state: 'visible' });
-
-  // 8. 형식이 아닌 파일은 안내만 내고 목록을 비우지 않는다
-  await page.locator('#builds-import').setInputFiles({
-    name: 'not-json.txt',
-    mimeType: 'text/plain',
-    buffer: Buffer.from('이것은 JSON이 아니다'),
-  });
-  assert.match(await page.locator('#builds-status').innerText(), /읽을 수 없습니다/);
-  await page.locator('#builds-rows').getByText('물리형 보만다').waitFor({ state: 'visible' });
+  // 6. 동기화 단추가 JSON 단추 자리(새로 만들기 옆)에 있다
+  assert.deepEqual(
+    await page
+      .locator('.builds-buttons [data-sync]')
+      .evaluateAll(els => els.map(e => e.dataset.sync)),
+    ['enable', 'join'],
+  );
+  assert.equal(await page.locator('#builds-sync-status').innerText(), '이 기기에만 저장합니다.');
 
   await page.screenshot({ path: 'test-results/builds-mobile.png' });
 
-  // 9. PC 폭과 다크 테마
+  // 7. PC 폭과 다크 테마
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({ path: 'test-results/builds-desktop-dark.png' });

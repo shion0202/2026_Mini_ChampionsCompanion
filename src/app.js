@@ -20,9 +20,6 @@ import { renderSpeedRows, renderSpeedLines } from './speed-view.js';
 import {
   readDoc,
   writeDoc,
-  toJson,
-  fromJson,
-  mergeDocs,
   searchSamples,
   searchParties,
   sortBuilds,
@@ -73,7 +70,8 @@ import {
   pickerRows,
   comboRows,
   comboOptions,
-  syncBar,
+  syncText,
+  syncActions,
 } from './builds-view.js';
 import {
   renderReference,
@@ -637,10 +635,13 @@ const uploader = createUploader({
   onState: syncState,
 });
 
+// 단추는 목록 위 단추 줄 안에 있어 편집 중에는 그 줄과 함께 숨는다. 상태 문장도
+// 편집 중에는 할 일이 없으므로 같이 숨긴다.
 function renderSyncBar() {
-  const bar = $('builds-sync');
-  bar.hidden = !!state.buildsEditing;
-  bar.innerHTML = syncBar(state.sync, state.syncStatus);
+  const text = $('builds-sync-status');
+  text.hidden = !!state.buildsEditing;
+  text.textContent = syncText(state.sync, state.syncStatus);
+  $('builds-sync').innerHTML = syncActions(state.sync, state.syncStatus);
 }
 
 // 올리기 결과를 반영한다. 성공하면 서버가 준 버전을 로컬 문서에 적고, 올리는 사이
@@ -705,6 +706,17 @@ function showSyncCode() {
     () => toast('코드를 복사했습니다.'),
     () => {},
   );
+}
+
+// 켠 뒤에는 코드를 화면에 띄우지 않고 클립보드로만 옮긴다. 클립보드를 쓸 수 없는
+// 환경(권한 거부, 보안 연결이 아닌 주소)에서는 옮겨 적을 수 있게 화면에 보인다.
+async function copySyncCode() {
+  try {
+    await navigator.clipboard.writeText(formatCode(state.sync.code));
+    toast('동기화 코드를 복사했습니다. 다른 기기의 ‘코드로 연결’에 붙여 넣으세요.');
+  } catch {
+    showSyncCode();
+  }
 }
 
 function buildsSave() {
@@ -1755,7 +1767,7 @@ $('builds-sync').addEventListener('click', async event => {
     }
     return renderBuilds();
   }
-  if (action === 'code') return showSyncCode();
+  if (action === 'copy') return copySyncCode();
   if (action === 'off')
     return askConfirm(
       '이 기기의 동기화를 끕니다. 서버와 다른 기기의 자료는 그대로 남습니다. ' +
@@ -1796,45 +1808,6 @@ $('builds-sync').addEventListener('click', async event => {
       },
       '덮어쓰기',
     );
-});
-$('builds-export').addEventListener('click', () => {
-  const blob = new Blob([toJson(state.builds)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `champions-builds-${new Date().toISOString().slice(0, 10)}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-});
-$('builds-import').addEventListener('change', async event => {
-  const file = event.target.files?.[0];
-  event.target.value = '';
-  if (!file) return;
-  const { doc, skipped, error } = fromJson(await file.text());
-  if (error) {
-    $('builds-status').textContent = error;
-    return;
-  }
-  // 덮어쓰지 않고 합친다. 이 기기에 있던 것을 지우면 되돌릴 수 없다.
-  const previous = state.builds;
-  state.builds = mergeDocs(previous, doc);
-  if (buildsSave()) {
-    $('builds-status').textContent =
-      `샘플 ${doc.samples.length}개, 파티 ${doc.parties.length}개를 가져왔습니다.` +
-      (skipped ? ` 형식을 확인할 수 없는 ${skipped}개는 제외했습니다.` : '');
-    const touched = new Set([...doc.samples, ...doc.parties].map(x => x.id));
-    // 가져온 항목의 초안은 가져오기 이전 것이라 더 오래됐다. 남겨두면 이어서
-    // 고치다 저장할 때 방금 가져온 내용을 덮어쓴다.
-    state.buildsDrafts = Object.fromEntries(
-      Object.entries(state.buildsDrafts).filter(([key]) => !touched.has(key)),
-    );
-    writeDrafts(storage, state.buildsDrafts);
-    if (state.buildsEditing) closeBuildsEditor();
-  }
-  // 저장하지 못했으면 화면도 되돌린다. 목록에 보이는데 새로고침하면 사라지는
-  // 상태가 저장 실패 자체보다 나쁘다. buildsSave가 이미 실패를 알렸다.
-  else state.builds = previous;
-  renderBuilds();
 });
 $('speed-type').innerHTML += Object.entries(TYPE_LABELS)
   .map(([type, label]) => `<option value="${type}">${label}</option>`)

@@ -393,9 +393,9 @@ export function pickerRows(rows, limit) {
     .join('')}</ul>`;
 }
 
-// 동기화 줄. 상태 문장 하나와 그 상태에서 할 수 있는 일만 둔다. 코드는 여기 그리지
-// 않는다. 코드를 가진 사람이 문서 전체 권한을 가지므로 ‘코드 보기’를 눌렀을 때만
-// 상태 줄에 보인다.
+// 동기화. 단추는 목록 위 단추 줄(새로 만들기 옆)에, 상태 문장은 그 아래 한 줄에
+// 둔다. 코드는 여기 그리지 않는다. 코드를 가진 사람이 문서 전체 권한을 가지므로
+// ‘코드 복사’로 클립보드에만 옮긴다.
 const SYNC_TEXT = {
   off: '이 기기에만 저장합니다.',
   checking: '서버와 맞추는 중…',
@@ -409,16 +409,12 @@ const SYNC_TEXT = {
 const syncButton = (action, label) =>
   `<button type="button" class="text-button" data-sync="${action}">${label}</button>`;
 
-export function syncBar(sync, status) {
-  if (!sync)
-    return (
-      `<p>${SYNC_TEXT.off}</p>` +
-      syncButton('enable', '동기화 켜기') +
-      syncButton('join', '코드로 연결')
-    );
-  const actions =
-    status === 'conflict'
-      ? syncButton('pull', '서버 것 불러오기') + syncButton('push', '이 기기 것으로 덮어쓰기')
-      : syncButton('code', '코드 보기') + syncButton('off', '끄기');
-  return `<p role="status">${SYNC_TEXT[status] ?? SYNC_TEXT.ok}</p>${actions}`;
+export const syncText = (sync, status) =>
+  sync ? (SYNC_TEXT[status] ?? SYNC_TEXT.ok) : SYNC_TEXT.off;
+
+export function syncActions(sync, status) {
+  if (!sync) return syncButton('enable', '동기화 켜기') + syncButton('join', '코드로 연결');
+  return status === 'conflict'
+    ? syncButton('pull', '서버 것 불러오기') + syncButton('push', '이 기기 것으로 덮어쓰기')
+    : syncButton('copy', '코드 복사') + syncButton('off', '끄기');
 }

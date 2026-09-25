@@ -11,7 +11,8 @@ import {
   partyEditor,
   pickerRows,
   fmtDay,
-  syncBar,
+  syncText,
+  syncActions,
 } from '../src/builds-view.js';
 
 const read = file =>
@@ -258,6 +259,7 @@ test('수정일은 날짜만 적고, 저장한 적 없으면 그렇게 알린다
 });
 
 const synced = { code: 'ABCDEFGHJKMNPQRSTV01', dirty: false };
+const syncBar = (sync, status) => `${syncText(sync, status)}|${syncActions(sync, status)}`;
 
 test('sync bar: off, checking, synced, offline and conflict', t => {
   t.assert.snapshot(
@@ -271,14 +273,14 @@ test('sync bar: off, checking, synced, offline and conflict', t => {
   );
 });
 
-test('sync bar buttons never submit a form', () => {
+test('sync buttons never submit a form', () => {
   for (const [sync, status] of [
     [null, 'off'],
     [synced, 'ok'],
     [synced, 'conflict'],
   ]) {
-    const buttons = syncBar(sync, status).match(/<button[^>]*>/g);
-    assert.ok(buttons.length >= 2, status);
+    const buttons = syncActions(sync, status).match(/<button[^>]*>/g);
+    assert.equal(buttons.length, 2, status);
     assert.ok(
       buttons.every(b => b.includes('type="button"')),
       status,
@@ -291,9 +293,11 @@ test('the sync bar never prints the code itself', () => {
     assert.ok(!syncBar(synced, status).includes('ABCD'), status);
 });
 
-test('a conflict offers exactly the two ways out', () => {
-  const actions = [...syncBar(synced, 'conflict').matchAll(/data-sync="(\w+)"/g)].map(m => m[1]);
-  assert.deepEqual(actions, ['pull', 'push']);
-  const off = [...syncBar(null, 'off').matchAll(/data-sync="(\w+)"/g)].map(m => m[1]);
-  assert.deepEqual(off, ['enable', 'join']);
+test('sync offers turn on or join, copy or off, and exactly two ways out of a conflict', () => {
+  const actions = (sync, status) =>
+    [...syncActions(sync, status).matchAll(/data-sync="(\w+)"/g)].map(m => m[1]);
+  assert.deepEqual(actions(null, 'off'), ['enable', 'join']);
+  assert.deepEqual(actions(synced, 'ok'), ['copy', 'off']);
+  assert.deepEqual(actions(synced, 'conflict'), ['pull', 'push']);
+  assert.equal(syncText(null, 'ok'), '이 기기에만 저장합니다.', '꺼져 있으면 상태와 상관없다');
 });
