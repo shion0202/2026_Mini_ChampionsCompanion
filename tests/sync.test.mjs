@@ -11,6 +11,9 @@ import {
   createUploader,
   readSync,
   writeSync,
+  createShare,
+  pullShare,
+  shareLink,
 } from '../src/sync.js';
 import { CODE } from '../functions/api/[[path]].js';
 
@@ -176,4 +179,52 @@ test('sync settings survive a reload and a broken store never throws', () => {
   };
   assert.equal(writeSync(full, { code, dirty: false }), false);
   assert.equal(writeSync(null, { code, dirty: false }), false);
+});
+
+test('sharing sends the snapshot with the code and reads back the id', async () => {
+  let seen;
+  const spy = async (url, init) => {
+    seen = { url, init };
+    return new Response('{"id":"ABCDEFGHJKMN","expiresAt":9}');
+  };
+  const snapshot = { kind: 'sample', sample: { id: 'a' } };
+  assert.deepEqual(await createShare(spy, code, snapshot), {
+    status: 'ok',
+    id: 'ABCDEFGHJKMN',
+    expiresAt: 9,
+  });
+  assert.equal(seen.url, './api/share');
+  assert.equal(seen.init.method, 'POST');
+  assert.equal(seen.init.headers['x-sync-code'], code);
+  assert.deepEqual(JSON.parse(seen.init.body), snapshot);
+  assert.equal((await createShare(reply(403, {}), code, snapshot)).status, 'notSynced');
+  assert.equal((await createShare(reply(413, {}), code, snapshot)).status, 'error');
+  assert.equal((await createShare(down, code, snapshot)).status, 'offline');
+});
+
+test('opening a link needs no code and tells a missing link apart', async () => {
+  let seen;
+  const spy = async (url, init) => {
+    seen = { url, init };
+    return new Response('{"kind":"sample"}');
+  };
+  assert.deepEqual(await pullShare(spy, 'ABCDEFGHJKMN'), {
+    status: 'ok',
+    share: { kind: 'sample' },
+  });
+  assert.equal(seen.url, './api/share/ABCDEFGHJKMN');
+  assert.equal(seen.init, undefined, '코드 헤더를 보내지 않는다');
+  assert.equal((await pullShare(reply(404, {}), 'X')).status, 'missing');
+  assert.equal((await pullShare(reply(503, {}), 'X')).status, 'retry');
+  assert.equal((await pullShare(down, 'X')).status, 'offline');
+});
+
+test('a share link is the app address with the id in the fragment', () => {
+  const location = {
+    origin: 'https://app.example',
+    pathname: '/',
+    search: '?x=1',
+    hash: '#builds',
+  };
+  assert.equal(shareLink(location, 'ABCDEFGHJKMN'), 'https://app.example/#share=ABCDEFGHJKMN');
 });

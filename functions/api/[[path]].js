@@ -8,6 +8,18 @@ export const CODE = /^[0-9A-HJKMNP-TV-Z]{20}$/;
 // 샘플 수백 개도 수십 KB다. 남의 코드로 큰 값을 밀어 넣어 한도를 쓰는 일을 막는다.
 export const MAX_BODY = 512 * 1024;
 
+// 공유 링크 id는 같은 글자로 12자(60비트)다. 링크를 가진 사람은 누구나 보므로
+// 비밀이 아니다. 남의 링크를 짐작으로 찾아낼 수 없을 만큼만 길면 된다.
+export const SHARE_ID = /^[0-9A-HJKMNP-TV-Z]{12}$/;
+// 공유는 그 시점의 스냅샷이다. 기간이 지나면 KV가 스스로 지운다. 기간은 저장 공간만
+// 좌우하고 요청 수(한도)와는 상관없다. 조회는 열 때마다, 쓰기는 만들 때만 센다.
+export const SHARE_DAYS = 30;
+// 파티 하나가 샘플 여섯을 펼쳐 담아도 수 KB다.
+export const MAX_SHARE = 64 * 1024;
+
+const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const DAY = 24 * 60 * 60;
+
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -19,10 +31,35 @@ const json = (body, status = 200) =>
 const isDoc = doc =>
   !!doc && typeof doc === 'object' && Array.isArray(doc.samples) && Array.isArray(doc.parties);
 
-export async function handle(request, env) {
+// 공유도 모양만 본다. 여는 쪽 앱의 readShare가 항목을 검사한다.
+const isObject = x => !!x && typeof x === 'object' && !Array.isArray(x);
+const isShare = body =>
+  body?.kind === 'sample'
+    ? isObject(body.sample)
+    : body?.kind === 'party' && isObject(body.party) && Array.isArray(body.samples);
+
+async function readJson(request, limit) {
+  const text = await request.text();
+  if (new TextEncoder().encode(text).byteLength > limit)
+    return { error: json({ error: 'too large' }, 413) };
+  try {
+    return { body: JSON.parse(text) };
+  } catch {
+    return { error: json({ error: 'bad json' }, 400) };
+  }
+}
+
+export async function handle(request, env, now = Date.now()) {
   if (!env?.BUILDS) return json({ error: 'storage not bound' }, 503);
   const url = new URL(request.url);
-  if (url.pathname !== '/api/doc') return json({ error: 'not found' }, 404);
+  if (url.pathname === '/api/doc') return handleDoc(request, env);
+  if (url.pathname === '/api/share') return createShare(request, env, now);
+  const shared = url.pathname.match(/^\/api\/share\/([^/]+)$/);
+  if (shared) return readShare(request, env, shared[1], now);
+  return json({ error: 'not found' }, 404);
+}
+
+async function handleDoc(request, env) {
   const code = request.headers.get('x-sync-code') ?? '';
   if (!CODE.test(code)) return json({ error: 'bad code' }, 400);
   const key = `doc:${code}`;
@@ -33,15 +70,8 @@ export async function handle(request, env) {
   }
 
   if (request.method === 'PUT') {
-    const text = await request.text();
-    if (new TextEncoder().encode(text).byteLength > MAX_BODY)
-      return json({ error: 'too large' }, 413);
-    let body;
-    try {
-      body = JSON.parse(text);
-    } catch {
-      return json({ error: 'bad json' }, 400);
-    }
+    const { body, error } = await readJson(request, MAX_BODY);
+    if (error) return error;
     if (!isDoc(body?.doc) || !Number.isInteger(body?.version) || body.version < 0)
       return json({ error: 'bad body' }, 400);
     const stored = await env.BUILDS.get(key, 'json');
@@ -62,6 +92,40 @@ export async function handle(request, env) {
   }
 
   return json({ error: 'method not allowed' }, 405);
+}
+
+// 동기화를 켠 사람만 링크를 만든다. 코드 모양만 보면 아무 글자로나 만들 수 있으므로
+// 서버에 그 코드의 문서가 있는지 본다. 아무나 KV를 채우는 일을 막는다.
+async function createShare(request, env, now) {
+  if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+  const code = request.headers.get('x-sync-code') ?? '';
+  if (!CODE.test(code)) return json({ error: 'bad code' }, 400);
+  if ((await env.BUILDS.get(`doc:${code}`)) === null) return json({ error: 'not synced' }, 403);
+  const { body, error } = await readJson(request, MAX_SHARE);
+  if (error) return error;
+  if (!isShare(body)) return json({ error: 'bad body' }, 400);
+  const id = [...crypto.getRandomValues(new Uint8Array(12))].map(b => ALPHABET[b % 32]).join('');
+  const expiresAt = now + SHARE_DAYS * DAY * 1000;
+  const { kind, sample, party, samples } = body;
+  const share =
+    kind === 'sample' ? { kind, sample, expiresAt } : { kind, party, samples, expiresAt };
+  try {
+    await env.BUILDS.put(`share:${id}`, JSON.stringify(share), {
+      expirationTtl: SHARE_DAYS * DAY,
+    });
+  } catch {
+    return json({ error: 'busy' }, 429);
+  }
+  return json({ id, expiresAt });
+}
+
+// KV는 만료된 키를 곧바로 지우지 않을 수 있다. 기한은 값에 적힌 시각으로 판단한다.
+async function readShare(request, env, id, now) {
+  if (request.method !== 'GET') return json({ error: 'method not allowed' }, 405);
+  if (!SHARE_ID.test(id)) return json({ error: 'not found' }, 404);
+  const share = await env.BUILDS.get(`share:${id}`, 'json');
+  if (!share || !(share.expiresAt > now)) return json({ error: 'not found' }, 404);
+  return json(share);
 }
 
 export const onRequest = ({ request, env }) => handle(request, env);

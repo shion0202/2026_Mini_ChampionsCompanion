@@ -32,6 +32,8 @@ import {
   pruneDrafts,
   docFromServer,
   joinDocs,
+  shareSnapshot,
+  readShare,
   speciesOptions,
   abilityOptions,
   moveOptions,
@@ -916,4 +918,45 @@ test('joining keeps both sides and lets the later save win', () => {
     ).samples[0].name,
     '이쪽',
   );
+});
+
+test('a party share carries copies of just the samples it uses', () => {
+  const a = { ...emptySample(), id: 'a', name: '가', pokemon: 'salamence' };
+  const b = { ...emptySample(), id: 'b', name: '나' };
+  const party = {
+    ...emptyParty(),
+    id: 'p',
+    name: '파티',
+    members: ['a', null, 'gone', null, null, null],
+  };
+  const doc = { samples: [a, b], parties: [party], version: 3 };
+  assert.deepEqual(shareSnapshot(doc, 'party', 'p'), { kind: 'party', party, samples: [a] });
+  assert.deepEqual(shareSnapshot(doc, 'sample', 'b'), { kind: 'sample', sample: b });
+  assert.equal(shareSnapshot(doc, 'sample', 'nope'), null);
+  assert.equal(shareSnapshot(doc, 'party', 'nope'), null);
+});
+
+test('an opened share is checked like stored data', () => {
+  const a = { ...emptySample(), id: 'a', name: '가' };
+  const party = {
+    ...emptyParty(),
+    id: 'p',
+    name: '파티',
+    members: ['a', null, null, null, null, null],
+  };
+  assert.deepEqual(readShare({ kind: 'sample', sample: { ...a, form: 'Mega' }, expiresAt: 5 }), {
+    kind: 'sample',
+    sample: a,
+    expiresAt: 5,
+  });
+  assert.deepEqual(readShare({ kind: 'party', party, samples: [a, { id: 'broken' }] }), {
+    kind: 'party',
+    party,
+    samples: [a],
+    expiresAt: null,
+  });
+  assert.equal(readShare({ kind: 'sample', sample: { id: 'broken' } }), null);
+  assert.equal(readShare({ kind: 'party', party: { id: 'p' }, samples: [] }), null);
+  assert.equal(readShare({ kind: 'doc' }), null);
+  assert.equal(readShare(null), null);
 });

@@ -7,6 +7,7 @@ const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 export const CODE_LENGTH = 20;
 const META = 'champions:sync';
 const URL_DOC = './api/doc';
+const URL_SHARE = './api/share';
 
 // 100비트. 32는 256을 나누므로 바이트를 32로 나눈 나머지에 치우침이 없다.
 export function newSyncCode(random = n => crypto.getRandomValues(new Uint8Array(n))) {
@@ -32,9 +33,9 @@ export const formatCode = code => code.match(/.{1,4}/g).join('-');
 //  retry    잠시 뒤 다시 하면 된다 (같은 키 초당 1회 제한, 서버 일시 오류)
 //  offline  연결이 없거나 응답을 받지 못했다
 //  error    서버가 받지 않았다 (너무 큼, 형식 오류). 다시 해도 같다
-async function send(fetcher, code, init) {
+async function send(fetcher, code, init, url = URL_DOC) {
   try {
-    const response = await fetcher(URL_DOC, {
+    const response = await fetcher(url, {
       ...init,
       headers: { 'content-type': 'application/json', 'x-sync-code': code },
     });
@@ -61,6 +62,39 @@ export async function pushDoc(fetcher, code, doc, version) {
   if (!response?.ok) return { status: failure(response) };
   return { status: 'ok', version: body.version };
 }
+
+// 공유 링크 만들기. 동기화 코드로 서버에 문서가 있는 사람만 만든다(notSynced).
+export async function createShare(fetcher, code, snapshot) {
+  const { response, body } = await send(
+    fetcher,
+    code,
+    {
+      method: 'POST',
+      body: JSON.stringify(snapshot),
+    },
+    URL_SHARE,
+  );
+  if (response?.status === 403) return { status: 'notSynced' };
+  if (!response?.ok) return { status: failure(response) };
+  return { status: 'ok', id: body.id, expiresAt: body.expiresAt };
+}
+
+// 공유 링크 열기. 코드가 필요 없다. 기한이 지났거나 없는 링크는 missing.
+export async function pullShare(fetcher, id) {
+  try {
+    const response = await fetcher(`${URL_SHARE}/${encodeURIComponent(id)}`);
+    if (response.status === 404) return { status: 'missing' };
+    if (!response.ok) return { status: failure(response) };
+    return { status: 'ok', share: await response.json() };
+  } catch {
+    return { status: 'offline' };
+  }
+}
+
+// 앱 주소에 #share=<id>를 붙인다. 해시는 서버로 가지 않고, 안드로이드 앱(TWA)도
+// 같은 주소를 받아 앱 안에서 연다.
+export const shareLink = (location, id) =>
+  `${location.origin}${location.pathname}#share=${encodeURIComponent(id)}`;
 
 // 앱을 열 때 할 일. 로컬 문서가 바탕으로 한 서버 버전(based)과 올리지 못한 변경이
 // 남았는지(dirty)만 보면 된다. 서버가 앞서 있는데 이 기기에도 변경이 있으면

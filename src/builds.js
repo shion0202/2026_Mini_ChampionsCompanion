@@ -232,6 +232,34 @@ export function writeDoc(storage, doc) {
   }
 }
 
+// 공유 링크에 담을 스냅샷. 파티는 참조하는 샘플을 펼쳐 함께 담는다. 원본을 나중에
+// 고치거나 지워도 이미 보낸 링크는 그대로 남는다. 없는 항목이면 null.
+export function shareSnapshot(doc, kind, id) {
+  if (kind === 'sample') {
+    const sample = doc.samples.find(s => s.id === id);
+    return sample ? { kind, sample } : null;
+  }
+  const party = doc.parties.find(p => p.id === id);
+  if (!party) return null;
+  const used = new Set(party.members.filter(Boolean));
+  return { kind, party, samples: doc.samples.filter(s => used.has(s.id)) };
+}
+
+// 링크로 받은 스냅샷도 신뢰 경계다. 저장소에서 읽은 문서와 같은 검사를 거친다.
+// 읽을 수 없으면 null.
+export function readShare(raw) {
+  const expiresAt = Number.isFinite(raw?.expiresAt) ? raw.expiresAt : null;
+  if (raw?.kind === 'sample') {
+    const [sample] = normalizeDoc({ samples: [raw.sample] }).samples;
+    return sample ? { kind: 'sample', sample, expiresAt } : null;
+  }
+  if (raw?.kind === 'party') {
+    const { samples, parties } = normalizeDoc({ samples: raw.samples, parties: [raw.party] });
+    return parties.length ? { kind: 'party', party: parties[0], samples, expiresAt } : null;
+  }
+  return null;
+}
+
 // 서버에서 받은 문서도 신뢰 경계다. 저장소에서 읽은 것과 같은 검사를 거친다.
 // 버전은 문서 안의 값이 아니라 서버가 따로 알려준 값을 쓴다.
 export const docFromServer = (doc, version) => ({ ...normalizeDoc(doc), version });
