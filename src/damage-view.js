@@ -399,7 +399,17 @@ function defenderPanel(state, context) {
         `<button type="button" data-dmg-spikes="${value}" aria-pressed="${String(side.spikes ?? 0) === value}">${label}</button>`,
     ).join('') +
     `</div></div>` +
-    check('stealthRock', side.stealthRock, '스텔스록') +
+    `<div class="calc-line"><span>스텔스록</span><div class="calc-choices" role="group" aria-label="스텔스록">` +
+    [
+      [false, '없음'],
+      [true, '설치됨'],
+    ]
+      .map(
+        ([on, label]) =>
+          `<button type="button" data-dmg-stealth-rock="${on}" aria-pressed="${!!side.stealthRock === on}">${label}</button>`,
+      )
+      .join('') +
+    `</div></div>` +
     `</div><div class="calc-subgroup">` +
     `<div class="calc-line is-wide"><span>울퉁불퉁멧을 받은 횟수 (1/6)</span><input type="number" min="0" max="9" step="1" value="${side.helmetHits ?? 0}" data-dmg-number="helmetHits" aria-label="울퉁불퉁멧을 받은 횟수"></div>` +
     `<div class="calc-line is-wide"><span>까칠한피부·철가시를 받은 횟수 (1/8)</span><input type="number" min="0" max="9" step="1" value="${side.roughSkinHits ?? 0}" data-dmg-number="roughSkinHits" aria-label="까칠한피부·철가시를 받은 횟수"></div>` +

@@ -2685,6 +2685,11 @@ $('calc-body').addEventListener('click', event => {
       return toast('샘플이 없습니다.');
     return openPicker(kind, null, { page: 'damage', side: sideKey });
   }
+  const rocks = target.closest('[data-dmg-stealth-rock]');
+  if (rocks) {
+    dmg[sideKey] = { ...side, stealthRock: rocks.dataset.dmgStealthRock === 'true' };
+    return renderDamage();
+  }
   const spikes = target.closest('[data-dmg-spikes]');
   if (spikes) {
     dmg[sideKey] = { ...side, spikes: Number(spikes.dataset.dmgSpikes) };
