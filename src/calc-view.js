@@ -77,7 +77,7 @@ function sidePanel(key, side, result, { reference, index, field, speciesLabel })
     `<div class="calc-side-head">` +
     `${portrait({ sprite: speciesSprite(reference, index, side.pokemon) }, 'calc-portrait')}` +
     `<div><h3>${title}</h3>` +
-    `<small>${species ? `${esc(speciesLabel(side.pokemon))} · 스피드 종족값 ${species.stats.spe}` : '포켓몬을 고르세요'}</small></div></div>` +
+    `<small>${species ? `${esc(speciesLabel(side.pokemon))} · 스피드 종족값 ${species.stats.spe}` : '포켓몬을 선택하세요'}</small></div></div>` +
     `<div class="calc-picks">` +
     `${key === 'mine' ? '<button type="button" class="builds-pick" data-calc-pick="member">샘플 불러오기</button>' : ''}` +
     `<button type="button" class="builds-pick" data-calc-pick="species">${species ? esc(speciesLabel(side.pokemon)) : '포켓몬 선택'}</button>` +
@@ -152,7 +152,7 @@ const VERDICT = {
 
 export function speedVerdict(mine, theirs, order) {
   if (!mine || !theirs)
-    return '<p class="calc-verdict-text">양쪽 포켓몬을 고르면 누가 먼저 행동하는지 보여줍니다.</p>';
+    return '<p class="calc-verdict-text">양쪽 포켓몬을 선택하면 누가 먼저 행동하는지 보여줍니다.</p>';
   return (
     `<div class="calc-verdict-speeds"><span>내 포켓몬 <strong>${mine.speed}</strong></span>` +
     `<span>상대 포켓몬 <strong>${theirs.speed}</strong></span></div>` +

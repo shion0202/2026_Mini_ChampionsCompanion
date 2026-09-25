@@ -38,9 +38,10 @@ import {
   emptyDamage,
   damageSideFromSample,
   stat as damageStat,
+  stageStat,
   hpStat,
 } from './damage-calc.js';
-import { damageCalcView, damageResult, statKeys } from './damage-view.js';
+import { damageCalcView, damageResult, statKeys, hpText } from './damage-view.js';
 import { NFE_SPECIES, SPREAD_MOVES } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { reviewedArticles, selectArticles } from './articles.js';
@@ -2425,6 +2426,11 @@ function damageContext() {
           side.nature?.[key] ?? 10,
         )
       : null;
+  // 랭크를 곱한 값. 실수치 칸과 따로 보인다.
+  const staged = (side, key) => {
+    const value = actual(side, key);
+    return value === null ? null : stageStat(value, side.stages?.[key] ?? 0);
+  };
   // 전체기인지는 기술로 정한다. 칸을 직접 바꿨으면 그것을 따른다.
   const spread = attacker.spread ?? (move ? SPREAD_MOVES.has(move.id) : false);
   const input = move && {
@@ -2440,13 +2446,18 @@ function damageContext() {
     spread,
     summary: input && attacker.pokemon && defender.pokemon ? damageSummary(input) : null,
     defaultHits: move ? defaultHits(move, attacker.ability) : 1,
-    attackerStats: { attack: actual(attacker, keys.attack) },
+    attackerStats: {
+      attack: actual(attacker, keys.attack),
+      staged: staged(attacker, keys.attack),
+    },
     defenderStats: {
       hp: species(defender.pokemon)
         ? hpStat(species(defender.pokemon).stats.hp, defender.points?.hp ?? 0)
         : null,
       defense: actual(defender, keys.defense),
+      staged: staged(defender, keys.defense),
       foul: actual(defender, 'atk'),
+      foulStaged: staged(defender, 'atk'),
     },
   };
 }
@@ -2513,11 +2524,19 @@ function damageInput(target, commit) {
   state.calc.damage[sideKey] = { ...side, [field]: value };
   if (field === 'hpPercent') {
     const out = target.closest('.calc-line')?.querySelector('[data-dmg-out="hpPercent"]');
-    if (out) out.textContent = `${value}%`;
+    if (out) out.textContent = hpText(value, Number(out.dataset.hpMax) || 0);
   }
   return true;
 }
 
+// ‘상세 보기’를 열어 두면 다시 그려도 열린 채로 둔다. toggle은 거품이 없어 잡아서 듣는다.
+$('calc-body').addEventListener(
+  'toggle',
+  event => {
+    if (event.target.matches?.('.dmg-rolls')) state.calc.damage.rollsOpen = event.target.open;
+  },
+  true,
+);
 $('calc-body').addEventListener('input', event => {
   if (state.calc.tab !== 'damage') return;
   if (damageInput(event.target, false)) renderDamageResult();

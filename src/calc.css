@@ -262,6 +262,14 @@
   width: 64px;
   height: 64px;
 }
+.dmg-move {
+  gap: 10px;
+}
+.dmg-stat {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
 .dmg-move b {
   font-size: 18px;
   font-variant-numeric: tabular-nums;
@@ -322,8 +330,10 @@
   color: var(--teal);
   font-weight: 700;
 }
+/* 난수로 쓰러뜨릴 수 있으면 주황, 확정이면 청록, 못 쓰러뜨리면 색 없음. */
 .dmg-chip.is-maybe {
-  color: var(--ink);
+  border-color: var(--amber);
+  color: var(--amber);
   font-weight: 700;
 }
 .calc-note {
@@ -346,4 +356,45 @@
     grid-column: 1 / -1;
     order: -1;
   }
+}
+
+:root {
+  --amber: #b45309;
+}
+:root[data-theme='dark'] {
+  --amber: #f5b041;
+}
+/* 아래쪽 결과가 계산 칸에 붙지 않게 띄운다. */
+.calc-sides + [data-dmg-result] {
+  margin-top: 16px;
+}
+/* 난수 16개는 접어 둔다. */
+.dmg-rolls {
+  display: grid;
+  margin: 2px 0 6px;
+}
+.dmg-rolls summary {
+  cursor: pointer;
+  color: var(--teal);
+  font-size: 13px;
+  justify-self: end;
+}
+.dmg-rolls[open] {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+.dmg-rolls > small {
+  color: var(--muted);
+  font-size: 12px;
+}
+/* 기술 칸. 이름은 왼쪽, 타입·분류·위력은 오른쪽. */
+.dmg-move-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
 }
