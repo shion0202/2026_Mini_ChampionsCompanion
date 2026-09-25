@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.shion0202.champions",
+      "sha256_cert_fingerprints": [
+        "06:B6:32:1C:D0:2D:1B:E8:49:02:3F:85:30:C7:59:C8:B4:A9:DD:33:D3:63:C8:0A:02:15:4E:91:5B:14:15:0F"
+      ]
+    }
+  }
+]
