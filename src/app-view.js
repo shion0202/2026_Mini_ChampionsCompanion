@@ -75,7 +75,7 @@ export const errorState = message =>
 
 export const rankingEmpty = favoriteOnly =>
   `<div class="empty-state"><span class="empty-symbol">${favoriteOnly ? '☆' : '⌕'}</span>` +
-  `<h3>조건에 맞는 포켓몬이 없어요</h3>` +
+  `<h3>조건에 맞는 포켓몬이 없습니다</h3>` +
   `<p>검색어와 적용한 필터를 확인해 주세요.</p>` +
   `<button id="reset-filters" class="text-button">필터 초기화</button></div>`;
 

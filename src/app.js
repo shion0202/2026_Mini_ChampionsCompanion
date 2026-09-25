@@ -2204,7 +2204,7 @@ $('calc-body').addEventListener('click', event => {
   const pick = target.closest('[data-calc-pick]');
   if (pick) {
     if (pick.dataset.calcPick === 'member' && !state.builds.samples.some(s => s.pokemon))
-      return toast('포켓몬을 고른 샘플이 없습니다.');
+      return toast('샘플이 없습니다.');
     return openPicker(pick.dataset.calcPick, null, key);
   }
   const side = state.calc[key];

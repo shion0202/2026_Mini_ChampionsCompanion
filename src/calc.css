@@ -119,8 +119,7 @@
   font-size: 14px;
 }
 .calc-line > span:first-child {
-  /* 이름표와 값 사이를 넉넉히 띄운다. 값이 왼쪽에 붙어 보였다. */
-  width: 112px;
+  width: 96px;
   flex: none;
   color: var(--muted);
   font-size: 12px;
@@ -130,7 +129,8 @@
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 6px 10px;
+  /* 숫자가 테두리에 붙어 보이지 않게 안쪽 왼쪽을 넉넉히 둔다. */
+  padding: 6px 10px 6px 16px;
   /* 오른쪽에 값을 올리고 내리는 화살표가 붙어 가운데 정렬은 치우쳐 보인다. */
   text-align: left;
   color: var(--ink);
@@ -224,14 +224,4 @@
 }
 .calc-sides + .calc-verdict {
   margin: 16px 0 0;
-}
-
-/* 폰 폭에서는 이름표를 줄여 값과 단추가 한 줄에 들게 한다. */
-@media (max-width: 480px) {
-  .calc-line > span:first-child {
-    width: 84px;
-  }
-  .calc-line input[type='number'] {
-    width: 64px;
-  }
 }
