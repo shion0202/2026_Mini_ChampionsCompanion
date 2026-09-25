@@ -53,6 +53,8 @@ import {
   joinDocs,
   shareSnapshot,
   readShare,
+  mergeThreeWay,
+  sameItems,
 } from './builds.js';
 import {
   newSyncCode,
@@ -67,6 +69,8 @@ import {
   createShare,
   pullShare,
   shareLink,
+  readBase,
+  writeBase,
 } from './sync.js';
 import {
   sampleList,
@@ -78,6 +82,7 @@ import {
   comboOptions,
   syncText,
   syncActions,
+  conflictList,
   shareView,
   moveMeta,
   moveEffect,
@@ -177,6 +182,8 @@ const state = {
   // null이면 이 기기에만 저장한다. dirty는 올리지 못한 변경이 남았다는 표시다.
   sync: readSync(storage),
   syncStatus: 'off',
+  // 사람이 골라야 하는 충돌. { remote, conflicts }. 없으면 null.
+  syncConflict: null,
   // 링크로 연 공유. { id, status, data }. 메뉴에는 없고 #share=<id>로만 연다.
   share: null,
   buildsTab: 'sample',
@@ -658,8 +665,14 @@ const BUILDS_TABS = ['sample', 'party'];
 // 동기화. 이 기기에 먼저 쓰고 서버는 뒤따른다(docs/builds-and-sync.md).
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const syncFetch = (url, init) => fetch(url, init);
+// 올린 문서. 올리기가 성공하면 이것이 서버와 맞춘 기준본이 된다. 올리는 사이
+// 새로 고친 state.builds가 아니라 실제로 보낸 것이어야 한다.
+let syncSent = null;
 const uploader = createUploader({
-  push: () => pushDoc(syncFetch, state.sync.code, state.builds, state.builds.version),
+  push: () => {
+    syncSent = state.builds;
+    return pushDoc(syncFetch, state.sync.code, syncSent, syncSent.version);
+  },
   wait,
   onState: syncState,
 });
@@ -680,12 +693,69 @@ function syncState(status, result) {
   if (status === 'ok' && Number.isInteger(result?.version)) {
     state.builds = { ...state.builds, version: result.version };
     writeDoc(storage, state.builds);
+    writeBase(storage, syncSent);
   }
   if (state.sync && status !== 'uploading') {
     state.sync = { ...state.sync, dirty: status === 'ok' ? uploader.pending() : true };
     writeSync(storage, state.sync);
   }
   renderSyncBar();
+  // 올리다 보니 다른 기기가 먼저 올렸다. 받아서 항목별로 맞춰 본다.
+  if (status === 'conflict') resolveConflict();
+}
+
+// 서버와 달라졌을 때. 기준본과 견주어 이 기기만, 또는 서버만 바꾼 항목은 저절로
+// 합치고, 같은 항목을 양쪽에서 다르게 바꿨을 때만 팝업으로 묻는다.
+async function resolveConflict(server = null) {
+  if (!state.sync) return;
+  server ??= await pullDoc(syncFetch, state.sync.code);
+  if (server.status !== 'ok') {
+    state.syncStatus = server.status;
+    return renderSyncBar();
+  }
+  const remote = docFromServer(server.doc, server.version);
+  const { doc, conflicts } = mergeThreeWay(readBase(storage), state.builds, remote);
+  if (!conflicts.length) return settleSync(doc, remote);
+  state.syncConflict = { remote, conflicts };
+  state.syncStatus = 'conflict';
+  state.sync = { ...state.sync, dirty: true };
+  writeSync(storage, state.sync);
+  renderSyncBar();
+  openConflictDialog();
+}
+
+// 합친 문서를 이 기기에 쓰고, 서버와 다르면 올린다. 합친 결과는 서버 버전 위에
+// 올라가므로 기준본은 받은 서버 문서다.
+function settleSync(doc, remote) {
+  state.syncConflict = null;
+  state.builds = { ...doc, version: remote.version };
+  writeDoc(storage, state.builds);
+  state.buildsDrafts = pruneDrafts(state.buildsDrafts, state.builds);
+  writeDrafts(storage, state.buildsDrafts);
+  writeBase(storage, remote);
+  const ahead = !sameItems(state.builds, remote);
+  state.sync = { ...state.sync, dirty: ahead };
+  writeSync(storage, state.sync);
+  // 올릴 것이 남았으면 다 올린 뒤에야 ‘동기화됩니다’가 맞다.
+  state.syncStatus = ahead ? 'uploading' : 'ok';
+  renderSyncBar();
+  renderBuilds();
+  if (ahead) uploader.request();
+}
+
+function openConflictDialog() {
+  const pending = state.syncConflict;
+  if (!pending) return;
+  $('sync-dialog-list').innerHTML = conflictList(pending.conflicts);
+  if (!$('sync-dialog').open) $('sync-dialog').showModal();
+}
+
+function chooseConflict(side) {
+  const pending = state.syncConflict;
+  $('sync-dialog').close();
+  if (!pending) return;
+  const { doc } = mergeThreeWay(readBase(storage), state.builds, pending.remote, side);
+  settleSync(doc, pending.remote);
 }
 
 // 서버 것을 그대로 받는다. 지워진 항목의 초안은 돌아갈 곳이 없으므로 털어낸다.
@@ -694,6 +764,7 @@ function adoptServer(server) {
   writeDoc(storage, state.builds);
   state.buildsDrafts = pruneDrafts(state.buildsDrafts, state.builds);
   writeDrafts(storage, state.buildsDrafts);
+  writeBase(storage, state.builds);
   state.sync = { ...state.sync, dirty: false };
   writeSync(storage, state.sync);
   state.syncStatus = 'ok';
@@ -717,11 +788,13 @@ async function syncOnOpen() {
     server: server.version,
   });
   if (plan === 'pull') return adoptServer(server);
-  if (plan === 'conflict') return syncState('conflict');
+  if (plan === 'conflict') return resolveConflict(server);
   if (plan === 'push') {
     state.builds = { ...state.builds, version: server.version };
     return uploader.request();
   }
+  // 서버와 같다. 기준본이 없던 기기(이 기능 전의 기기)도 여기서 기준본을 얻는다.
+  writeBase(storage, docFromServer(server.doc, server.version));
   state.syncStatus = 'ok';
   renderSyncBar();
 }
@@ -1885,6 +1958,13 @@ $('shared-body').addEventListener('click', event => {
   if (event.target.closest('[data-share-retry]') && state.share)
     openShare(state.share.id, { navigate: false });
 });
+// 충돌 팝업. 닫으면(× 또는 Esc) 고르지 않은 채로 두고, 동기화 줄의 ‘충돌 해결’로
+// 다시 연다. 올리기는 고를 때까지 멈춘다.
+$('sync-dialog').addEventListener('click', event => {
+  const side = event.target.closest('[data-sync-choose]')?.dataset.syncChoose;
+  if (side) return chooseConflict(side);
+  if (event.target.closest('#close-sync-dialog')) $('sync-dialog').close();
+});
 $('builds-sync').addEventListener('click', async event => {
   const action = event.target.closest('[data-sync]')?.dataset.sync;
   if (!action) return;
@@ -1892,13 +1972,14 @@ $('builds-sync').addEventListener('click', async event => {
     // 새 코드는 서버에 아무것도 없으므로 버전 0에서 올린다.
     state.sync = { code: newSyncCode(), dirty: true };
     writeSync(storage, state.sync);
+    writeBase(storage, null);
     state.builds = { ...state.builds, version: 0 };
     writeDoc(storage, state.builds);
     uploader.request();
     return showSyncCode();
   }
   if (action === 'join') {
-    const typed = prompt('다른 기기의 ‘코드 보기’에 나온 동기화 코드를 입력하세요.');
+    const typed = prompt('다른 기기에서 ‘코드 복사’로 얻은 동기화 코드를 입력하세요.');
     if (typed === null) return;
     const code = normalizeCode(typed);
     if (!code) {
@@ -1913,10 +1994,13 @@ $('builds-sync').addEventListener('click', async event => {
     }
     // 이 기기 것을 버리지 않고 합친다. 같은 항목은 나중에 저장한 쪽을 남긴다.
     const previous = { builds: state.builds, sync: state.sync };
-    state.builds = joinDocs(state.builds, docFromServer(server.doc, server.version));
+    const remote = docFromServer(server.doc, server.version);
+    state.builds = joinDocs(state.builds, remote);
     state.sync = { code, dirty: true };
     writeSync(storage, state.sync);
-    if (!buildsSave()) {
+    // 합친 결과는 서버 문서 위에 이 기기 것을 얹은 것이다. 기준본은 서버 문서다.
+    if (buildsSave()) writeBase(storage, remote);
+    else {
       state.builds = previous.builds;
       state.sync = previous.sync;
       writeSync(storage, previous.sync);
@@ -1930,40 +2014,18 @@ $('builds-sync').addEventListener('click', async event => {
         '다시 켜려면 코드가 필요하니 먼저 적어 두세요.',
       () => {
         state.sync = null;
+        state.syncConflict = null;
         writeSync(storage, null);
+        writeBase(storage, null);
         state.syncStatus = 'off';
         renderSyncBar();
       },
       '끄기',
     );
-  if (action === 'pull')
-    return askConfirm(
-      '서버의 내용으로 바꿉니다. 이 기기에서 올리지 못한 변경은 사라집니다.',
-      async () => {
-        const server = await pullDoc(syncFetch, state.sync.code);
-        if (server.status !== 'ok') {
-          state.syncStatus = server.status;
-          return renderSyncBar();
-        }
-        adoptServer(server);
-      },
-      '불러오기',
-    );
-  if (action === 'push')
-    return askConfirm(
-      '이 기기의 내용으로 서버를 덮어씁니다. 다른 기기에서 바꾼 내용은 사라집니다.',
-      async () => {
-        const server = await pullDoc(syncFetch, state.sync.code);
-        if (server.status !== 'ok') {
-          state.syncStatus = server.status;
-          return renderSyncBar();
-        }
-        state.builds = { ...state.builds, version: server.version };
-        writeDoc(storage, state.builds);
-        uploader.request();
-      },
-      '덮어쓰기',
-    );
+  if (action === 'resolve') {
+    if (state.syncConflict) return openConflictDialog();
+    return resolveConflict();
+  }
 });
 $('speed-type').innerHTML += Object.entries(TYPE_LABELS)
   .map(([type, label]) => `<option value="${type}">${label}</option>`)

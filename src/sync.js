@@ -6,6 +6,7 @@
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 export const CODE_LENGTH = 20;
 const META = 'champions:sync';
+const BASE = 'champions:sync-base';
 const URL_DOC = './api/doc';
 const URL_SHARE = './api/share';
 
@@ -168,6 +169,29 @@ export function writeSync(storage, meta) {
     if (!storage) return false;
     if (meta) storage.setItem(META, JSON.stringify(meta));
     else storage.removeItem(META);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 기준본. 이 기기가 마지막으로 서버와 맞췄을 때의 문서다. 충돌이 나면 이것과
+// 견주어 어느 쪽이 무엇을 바꿨는지 가린다(builds.js의 mergeThreeWay). 없거나 깨졌으면
+// null이고, 그때는 양쪽이 다른 항목을 모두 사람에게 묻는다.
+export function readBase(storage) {
+  try {
+    const raw = JSON.parse(storage?.getItem(BASE));
+    return raw && Array.isArray(raw.samples) && Array.isArray(raw.parties) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeBase(storage, doc) {
+  try {
+    if (!storage) return false;
+    if (doc) storage.setItem(BASE, JSON.stringify({ samples: doc.samples, parties: doc.parties }));
+    else storage.removeItem(BASE);
     return true;
   } catch {
     return false;

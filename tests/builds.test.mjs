@@ -35,6 +35,8 @@ import {
   joinDocs,
   shareSnapshot,
   readShare,
+  mergeThreeWay,
+  sameItems,
   speciesOptions,
   abilityOptions,
   moveOptions,
@@ -1039,4 +1041,80 @@ test('empty slots cannot be dragged and bad targets change nothing', () => {
     ],
   ])
     assert.deepEqual(validateSample({ ...dragMove(s, from, to), name: 'x', pokemon: 'y' }), []);
+});
+
+const item = (id, name, extra = {}) => ({ ...emptySample(), id, name, updatedAt: 1, ...extra });
+const docOf = (samples, parties = [], version = 0) => ({ samples, parties, version });
+
+test('changes on different items merge on their own', () => {
+  const base = docOf([item('a', 'A'), item('b', 'B'), item('c', 'C')]);
+  const local = docOf([item('a', 'A 이 기기'), item('b', 'B'), item('c', 'C'), item('n', '새것')]);
+  const server = docOf([item('a', 'A'), item('b', 'B 서버')], [], 7);
+  const { doc, conflicts } = mergeThreeWay(base, local, server);
+  assert.deepEqual(conflicts, []);
+  assert.deepEqual(
+    doc.samples.map(x => x.name),
+    ['A 이 기기', 'B 서버', '새것'],
+    'c는 서버에서 지웠으므로 사라진다',
+  );
+  assert.equal(doc.version, 7);
+});
+
+test('the same item changed on both sides is a conflict the person settles', () => {
+  const base = docOf([item('a', 'A'), item('b', 'B')]);
+  const local = docOf([item('a', 'A 이 기기'), item('b', 'B 이 기기')]);
+  const server = docOf([item('a', 'A 서버'), item('b', 'B 이 기기')], [], 3);
+  const open = mergeThreeWay(base, local, server);
+  assert.deepEqual(
+    open.conflicts.map(c => [c.kind, c.id, c.local.name, c.server.name]),
+    [['sample', 'a', 'A 이 기기', 'A 서버']],
+    '양쪽이 똑같이 고친 b는 충돌이 아니다',
+  );
+  assert.equal(mergeThreeWay(base, local, server, 'server').doc.samples[0].name, 'A 서버');
+  assert.equal(mergeThreeWay(base, local, server, 'local').doc.samples[0].name, 'A 이 기기');
+});
+
+test('an edit against a deletion is a conflict too', () => {
+  const base = docOf([item('a', 'A')]);
+  const local = docOf([item('a', 'A 고침')]);
+  const server = docOf([], [], 2);
+  const { conflicts } = mergeThreeWay(base, local, server);
+  assert.deepEqual(
+    conflicts.map(c => [c.id, c.server]),
+    [['a', null]],
+  );
+  assert.deepEqual(mergeThreeWay(base, local, server, 'server').doc.samples, []);
+  assert.equal(mergeThreeWay(base, local, server, 'local').doc.samples.length, 1);
+});
+
+test('parties lose members whose samples were deleted by the merge', () => {
+  const party = {
+    ...emptyParty(),
+    id: 'p',
+    name: '파티',
+    members: ['a', 'b', null, null, null, null],
+  };
+  const base = docOf([item('a', 'A'), item('b', 'B')], [party]);
+  const local = docOf([item('a', 'A'), item('b', 'B')], [party]);
+  const server = docOf([item('a', 'A')], [party], 4);
+  const { doc } = mergeThreeWay(base, local, server);
+  assert.deepEqual(doc.parties[0].members, ['a', null, null, null, null, null]);
+});
+
+test('without a base, one-sided items survive and differing ones conflict', () => {
+  const local = docOf([item('a', 'A 이 기기'), item('l', '이 기기만')]);
+  const server = docOf([item('a', 'A 서버'), item('s', '서버만')], [], 5);
+  const { doc, conflicts } = mergeThreeWay(null, local, server);
+  assert.deepEqual(
+    conflicts.map(c => c.id),
+    ['a'],
+  );
+  assert.deepEqual(doc.samples.map(x => x.id).sort(), ['a', 'l', 's']);
+});
+
+test('key order does not make two equal items differ', () => {
+  const a = item('a', 'A');
+  const reordered = Object.fromEntries(Object.entries(a).reverse());
+  assert.equal(sameItems(docOf([a]), docOf([reordered], [], 9)), true);
+  assert.deepEqual(mergeThreeWay(docOf([a]), docOf([reordered]), docOf([a])).conflicts, []);
 });

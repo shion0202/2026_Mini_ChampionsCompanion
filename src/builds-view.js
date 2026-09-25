@@ -473,9 +473,25 @@ export const syncText = (sync, status) =>
 
 export function syncActions(sync, status) {
   if (!sync) return syncButton('enable', '동기화 켜기') + syncButton('join', '코드로 연결');
+  // 충돌은 팝업에서 고른다. 팝업을 닫았으면 이 단추로 다시 연다.
   return status === 'conflict'
-    ? syncButton('pull', '서버 것 불러오기') + syncButton('push', '이 기기 것으로 덮어쓰기')
+    ? syncButton('resolve', '충돌 해결') + syncButton('copy', '코드 복사')
     : syncButton('copy', '코드 복사') + syncButton('off', '끄기');
+}
+
+// 충돌 팝업의 목록. 어느 항목을 양쪽에서 어떻게 바꿨는지 보여 고를 수 있게 한다.
+// 이름은 남아 있는 쪽에서 가져온다(한쪽이 지웠으면 다른 쪽 이름).
+export function conflictList(conflicts) {
+  const did = item => (item ? '고침' : '지움');
+  return `<ul class="sync-conflicts">${conflicts
+    .map(c => {
+      const name = (c.local ?? c.server)?.name || '이름 없음';
+      return (
+        `<li><strong>${c.kind === 'sample' ? '샘플' : '파티'} · ${esc(name)}</strong>` +
+        `<small>이 기기: ${did(c.local)} / 서버: ${did(c.server)}</small></li>`
+      );
+    })
+    .join('')}</ul>`;
 }
 
 // 공유 화면. 링크로 받은 스냅샷을 보기만 한다. 고치는 단추도, 내 목록으로 가져오는

@@ -14,6 +14,8 @@ import {
   createShare,
   pullShare,
   shareLink,
+  readBase,
+  writeBase,
 } from '../src/sync.js';
 import { CODE } from '../functions/api/[[path]].js';
 
@@ -227,4 +229,21 @@ test('a share link is the app address with the id in the fragment', () => {
     hash: '#builds',
   };
   assert.equal(shareLink(location, 'ABCDEFGHJKMN'), 'https://app.example/#share=ABCDEFGHJKMN');
+});
+
+test('the last synced base survives a reload and a broken one reads as none', () => {
+  const store = new Map();
+  const storage = {
+    getItem: k => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, v),
+    removeItem: k => store.delete(k),
+  };
+  assert.equal(readBase(storage), null);
+  writeBase(storage, { samples: [{ id: 'a' }], parties: [], version: 4 });
+  assert.deepEqual(readBase(storage), { samples: [{ id: 'a' }], parties: [] });
+  writeBase(storage, null);
+  assert.equal(readBase(storage), null);
+  store.set('champions:sync-base', '{"samples":1}');
+  assert.equal(readBase(storage), null);
+  assert.equal(writeBase(null, { samples: [], parties: [] }), false);
 });

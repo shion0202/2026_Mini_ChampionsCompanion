@@ -15,6 +15,7 @@ import {
   fmtDay,
   syncText,
   syncActions,
+  conflictList,
   shareView,
   shareTitle,
 } from '../src/builds-view.js';
@@ -297,12 +298,12 @@ test('the sync bar never prints the code itself', () => {
     assert.ok(!syncBar(synced, status).includes('ABCD'), status);
 });
 
-test('sync offers turn on or join, copy or off, and exactly two ways out of a conflict', () => {
+test('sync offers turn on or join, copy or off, and a way back to the conflict popup', () => {
   const actions = (sync, status) =>
     [...syncActions(sync, status).matchAll(/data-sync="(\w+)"/g)].map(m => m[1]);
   assert.deepEqual(actions(null, 'off'), ['enable', 'join']);
   assert.deepEqual(actions(synced, 'ok'), ['copy', 'off']);
-  assert.deepEqual(actions(synced, 'conflict'), ['pull', 'push']);
+  assert.deepEqual(actions(synced, 'conflict'), ['resolve', 'copy']);
   assert.equal(syncText(null, 'ok'), '이 기기에만 저장합니다.', '꺼져 있으면 상태와 상관없다');
 });
 
@@ -389,4 +390,15 @@ test('picker rows show traits and effect only when given', () => {
   assert.ok(html.includes('<small class="picker-effect">&lt;효과&gt;</small>'));
   const bare = pickerRows([{ value: 'A', label: '가', sub: '물리', chips: [], effect: '' }], 5);
   assert.ok(!bare.includes('picker-chips') && !bare.includes('picker-effect'));
+});
+
+test('the conflict list names each item and what each side did', () => {
+  const html = conflictList([
+    { kind: 'sample', id: 'a', local: { name: '<보만다>' }, server: { name: '보만다' } },
+    { kind: 'party', id: 'p', local: { name: '파티' }, server: null },
+  ]);
+  assert.ok(html.includes('샘플 · &lt;보만다&gt;'));
+  assert.ok(html.includes('이 기기: 고침 / 서버: 고침'));
+  assert.ok(html.includes('파티 · 파티'));
+  assert.ok(html.includes('이 기기: 고침 / 서버: 지움'));
 });

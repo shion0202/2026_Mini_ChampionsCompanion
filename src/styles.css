@@ -3838,3 +3838,26 @@ body.is-dragging-move {
   font-size: 13px;
   color: var(--muted);
 }
+
+/* 동기화 충돌 팝업. 어느 항목이 걸렸는지 한 줄씩 보인다. 두 선택은 무게를 같게 둔다.
+   어느 쪽이 맞는지는 앱이 모른다. */
+.sync-conflicts {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+.sync-conflicts li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.sync-conflicts small {
+  color: var(--muted);
+}
+.sync-choices {
+  flex-wrap: wrap;
+}

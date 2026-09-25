@@ -292,6 +292,56 @@ export function readShare(raw) {
   return null;
 }
 
+// 두 값이 같은지. 키 순서가 달라도 같은 내용이면 같다. 없는 값(undefined)끼리도 같다.
+const canonical = value =>
+  JSON.stringify(value, (key, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : v,
+  );
+const same = (a, b) => canonical(a) === canonical(b);
+
+// 동기화 충돌을 항목(샘플·파티) 단위로 푼다. base는 이 기기가 마지막으로 서버와
+// 맞췄을 때의 문서다. 이 기기만 바꾼 항목은 이 기기 것을, 서버만 바꾼 항목은 서버
+// 것을 남긴다(지운 것도 바꾼 것이다). 양쪽이 다르게 바꾼 항목만 conflicts에 담고,
+// prefer('local' | 'server')가 있으면 그쪽으로 정한다. prefer가 없으면 충돌 항목은
+// 이 기기 것을 임시로 둔다. base가 없으면(예전 기기) 한쪽에만 있는 항목은 살리고,
+// 양쪽이 다른 항목은 모두 충돌로 본다.
+export function mergeThreeWay(base, local, server, prefer = null) {
+  const conflicts = [];
+  const merge = (kind, baseList, localList, serverList) => {
+    const index = list => new Map(list.map(x => [x.id, x]));
+    const [b, l, s] = [index(baseList), index(localList), index(serverList)];
+    const ids = [...new Set([...l.keys(), ...s.keys()])];
+    return ids
+      .map(id => {
+        const [was, mine, theirs] = [b.get(id), l.get(id), s.get(id)];
+        if (same(mine, theirs) || same(theirs, was)) return mine;
+        if (same(mine, was)) return theirs;
+        conflicts.push({ kind, id, local: mine ?? null, server: theirs ?? null });
+        return prefer === 'server' ? theirs : mine;
+      })
+      .filter(Boolean);
+  };
+  const samples = merge('sample', base?.samples ?? [], local.samples, server.samples);
+  const parties = merge('party', base?.parties ?? [], local.parties, server.parties);
+  // 한쪽에서 지운 샘플을 다른 쪽 파티가 가리키면 그 자리를 비운다(deleteSample과 같다).
+  const kept = new Set(samples.map(x => x.id));
+  const doc = {
+    samples,
+    parties: parties.map(p =>
+      p.members.every(id => id === null || kept.has(id))
+        ? p
+        : { ...p, members: p.members.map(id => (id !== null && kept.has(id) ? id : null)) },
+    ),
+    version: server.version,
+  };
+  return { doc, conflicts };
+}
+
+// 항목만 견준다. 버전은 문서 밖의 사정이다.
+export const sameItems = (a, b) => same(a.samples, b.samples) && same(a.parties, b.parties);
+
 // 서버에서 받은 문서도 신뢰 경계다. 저장소에서 읽은 것과 같은 검사를 거친다.
 // 버전은 문서 안의 값이 아니라 서버가 따로 알려준 값을 쓴다.
 export const docFromServer = (doc, version) => ({ ...normalizeDoc(doc), version });
