@@ -12,7 +12,7 @@
 | 단계 | 수행 주체 | 산출물 |
 | --- | --- | --- |
 | 1 수집 | `scripts/collect-articles.mjs` | 리드(기사 주소) → `.cache/articles/<sha1>.html` |
-| 2 추출 | `scripts/article-parse.mjs` | `.cache/article-queue.json` (기사당 약 2KB) |
+| 2 추출 | `scripts/article-parse.mjs` | `.cache/article-queue-<시즌>.json` (예: `article-queue-m5.json`) |
 | 3 판정 | Claude Code 세션 | 최종 6마리와 근거문을 `pending`으로 기록 |
 | 4 승격 | 사람 | `articles.json`의 `pending` → `reviewed` |
 
@@ -95,7 +95,9 @@ pokesol은 공개된 작성자 피드를 찾지 못했다. 그 외에 따로 볼
 `scripts/article-feeds.json`의 `feeds`에 적는다. 기사 주소를 적으면 피드로 바꿔 본다.
 피드에는 지난 시즌 기사도 있으므로 제목의 시즌이 다르면 받기 전에 버린다.
 
-큐는 이제 **합친다**. 검색 한 번, 주소 목록 한 번처럼 나눠 돌려도 앞의 결과가
+큐는 시즌마다 파일을 나눈다(`article-queue-m5.json`). 한 파일에 두면 지난 시즌 후보가
+이번 판정에 섞인다. 작성자 피드는 시즌과 무관하므로 모든 시즌의 큐와 옛 이름
+`article-queue.json`에서 되짚는다. 같은 시즌 큐는 **합친다**. 검색 한 번, 주소 목록 한 번처럼 나눠 돌려도 앞의 결과가
 지워지지 않는다. 다시 본 주소는 새 결과로 바꾸고, 그사이 `articles.json`에 등록된
 주소는 뺀다.
 

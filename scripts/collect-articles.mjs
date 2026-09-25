@@ -2,7 +2,7 @@
 // article-parse.mjs가 한다.
 // 사용: node scripts/collect-articles.mjs --season M5 [--format singles]
 //        [--urls 주소목록.txt ...] [--from 목록페이지주소 ...] [--no-search] [--no-feeds]
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import {
   buildIndex,
@@ -112,13 +112,21 @@ const readJson = (path, fallback) =>
       if (fallback !== undefined && error.code === 'ENOENT') return fallback;
       throw error;
     });
-const [reference, ko, existing, feedList, previous] = await Promise.all([
+// 큐는 시즌마다 따로 둔다. 한 파일에 합치면 지난 시즌 후보가 이번 판정에 섞인다.
+const queueName = `article-queue-${season.toLowerCase()}.json`;
+// 작성자 피드는 시즌과 무관하다. 지난 시즌 큐(시즌 없는 옛 이름 포함)의 기사도 모두
+// 피드를 되짚는 데 쓴다.
+const queueNames = (await readdir(new URL('.cache/', root))).filter(name =>
+  /^article-queue(-[a-z0-9]+)?\.json$/.test(name),
+);
+const [reference, ko, existing, feedList, queues] = await Promise.all([
   readJson('public/data/reference.json'),
   readJson('public/data/ko.json'),
   readJson('public/data/articles.json'),
   readJson('scripts/article-feeds.json', { feeds: [] }),
-  readJson('.cache/article-queue.json', { entries: [] }),
+  Promise.all(queueNames.map(name => readJson(`.cache/${name}`))),
 ]);
+const previous = queues[queueNames.indexOf(queueName)] ?? { entries: [] };
 const index = buildIndex(reference, ko);
 const known = new Set(existing.articles.map(article => article.url));
 
@@ -175,7 +183,7 @@ if (useFeeds) {
   const feeds = new Set(
     [
       ...existing.articles.map(article => feedUrlFor(article.url)),
-      ...previous.entries.map(entry => feedUrlFor(entry.url)),
+      ...queues.flatMap(queue => queue.entries.map(entry => feedUrlFor(entry.url))),
       ...feedList.feeds.map(value => feedUrlFor(value) ?? value),
     ].filter(Boolean),
   );
@@ -323,7 +331,7 @@ for (const [url, link] of found) {
 // 새 결과로 바꾸고, 그사이 articles.json에 등록된 주소는 뺀다.
 const fresh = new Set(entries.map(entry => entry.url));
 const kept = previous.entries.filter(entry => !fresh.has(entry.url) && !known.has(entry.url));
-const out = new URL('.cache/article-queue.json', root);
+const out = new URL(`.cache/${queueName}`, root);
 await writeFile(
   out,
   JSON.stringify(
@@ -332,7 +340,7 @@ await writeFile(
     2,
   ),
 );
-console.log(`큐에 새로 ${entries.length}건, 이전 ${kept.length}건 유지`);
+console.log(`${queueName}: 새로 ${entries.length}건, 이전 ${kept.length}건 유지`);
 console.log(
   '거른 것: ' +
     (Object.entries(skipped)
