@@ -9,7 +9,9 @@ import {
   feedLinks,
   feedUrlFor,
   googleLinks,
+  humanOnly,
   isBlogPost,
+  pageUrlOf,
   isLeadLink,
   robotsAllows,
   isFetchable,
@@ -467,4 +469,59 @@ Disallow: /`;
   assert.equal(robotsAllows(trainingOnly, 'https://blog.example/entry/1'), true);
   assert.equal(robotsAllows('', 'https://blog.example/entry/1'), true, 'robots.txt가 없으면 허용');
   assert.equal(robotsAllows('User-agent: *\nDisallow: /*.pdf$', 'https://a.example/x.pdf'), false);
+});
+
+// 포케DB 카드처럼 순위는 윗줄, 기사 링크는 아랫줄의 다른 블록에 있는 목록이다.
+// 제목에 最終이 없어도 카드의 순위를 읽어야 한다.
+const CARDS = `<!-- saved from url=(0040)https://list.example/article/search?s=5 -->
+<link rel="canonical" href="https://list.example/article/search?s=5">
+<nav><a href="https://x.com/listsite">X</a><a href="/trainer">トレーナー</a></nav>
+<div class="card"><div class="head"><span>シーズンM-5</span><span>23位</span> / 2500.1
+<a href="https://x.com/kemi">kemi</a></div><div class="team"><a href="/pokemon/garchomp">ガブリアス</a></div>
+<div class="foot"><a href="https://m.cafe.naver.com/ca-fe/web/cafes/kemipoke/articles/1514?art=abc&useCafeId=false">M-5 싱글 구축</a></div></div>
+<div class="card"><div class="head"><span>47位</span> / 2480.0</div>
+<div class="foot"><a href="https://someone.hatenablog.com/entry/2026/09/12/1">ガブリアス軸</a></div></div>
+<div class="card"><div class="head"><span>52位</span></div><div class="foot">記事なし</div></div>
+<div class="card"><div class="head"><span>53位</span></div>
+<div class="foot"><a href="https://x.com/tw/status/1966">構築</a></div></div>
+<div class="card"><div class="head"><span>84位</span></div>
+<div class="foot"><a href="https://note.com/a/n/n84">【最終84位 M-5 メガバシャーモ軸】</a></div></div>
+<footer><a href="/terms">利用規約</a></footer>`;
+
+test('a saved list page names its own address, so its own links are dropped', () => {
+  assert.equal(pageUrlOf(CARDS), 'https://list.example/article/search?s=5');
+  assert.equal(pageUrlOf('<p>없음</p>'), undefined);
+});
+
+test('card lists pass the rank from the header row to the article link below it', () => {
+  const base = pageUrlOf(CARDS);
+  const leads = extractLinks(CARDS).filter(link => isLeadLink(link, base));
+  assert.deepEqual(
+    leads.map(link => [link.url.slice(0, 40), link.rankHint]),
+    [
+      ['https://m.cafe.naver.com/ca-fe/web/cafes', 23],
+      ['https://someone.hatenablog.com/entry/202', 47],
+      ['https://x.com/tw/status/1966', 53],
+      ['https://note.com/a/n/n84', 84],
+    ],
+    '기사 없는 52위 카드의 순위가 다음 카드로 넘어가지 않고, 프로필·자체 링크는 버린다',
+  );
+});
+
+test('X posts and blocked hosts go to people, never to the fetcher', () => {
+  assert.equal(humanOnly('https://x.com/tw/status/1966'), 'X 게시물');
+  assert.equal(humanOnly('https://twitter.com/tw/status/1966'), 'X 게시물');
+  assert.equal(
+    humanOnly('https://m.cafe.naver.com/ca-fe/web/cafes/kemipoke/articles/1514'),
+    '수집 금지 호스트',
+  );
+  assert.equal(humanOnly('https://blog.naver.com/someone/223456789'), '수집 금지 호스트');
+  assert.equal(humanOnly('https://note.com/a/n/n1'), null);
+  assert.ok(isBlogPost('https://yakkun.com/bbs/party/n12345'));
+  assert.ok(!isLeadLink({ url: 'https://x.com/kemi', title: 'kemi', context: '', rankHint: 23 }));
+});
+
+test('a pasted line gives its bare rank as a hint', () => {
+  const [link] = extractLinks('https://x.com/tw/status/1 23位 싱글');
+  assert.equal(link.rankHint, 23);
 });

@@ -333,7 +333,28 @@ const BLOG_POST = [
   /\.blog\.fc2\.com\/blog-entry-/,
   /\.(livedoor\.blog|blog\.jp)\/archives\//,
   /\.seesaa\.net\/article\//,
+  // 아래는 기사로 알아보되 받지는 않는 곳이다. 검토 목록으로 간다(humanOnly, robots.txt).
+  /^(m\.)?blog\.naver\.com\/[^/]+\/\d+/,
+  /^(m\.)?cafe\.naver\.com\/(ca-fe\/web\/cafes\/[^/]+\/articles\/\d+|[^/]+\/\d+)/,
+  /^yakkun\.com\/bbs\/party\/n\d+/,
+  /^(mobile\.)?(x|twitter)\.com\/[^/]+\/status\/\d+/,
 ];
+
+// X 게시물은 로그인 없이 본문이 나오지 않아 수집기가 읽을 수 없다. 받지 않고 사람이
+// 검토할 목록으로 보낸다. 계정 프로필이나 영상처럼 기사가 아닌 링크는 리드가 아니다.
+const X_POST = /^(www\.|mobile\.)?(x|twitter)\.com\/[^/]+\/status\/\d+/;
+const NOT_ARTICLE_HOST =
+  /^(www\.|mobile\.|m\.)?(x|twitter|youtube|youtu|twitch|discord|instagram|tiktok)\.(com|be|tv|gg)$/;
+
+export function humanOnly(value) {
+  try {
+    const url = new URL(value);
+    if (X_POST.test(url.host + url.pathname)) return 'X 게시물';
+  } catch {
+    return null;
+  }
+  return isFetchable(value) ? null : '수집 금지 호스트';
+}
 export const isBlogPost = value => {
   try {
     const url = new URL(value);
@@ -343,6 +364,7 @@ export const isBlogPost = value => {
   }
 };
 
+const SCRIPTS = /<(script|style)\b[^]*?<\/\1>/gi;
 const TRACKING = /^(utm_|fbclid$|gclid$|ref$|ref_src$)/;
 const cleanUrl = (value, base) => {
   try {
@@ -360,12 +382,33 @@ const cleanUrl = (value, base) => {
 // 사람이 넘긴 주소 목록이나 기사 모음 페이지에서 링크를 꺼낸다. HTML이면 a 태그의
 // 문구와 앞뒤 글을, 일반 텍스트면 줄에 적힌 나머지 글을 순위 힌트로 함께 넘긴다.
 // 같은 주소는 한 번만 돌려준다.
-export function extractLinks(body, base) {
+// 저장한 목록 페이지의 원래 주소. 이것을 알아야 그 사이트 자체의 링크(메뉴, 포켓몬
+// 페이지)를 버리고 상대 주소를 풀 수 있다. 브라우저 저장본은 canonical, og:url, 또는
+// 'saved from url' 주석을 남긴다.
+export function pageUrlOf(body) {
+  const found =
+    body.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)?.[1] ??
+    body.match(/<meta\b[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["']/i)?.[1] ??
+    body.match(/<!--\s*saved from url=\(\d+\)(\S+?)\s*-->/i)?.[1];
+  try {
+    return found ? new URL(decode(found)).href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// 순위만 적힌 칸(84位, 23위)을 읽는다. 最終이 없어 parseTitle은 받지 않는 표기다.
+const lastRank = text => {
+  const all = [...normalize(text).matchAll(/(\d{1,5})\s*[位위]/g)];
+  return all.length ? Number(all.at(-1)[1]) : null;
+};
+
+export function extractLinks(body, base = pageUrlOf(body)) {
   const found = new Map();
-  const add = (href, title, context) => {
+  const add = (href, title, context, rankHint = null) => {
     const url = cleanUrl(href, base);
     if (!url || found.has(url)) return;
-    found.set(url, { url, title: flatten(title), context: flatten(context) });
+    found.set(url, { url, title: flatten(title), context: flatten(context), rankHint });
   };
   const anchors = [...body.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([^]*?)<\/a>/gi)];
   if (anchors.length) {
@@ -373,19 +416,26 @@ export function extractLinks(body, base) {
     // 안에서만 잘라야 옆 행의 순위가 메뉴 링크에 붙지 않는다.
     const BLOCK_START = /<(tr|li|p|h\d|div|dt|dd|nav|section|article)\b[^>]*>|<br\s*\/?>/gi;
     const BLOCK_END = /<\/(tr|li|p|h\d|div|dd|nav|section|article)>|<br\s*\/?>/i;
+    // 카드형 목록은 순위를 윗줄에, 기사 링크를 아랫줄의 다른 블록에 둔다. 그래서 직전
+    // 기사 링크가 끝난 뒤부터 이 링크 앞까지의 글에서 가장 가까운 순위를 따로 읽는다.
+    // 카드마다 기사 링크가 하나씩 있으므로 옆 카드의 순위가 넘어오지 않는다.
+    let segment = 0;
     for (const match of anchors) {
       const before = body.slice(Math.max(0, match.index - 300), match.index);
       const starts = [...before.matchAll(BLOCK_START)];
       const head = starts.length ? before.slice(starts.at(-1).index) : before;
       const after = body.slice(match.index + match[0].length, match.index + match[0].length + 300);
       const end = after.search(BLOCK_END);
-      add(match[1], match[2], `${head} ${end < 0 ? after : after.slice(0, end)}`);
+      const rankHint = lastRank(flatten(body.slice(segment, match.index).replace(SCRIPTS, ' ')));
+      add(match[1], match[2], `${head} ${end < 0 ? after : after.slice(0, end)}`, rankHint);
+      const url = cleanUrl(match[1], base);
+      if (url && isBlogPost(url)) segment = match.index + match[0].length;
     }
     return [...found.values()];
   }
   for (const line of body.split(/\r?\n/))
     for (const match of line.matchAll(/https?:\/\/[^\s"'<>]+/g))
-      add(match[0], '', line.replace(match[0], ' '));
+      add(match[0], '', line.replace(match[0], ' '), lastRank(line.replace(match[0], ' ')));
   return [...found.values()];
 }
 
@@ -393,12 +443,16 @@ export function extractLinks(body, base) {
 // 메뉴와 다른 공략 글이므로 버린다.
 export const isLeadLink = (link, pageUrl) => {
   if (!looksLikeArticle(link.url)) return false;
+  let url;
   try {
-    if (pageUrl && new URL(link.url).host === new URL(pageUrl).host) return false;
+    url = new URL(link.url);
+    if (pageUrl && url.host === new URL(pageUrl).host) return false;
   } catch {
     return false;
   }
-  return isBlogPost(link.url) || parseTitle(`${link.title} ${link.context}`).rank !== null;
+  if (isBlogPost(link.url)) return true;
+  if (NOT_ARTICLE_HOST.test(url.host)) return false;
+  return parseTitle(`${link.title} ${link.context}`).rank !== null || link.rankHint != null;
 };
 
 // 競馬의 チャンピオンズカップ와 最終予想이 같은 검색어에 걸린다. 측정한 회차에서

@@ -9,13 +9,15 @@ import {
   readPage,
   digest,
   parseTitle,
-  isFetchable,
   looksRelevant,
   searchQueries,
   feedLinks,
   feedUrlFor,
   extractLinks,
   isLeadLink,
+  humanOnly,
+  looksLikeArticle,
+  pageUrlOf,
   robotsAllows,
   googleLinks,
 } from './article-parse.mjs';
@@ -76,7 +78,7 @@ async function fetchText(url) {
 // 초과)는 판단할 수 없으므로 받지 않는다.
 const robotsCache = new Map();
 async function allowed(url) {
-  if (!isFetchable(url)) return false;
+  if (humanOnly(url)) return false;
   const origin = new URL(url).origin;
   if (!robotsCache.has(origin))
     robotsCache.set(
@@ -154,9 +156,10 @@ const channels = [];
 // 링크만 쓴다.
 for (const file of every('urls')) {
   const body = await readFile(file, 'utf8');
-  const links = extractLinks(body);
   const html = /<a\b/i.test(body);
-  links.filter(link => !html || isLeadLink(link)).forEach(link => take(link, 'manual', true));
+  const base = html ? pageUrlOf(body) : undefined;
+  const links = extractLinks(body, base);
+  links.filter(link => !html || isLeadLink(link, base)).forEach(link => take(link, 'manual', true));
   channels.push(`주소 목록 ${file} ${links.length}건`);
 }
 
@@ -255,14 +258,44 @@ const slug = value =>
     .replace(/^-|-$/g, '')
     .slice(0, 24);
 
+// 사람이 직접 봐야 하는 기사. 수집기가 받지 않는(받을 수 없는) 곳이라 판정 큐 대신
+// leads/review-<시즌>.txt에 남긴다. 파일은 누적되고 같은 주소는 한 번만 적는다.
+const reviewPath = new URL(`leads/review-${season.toLowerCase()}.txt`, root);
+const reviewLines = await readFile(reviewPath, 'utf8')
+  .then(body => body.split(/\r?\n/).filter(Boolean))
+  .catch(() => ['# 순위\t이유\t주소\t제목·메모 — 사람이 원문을 보고 파티를 확인할 기사']);
+const reviewed = new Set(reviewLines.map(line => line.split('\t')[2]).filter(Boolean));
+let reviewAdded = 0;
+const toReview = (url, link, reason) => {
+  if (reviewed.has(url)) return;
+  reviewed.add(url);
+  const rank =
+    parseTitle(`${link.title ?? ''} ${link.context ?? ''}`).rank ?? link.rankHint ?? null;
+  const memo = (link.title || link.context || '').replace(/\s+/g, ' ').slice(0, 80);
+  reviewLines.push([rank === null ? '-' : `${rank}위`, reason, url, memo].join('\t'));
+  reviewAdded++;
+};
+
 const entries = [];
 // 왜 걸렀는지 세어 둔다. 한 건도 안 남을 때 검색어 탓인지 필터 탓인지 알아야 한다.
-const skipped = { robots: 0, fetch: 0, 'not-an-article': 0, season: 0, format: 0 };
+const skipped = {
+  'X 게시물': 0,
+  '수집 금지 호스트': 0,
+  'robots.txt': 0,
+  fetch: 0,
+  'not-an-article': 0,
+  season: 0,
+  format: 0,
+};
 for (const [url, link] of found) {
-  if (!(await allowed(url))) {
-    // 사람이 넘긴 주소가 왜 빠졌는지 알 수 있게 주소를 남긴다.
-    console.error(`받지 않음 (robots.txt): ${url}`);
-    skipped.robots++;
+  if (!looksLikeArticle(url)) {
+    skipped['not-an-article']++;
+    continue;
+  }
+  const reason = humanOnly(url) ?? ((await allowed(url)) ? null : 'robots.txt');
+  if (reason) {
+    toReview(url, link, reason);
+    skipped[reason]++;
     continue;
   }
   let html;
@@ -270,6 +303,8 @@ for (const [url, link] of found) {
     html = await fetchArticle(url);
   } catch (error) {
     console.error(`본문 실패 (${url}): ${error.message}`);
+    // 일시적인 실패일 수 있다. 다시 돌려도 안 되면 사람이 본다.
+    toReview(url, link, '받기 실패');
     skipped.fetch++;
     continue;
   }
@@ -277,7 +312,7 @@ for (const [url, link] of found) {
   // 사람이 넘긴 주소는 제목이 아니라 옆에 적은 힌트에 순위가 있을 수 있다.
   const title = parseTitle(page.title || link.title);
   const hint = parseTitle(`${link.title ?? ''} ${link.context ?? ''}`);
-  const rank = title.rank ?? hint.rank;
+  const rank = title.rank ?? hint.rank ?? link.rankHint ?? null;
   const titledSeason = title.season ?? hint.season;
   const titledFormat = title.format ?? hint.format;
   const { candidates, flags } = digest(page, index);
@@ -321,7 +356,7 @@ for (const [url, link] of found) {
     flags: [
       ...flags,
       ...(rank === null ? ['rank-missing'] : []),
-      ...(title.rank === null && hint.rank !== null ? ['rank-from-hint'] : []),
+      ...(title.rank === null && rank !== null ? ['rank-from-hint'] : []),
       ...(titledSeason === null ? ['season-missing'] : []),
       ...(titledFormat === null ? ['format-missing'] : []),
       ...(title.monthly || hint.monthly ? ['monthly-challenge'] : []),
@@ -351,3 +386,10 @@ console.log(
       .join(', ') || '없음'),
 );
 console.log(`플래그가 붙은 건: ${entries.filter(e => e.flags.length).length}`);
+if (reviewAdded) {
+  await mkdir(new URL('leads/', root), { recursive: true });
+  await writeFile(reviewPath, reviewLines.join('\n') + '\n');
+}
+console.log(
+  `사람 검토 목록 leads/review-${season.toLowerCase()}.txt: 새로 ${reviewAdded}건, 전체 ${reviewLines.length - 1}건`,
+);
