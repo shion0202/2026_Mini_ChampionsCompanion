@@ -149,7 +149,7 @@ test('the small chart labels only the ends and the best and worst ranks once', a
   assert.ok(miniRankChart(points, Array(12).fill(null)).includes('순위 기록이 없습니다'));
 });
 
-test('leading days identical to the previous final are dropped', () => {
+test('leading days with the same roster as the previous final are dropped', () => {
   const previous = at([
     ['A', 1],
     ['B', 2],
@@ -159,10 +159,17 @@ test('leading days identical to the previous final are dropped', () => {
     ['A', 1],
     ['B', 2],
   ]);
-  const moved = at([
+  // 순위가 몇 칸 달라도 구성이 같으면 이전 시즌 자료로 본다.
+  const shuffled = at([
     ['A', 2],
     ['B', 1],
   ]);
+  const moved = at([
+    ['A', 2],
+    ['B', 1],
+    ['N', 3],
+  ]);
+  assert.equal(dropCarryOver(points, [shuffled, moved, moved], previous).points.length, 2);
   const dropped = dropCarryOver(points, [same, moved, same], previous);
   assert.deepEqual(
     dropped.points.map(p => p.label),

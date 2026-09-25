@@ -81,15 +81,16 @@ export function rankSeries(positionsList, limit = TREND_LIMIT) {
     );
 }
 
-const samePositions = (a, b) =>
-  !!a && !!b && a.size === b.size && [...a].every(([name, rank]) => b.get(name) === rank);
+const sameRoster = (a, b) =>
+  !!a && !!b && a.size === b.size && [...a.keys()].every(name => b.has(name));
 
-// 시즌이 바뀐 첫날에는 제공처가 이전 시즌 최종일 자료를 그대로 두기도 한다(M6의 9/11).
-// 현재 시즌 앞쪽에서 이전 시즌 최종일과 순위가 완전히 같은 날을 뺀다. 가운데 날은
-// 건드리지 않는다. 우연히 같을 수는 없으므로 앞에서부터 이어진 날만 본다.
+// 시즌이 바뀐 첫날에는 제공처가 이전 시즌 순위표를 조금 더 집계한 자료를 두기도 한다.
+// M6의 9/11은 M5 최종일과 포켓몬 구성(235마리)이 같고 순위만 몇 칸 달랐다. 그래서
+// 순위가 아니라 구성으로 본다. 현재 시즌 앞쪽에서 이전 시즌 최종일과 구성이 같은 날을
+// 뺀다. 가운데 날은 건드리지 않고, 적어도 하루는 남긴다.
 export function dropCarryOver(points, positionsList, previous) {
   let start = 0;
-  while (start < points.length - 1 && samePositions(positionsList[start], previous)) start++;
+  while (start < points.length - 1 && sameRoster(positionsList[start], previous)) start++;
   return { points: points.slice(start), positionsList: positionsList.slice(start) };
 }
 
