@@ -3600,19 +3600,7 @@ body.is-dragging-move {
 .picker-sub {
   color: var(--muted);
 }
-/* 기술의 성질(접촉·소리 등)과 효과. 있을 때만 그린다. */
-.picker-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.picker-chips span {
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--muted);
-  font-size: 11px;
-}
+/* 기술의 효과. 성질은 .picker-sub 한 줄로 적고, 둘 다 있을 때만 그린다. */
 .picker-effect {
   color: var(--ink);
   font-size: 12px;

@@ -2,7 +2,7 @@
 export const MOVE_TRAITS = {
   contact: '접촉',
   slicing: '베기',
-  bullet: '구슬·폭탄',
+  bullet: '구슬/폭탄',
   punch: '펀치',
   bite: '물기',
   pulse: '파동',

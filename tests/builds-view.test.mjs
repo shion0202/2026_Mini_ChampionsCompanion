@@ -383,13 +383,13 @@ test('move effects drop the no-effect phrase and the game line breaks', () => {
 
 test('picker rows show traits and effect only when given', () => {
   const html = pickerRows(
-    [{ value: 'A', label: '가', sub: '물리', chips: ['접촉'], effect: '<효과>' }],
+    [{ value: 'A', label: '가', sub: '물리', chips: ['접촉', '물기'], effect: '<효과>' }],
     5,
   );
-  assert.ok(html.includes('<span class="picker-chips"><span>접촉</span></span>'));
+  assert.ok(html.includes('<small class="picker-sub picker-traits">접촉 · 물기</small>'));
   assert.ok(html.includes('<small class="picker-effect">&lt;효과&gt;</small>'));
   const bare = pickerRows([{ value: 'A', label: '가', sub: '물리', chips: [], effect: '' }], 5);
-  assert.ok(!bare.includes('picker-chips') && !bare.includes('picker-effect'));
+  assert.ok(!bare.includes('picker-traits') && !bare.includes('picker-effect'));
 });
 
 test('the conflict list names each item and what each side did', () => {
@@ -401,4 +401,11 @@ test('the conflict list names each item and what each side did', () => {
   assert.ok(html.includes('이 기기: 고침 / 서버: 고침'));
   assert.ok(html.includes('파티 · 파티'));
   assert.ok(html.includes('이 기기: 고침 / 서버: 지움'));
+});
+
+test('editor buttons read save, reset, delete, share, back to list', () => {
+  const html = sampleEditor(sample, { reference, locale, existing: true, shareable: true });
+  const order = [...html.matchAll(/data-builds-(save|reset|delete|share|cancel)>/g)].map(m => m[1]);
+  // 위의 ‘← 목록으로’가 맨 앞에 하나 더 있다.
+  assert.deepEqual(order, ['cancel', 'save', 'reset', 'delete', 'share', 'cancel']);
 });

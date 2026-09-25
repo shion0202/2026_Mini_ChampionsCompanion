@@ -83,8 +83,8 @@ const editorActions = (existing, errors, shareable = false, shareLabel = '샘플
   `<div class="builds-actions">` +
   `<button type="submit" class="primary-button" data-builds-save>저장</button>` +
   `<button type="button" class="text-button" data-builds-reset>초기화</button>` +
-  `${shareable ? `<button type="button" class="text-button" data-builds-share>${shareLabel}</button>` : ''}` +
   `${existing ? '<button type="button" class="text-button builds-delete" data-builds-delete>삭제</button>' : ''}` +
+  `${shareable ? `<button type="button" class="text-button" data-builds-share>${shareLabel}</button>` : ''}` +
   `<button type="button" class="text-button" data-builds-cancel>목록으로</button>` +
   `</div>`;
 
@@ -445,7 +445,8 @@ export function pickerRows(rows, limit) {
         `<span class="picker-text">` +
         `<span class="picker-name">${esc(row.label)}</span>` +
         `${row.sub ? `<small class="picker-sub">${esc(row.sub)}</small>` : ''}` +
-        `${row.chips?.length ? `<span class="picker-chips">${row.chips.map(c => `<span>${esc(c)}</span>`).join('')}</span>` : ''}` +
+        // 성질은 둘째 줄과 같은 글꼴로 · 를 사이에 두고 잇는다.
+        `${row.chips?.length ? `<small class="picker-sub picker-traits">${esc(row.chips.join(' · '))}</small>` : ''}` +
         `${row.effect ? `<small class="picker-effect">${esc(row.effect)}</small>` : ''}` +
         `</span></button></li>`,
     )
