@@ -79,6 +79,8 @@ import {
   syncText,
   syncActions,
   shareView,
+  moveMeta,
+  moveEffect,
   shareTitle,
   fmtDay,
 } from './builds-view.js';
@@ -130,15 +132,15 @@ import {
   sortLabel,
   activeFilters,
 } from './app-state.js';
-// 상세 탭 순서. 배치를 정하는 순서(보정 → 포인트 → 특성 → 기술 → 도구)를 따르고,
-// 파티를 짜는 데 쓰는 같은 팀과 참고 자료는 뒤에 둔다.
+// 상세 탭 순서. 기술·특성·도구를 먼저 보고 능력 보정·포인트가 뒤따른다. 파티를
+// 짜는 데 쓰는 같은 팀과 참고 자료는 뒤에 둔다.
 const DETAIL_ORDER = [
   'overview',
+  'move',
+  'ability',
+  'held_item',
   'stat_alignment',
   'stat_points',
-  'ability',
-  'move',
-  'held_item',
   'teammate',
   'learnset',
   'articles',
@@ -1038,21 +1040,20 @@ function pickerSource() {
         Object.values(state.reference.move)
           .filter(m => m.champions)
           .map(m => m.name);
-    // 타입과 분류를 줄에 함께 적는다. 무엇을 쓸지 고민하는 자리라 이름만으로는
-    // 고를 수가 없다. 걸러내는 일도 이 값으로 한다.
+    // 타입·분류·위력·명중·PP를 줄에 함께 적고, 성질과 효과를 그 아래 둔다. 무엇을
+    // 쓸지 고민하는 자리라 이름만으로는 고를 수가 없다. 걸러내는 일도 이 값으로 한다.
     return names
       .map(name => {
         const move = state.reference.move[toId(name)] ?? {};
         return {
           value: name,
           label: buildLabel('move', name),
-          sub: [
-            TYPE_LABELS[move.type] ?? move.type,
-            CATEGORY_NAMES[move.category],
-            move.power ? `위력 ${move.power}` : null,
-          ]
+          sub: [TYPE_LABELS[move.type] ?? move.type, moveMeta(move, { pp: true })]
             .filter(Boolean)
             .join(' · '),
+          // 성질과 효과는 있을 때만 적는다.
+          chips: (move.traits ?? []).map(t => MOVE_TRAITS[t] ?? t),
+          effect: moveEffect(move),
           name,
           type: move.type ?? '',
           category: move.category ?? '',

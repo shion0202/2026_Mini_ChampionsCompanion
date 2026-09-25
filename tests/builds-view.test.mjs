@@ -10,6 +10,8 @@ import {
   sampleEditor,
   partyEditor,
   pickerRows,
+  moveMeta,
+  moveEffect,
   fmtDay,
   syncText,
   syncActions,
@@ -352,4 +354,39 @@ test('share states say what happened and offer a retry only when it can help', (
   assert.equal(shareTitle(null), '공유');
   assert.equal(shareTitle({ kind: 'sample' }), '공유받은 샘플');
   assert.equal(shareTitle({ kind: 'party' }), '공유받은 파티');
+});
+
+test('move numbers: category, power, accuracy and PP only when they mean something', () => {
+  const quake = reference.move.earthquake;
+  assert.equal(moveMeta(quake), '물리 · 위력 100 · 명중 100');
+  assert.equal(moveMeta(quake, { pp: true }), '물리 · 위력 100 · 명중 100 · PP 12');
+  assert.equal(
+    moveMeta({ category: 'Status', accuracy: true, pp: 20 }, { pp: true }),
+    '변화 · PP 20',
+  );
+  assert.equal(
+    moveMeta({ category: 'Special', power: 60, accuracy: true }),
+    '특수 · 위력 60 · 필중',
+  );
+  assert.equal(moveMeta(undefined), '');
+});
+
+test('move effects drop the no-effect phrase and the game line breaks', () => {
+  assert.equal(moveEffect({ effect: '별도의 추가 효과가 없습니다.' }), '');
+  assert.equal(moveEffect({}), '');
+  assert.equal(
+    moveEffect({ effect: '4턴 동안\n상대를 기술봉인 상태로 만든다.' }),
+    '4턴 동안 상대를 기술봉인 상태로 만든다.',
+  );
+});
+
+test('picker rows show traits and effect only when given', () => {
+  const html = pickerRows(
+    [{ value: 'A', label: '가', sub: '물리', chips: ['접촉'], effect: '<효과>' }],
+    5,
+  );
+  assert.ok(html.includes('<span class="picker-chips"><span>접촉</span></span>'));
+  assert.ok(html.includes('<small class="picker-effect">&lt;효과&gt;</small>'));
+  const bare = pickerRows([{ value: 'A', label: '가', sub: '물리', chips: [], effect: '' }], 5);
+  assert.ok(!bare.includes('picker-chips') && !bare.includes('picker-effect'));
 });

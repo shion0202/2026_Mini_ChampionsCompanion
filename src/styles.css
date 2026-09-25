@@ -1699,7 +1699,7 @@ summary {
   text-align: center;
 }
 .move-table td:first-child {
-  width: 45%;
+  width: 36%;
 }
 .move-table .effect-link {
   font-weight: 650;
@@ -3599,6 +3599,45 @@ body.is-dragging-move {
 }
 .picker-sub {
   color: var(--muted);
+}
+/* 기술의 성질(접촉·소리 등)과 효과. 있을 때만 그린다. */
+.picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.picker-chips span {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.picker-effect {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+}
+/* 채용·후보 칸. 이름은 왼쪽, 타입 배지와 분류·위력·명중은 오른쪽에 둔다. 폰처럼
+   좁아 한 줄에 들지 않으면 이름을 꺾지 않고 수치를 아랫줄 오른쪽으로 내린다. */
+.builds-editor .builds-move {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.builds-move-name {
+  white-space: nowrap;
+}
+.builds-move-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-inline-start: auto;
+}
+.builds-move-meta small {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
 }
 /* ⌕ 글자는 em 박스 아래쪽에 앉아 가운데보다 내려 보인다. 이 창에서만 끌어올린다. */
 /* 돋보기는 글자 상자가 아래로 치우쳐 가운데보다 내려앉아 보인다. */

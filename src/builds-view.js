@@ -6,6 +6,7 @@ import { portrait, typeBadges } from './app-view.js';
 import { itemArtwork } from './images.js';
 import { NATURES, natureAdjust, abilityOptions, speciesSprite, actualStats } from './builds.js';
 import { STAT_NAMES } from './locale.js';
+import { CATEGORY_NAMES } from './reference-view.js';
 
 // 도감 화면과 같은 규칙이다(app-view.js). reference가 기술·특성·도구 모두의
 // 한국어 이름을 갖고 있고 ko.json은 일부가 비어 있으므로 reference를 먼저 본다.
@@ -135,10 +136,46 @@ export function partyList(parties, samples, locale) {
 // 기술은 영문 이름으로 담고 한국어로 보여준다. locale을 받지 않으면 저장된
 // 영문이 그대로 화면에 나온다. 타입은 랭킹·도감이 쓰는 배지를 그대로 쓴다.
 // 이름 자체를 물들이면 읽기 어려워지므로 작은 배지로 구분만 준다.
+// 기술의 수치를 한 줄로. 선택 창은 PP까지, 편집기 칸은 분류·위력·명중만 적는다.
+// 위력이 없는 기술은 위력을 적지 않는다. 명중이 ‘반드시 맞음’인 변화 기술은 대개
+// 자신이나 필드에 거는 것이라 명중을 적지 않고, 공격 기술이면 ‘필중’으로 적는다.
+export function moveMeta(move, { pp = false } = {}) {
+  if (!move) return '';
+  const accuracy =
+    move.accuracy === true
+      ? move.category === 'Status'
+        ? null
+        : '필중'
+      : Number.isFinite(move.accuracy)
+        ? `명중 ${move.accuracy}`
+        : null;
+  return [
+    CATEGORY_NAMES[move.category],
+    move.power ? `위력 ${move.power}` : null,
+    accuracy,
+    pp && move.pp ? `PP ${move.pp}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+// 효과 설명. 게임 문구의 줄바꿈은 칸 너비에 맞춘 것이라 띄어쓰기로 잇는다. 추가
+// 효과가 없다는 문구는 효과가 없는 것으로 본다.
+export const moveEffect = move =>
+  move?.effect && move.effect !== '별도의 추가 효과가 없습니다.'
+    ? move.effect.replace(/\s*\n\s*/g, ' ')
+    : '';
+
 const moveTypeBadge = (reference, move) => {
   const type = reference?.move?.[toId(move)]?.type;
   return type ? typeBadges([type]) : '';
 };
+
+// 채용·후보 칸의 기술. 이름 옆에 타입 배지와 분류·위력·명중을 둔다.
+const moveFace = (reference, locale, move) =>
+  `<span class="builds-move-name">${esc(refLabel(reference, locale, 'move', move))}</span>` +
+  `<span class="builds-move-meta">${moveTypeBadge(reference, move)}` +
+  `<small>${esc(moveMeta(reference?.move?.[toId(move)]))}</small></span>`;
 
 // 끌기 손잡이. 손가락으로 잡기 쉽게 줄 왼쪽 끝에 둔다. 빈 칸은 끌 것이 없어 손잡이
 // 대신 같은 너비의 빈자리를 둔다. 놓을 자리는 li의 data-drag-list·index가 알린다.
@@ -151,14 +188,13 @@ const moveSlot = (reference, locale) => (move, slot) =>
   `<li data-drag-list="moves" data-drag-index="${slot}">${grip(!!move)}` +
   `<span class="builds-slot">${slot + 1}</span>` +
   `<button type="button" class="builds-pick builds-move" data-builds-move="${slot}">` +
-  `${move ? `${esc(refLabel(reference, locale, 'move', move))}${moveTypeBadge(reference, move)}` : '기술 선택'}` +
+  `${move ? moveFace(reference, locale, move) : '기술 선택'}` +
   `</button></li>`;
 
 // 후보도 채용 기술과 같은 칸으로 보여야 한눈에 견준다. 빼기는 글자 대신 ×로.
 const altRow = (reference, locale) => (move, at) =>
   `<li data-drag-list="alts" data-drag-index="${at}">${grip(true)}` +
-  `<span class="builds-pick builds-move builds-alt-name">` +
-  `${esc(refLabel(reference, locale, 'move', move))}${moveTypeBadge(reference, move)}</span>` +
+  `<span class="builds-pick builds-move builds-alt-name">${moveFace(reference, locale, move)}</span>` +
   `<button type="button" class="icon-button builds-alt-remove"` +
   ` data-builds-alt-remove="${esc(move)}"` +
   ` aria-label="${esc(refLabel(reference, locale, 'move', move))} 후보에서 빼기">×</button></li>`;
@@ -409,6 +445,8 @@ export function pickerRows(rows, limit) {
         `<span class="picker-text">` +
         `<span class="picker-name">${esc(row.label)}</span>` +
         `${row.sub ? `<small class="picker-sub">${esc(row.sub)}</small>` : ''}` +
+        `${row.chips?.length ? `<span class="picker-chips">${row.chips.map(c => `<span>${esc(c)}</span>`).join('')}</span>` : ''}` +
+        `${row.effect ? `<small class="picker-effect">${esc(row.effect)}</small>` : ''}` +
         `</span></button></li>`,
     )
     .join('')}</ul>`;

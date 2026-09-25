@@ -196,13 +196,13 @@ export function selectMoves(data, locale, ids, { query, type, category, trait = 
 }
 export function moveTable(data, locale, moves) {
   const moveRow = m =>
-    `<tr><td>${effectButton('move', m.id, label(data, locale, 'move', m.id))}` +
-    `<div>${types([m.type])}</div></td>` +
+    `<tr><td>${effectButton('move', m.id, label(data, locale, 'move', m.id))}</td>` +
+    `<td>${types([m.type])}</td>` +
     `<td>${CATEGORY_NAMES[m.category]}</td><td>${m.power || '—'}</td>` +
     `<td>${m.accuracy === true ? '—' : m.accuracy}</td><td>${m.pp}</td></tr>`;
   return (
     `<div class="move-table-wrap"><table class="move-table"><thead><tr>` +
-    `<th>기술 / 타입</th><th>분류</th><th>위력</th><th>명중</th><th>PP</th>` +
+    `<th>기술</th><th>타입</th><th>분류</th><th>위력</th><th>명중</th><th>PP</th>` +
     `</tr></thead><tbody>${moves.map(moveRow).join('')}</tbody></table></div>`
   );
 }
