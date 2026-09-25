@@ -7,6 +7,8 @@ import {
   rankOf,
   createTrendStore,
   dateLabel,
+  dropCarryOver,
+  previousFinal,
 } from '../src/trends.js';
 
 // normalizeIndex가 만드는 모양: 최신 시즌이 앞, 날짜도 최신이 앞.
@@ -91,6 +93,12 @@ test('series include anyone inside the limit at some point, sorted by the last r
   ];
   const series = rankSeries(list, 3);
   assert.deepEqual(
+    series.find(s => s.name === 'D').outside,
+    [true, false],
+    'D는 처음에 9위, 한계 밖에 있었다',
+  );
+  assert.deepEqual(series.find(s => s.name === 'C').outside, [false, true]);
+  assert.deepEqual(
     series.map(s => [s.name, s.ranks]),
     [
       ['B', [2, 1]],
@@ -101,7 +109,9 @@ test('series include anyone inside the limit at some point, sorted by the last r
     '한계 밖과 자료 없음은 null이다',
   );
   // 불러오지 못한 시점(null)은 빈칸이다.
-  assert.deepEqual(rankSeries([null, at([['A', 1]])], 3), [{ name: 'A', ranks: [null, 1] }]);
+  assert.deepEqual(rankSeries([null, at([['A', 1]])], 3), [
+    { name: 'A', ranks: [null, 1], outside: [false, false] },
+  ]);
 });
 
 test('a single pokemon keeps its real rank beyond the limit', () => {
@@ -137,4 +147,61 @@ test('the small chart labels only the ends and the best and worst ranks once', a
   assert.deepEqual(moving.match(/\d+위/g), ['5위', '1위', '9위', '6위']);
   assert.ok(miniRankChart(points.slice(0, 3), [null, null, 2]).includes('순위 밖'));
   assert.ok(miniRankChart(points, Array(12).fill(null)).includes('순위 기록이 없습니다'));
+});
+
+test('leading days identical to the previous final are dropped', () => {
+  const previous = at([
+    ['A', 1],
+    ['B', 2],
+  ]);
+  const points = ['9/11', '9/12', '9/13'].map(label => ({ label }));
+  const same = at([
+    ['A', 1],
+    ['B', 2],
+  ]);
+  const moved = at([
+    ['A', 2],
+    ['B', 1],
+  ]);
+  const dropped = dropCarryOver(points, [same, moved, same], previous);
+  assert.deepEqual(
+    dropped.points.map(p => p.label),
+    ['9/12', '9/13'],
+    '앞쪽만 뺀다. 가운데 같은 날은 둔다',
+  );
+  assert.equal(dropCarryOver(points, [moved, same, same], previous).points.length, 3);
+  assert.equal(
+    dropCarryOver(points, [same, same, same], previous).points.length,
+    1,
+    '하나는 남긴다',
+  );
+  assert.equal(dropCarryOver(points, [same, moved, moved], null).points.length, 3);
+});
+
+test('the previous final is the last day of the season before the newest', () => {
+  assert.deepEqual(previousFinal(seasons), { season: 'M5', date: '10_09_2026', label: 'M5' });
+  assert.equal(previousFinal([seasons[5]]), null);
+});
+
+test('lines leaving or entering the top 100 drop below the chart halfway between columns', async () => {
+  const { rankChart } = await import('../src/trends-view.js');
+  const html = rankChart(
+    [{ label: 'a' }, { label: 'b' }, { label: 'c' }],
+    [
+      { name: 'Up', ranks: [null, 2, 1], outside: [true, false, false] },
+      { name: 'Down', ranks: [1, 1, null], outside: [false, false, true] },
+      { name: 'New', ranks: [null, null, 2], outside: [false, false, false] },
+    ],
+    { label: n => n, sprite: () => null, limit: 3, width: 800 },
+  );
+  const paths = Object.fromEntries(
+    [...html.matchAll(/data-trend="(\w+)"[^>]*>(?:<title>[^<]*<\/title>)<path d="([^"]*)"/g)].map(
+      m => [m[1], m[2]],
+    ),
+  );
+  // 열은 78, 400, 722. 그래프 아래(밖)는 16 + 30 × 3 = 106.
+  assert.equal(paths.Up, 'M239,106 L400,46 L722,16');
+  assert.equal(paths.Down, 'M78,16 L400,16 L561,106');
+  assert.equal(paths.New, '', '처음 나온 포켓몬은 선 없이 점에서 시작한다');
+  assert.match(html, /<circle cx="722" cy="46" r="3.5"/);
 });

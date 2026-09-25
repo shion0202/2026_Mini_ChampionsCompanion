@@ -17,6 +17,8 @@ import {
   TREND_SCOPES,
   TREND_LIMIT,
   trendPoints,
+  previousFinal,
+  dropCarryOver,
   rankSeries,
   rankOf,
   createTrendStore,
@@ -174,8 +176,9 @@ const DETAIL_ORDER = [
 const DETAIL_LABELS = Object.fromEntries(
   DETAIL_ORDER.map(key => [
     key,
-    { overview: '기본 정보', learnset: '배우는 기술', articles: '구축 기사', trend: '추이' }[key] ??
-      CATEGORY_LABELS[key],
+    { overview: '기본 정보', learnset: '배우는 기술', articles: '구축 기사', trend: '사용률 추이' }[
+      key
+    ] ?? CATEGORY_LABELS[key],
   ]),
 );
 
@@ -206,7 +209,7 @@ const state = {
   // 사람이 골라야 하는 충돌. { remote, conflicts }. 없으면 null.
   syncConflict: null,
   // 사용률 추이. focus는 강조한 포켓몬 이름이다.
-  trends: { scope: 'regulation', format: null, focus: null },
+  trends: { scope: 'current', format: null, focus: null },
   // 계산기. 스피드 계산기의 양쪽 칸과 둘이 함께 쓰는 날씨·필드.
   calc: {
     tab: 'speed',
@@ -2129,7 +2132,7 @@ let trendRequest = 0;
 const trendFormat = () => state.trends.format ?? state.format;
 
 function openTrends(scope = state.trends.scope, { navigate = true } = {}) {
-  state.trends.scope = TREND_SCOPES[scope] ? scope : 'regulation';
+  state.trends.scope = TREND_SCOPES[scope] ? scope : 'current';
   showPage('trends');
   if (navigate)
     history.pushState({ trends: state.trends.scope }, '', `#trends=${state.trends.scope}`);
@@ -2152,22 +2155,17 @@ async function renderTrends() {
     $('trends-chart').innerHTML = loadingState('시즌 목록을 불러오는 중입니다.');
     return;
   }
-  const points = trendPoints(state.index.seasons, scope);
   const request = ++trendRequest;
   let done = 0;
+  let total = trendPoints(state.index.seasons, scope).length;
   const progress = () =>
-    ($('trends-status').textContent = `자료를 불러오는 중입니다 (${done}/${points.length})`);
+    ($('trends-status').textContent = `자료를 불러오는 중입니다 (${done}/${total})`);
   progress();
   $('trends-chart').innerHTML = loadingState('날짜별 순위를 모으는 중입니다.');
-  const positions = await Promise.all(
-    points.map(point =>
-      trendStore.get(point, format).then(result => {
-        done++;
-        if (request === trendRequest) progress();
-        return result;
-      }),
-    ),
-  );
+  const { points, positions } = await trendData(scope, format, () => {
+    done++;
+    if (request === trendRequest) progress();
+  });
   if (request !== trendRequest || state.page !== 'trends') return;
   const missing = positions.filter(p => !p).length;
   $('trends-status').textContent =
@@ -2177,9 +2175,32 @@ async function renderTrends() {
     label: name => state.locale.pokemon(name).label,
     sprite: name => state.index.pokemon[name]?.sprite ?? null,
     limit: TREND_LIMIT,
+    // 테두리 안쪽 폭만큼 열 간격을 늘려 왼쪽 끝에서 오른쪽 끝까지 채운다.
+    width: $('trends-chart').clientWidth - 2,
   });
   if (focus) focusTrend(focus);
 }
+
+// 한 기간의 시점과 순위. 현재 시즌은 이전 시즌 최종일을 그대로 둔 첫날을 뺀다.
+async function trendData(scope, format, onEach = () => {}) {
+  const points = trendPoints(state.index.seasons, scope);
+  const positions = await Promise.all(
+    points.map(point => trendStore.get(point, format).finally(onEach)),
+  );
+  if (scope !== 'current') return { points, positions };
+  const previous = previousFinal(state.index.seasons);
+  const before = previous ? await trendStore.get(previous, format) : null;
+  const trimmed = dropCarryOver(points, positions, before);
+  return { points: trimmed.points, positions: trimmed.positionsList };
+}
+
+// 폭이 바뀌면 열 간격을 다시 맞춘다. 받은 자료는 메모리에 있어 다시 받지 않는다.
+let trendResize = null;
+window.addEventListener('resize', () => {
+  if (state.page !== 'trends') return;
+  clearTimeout(trendResize);
+  trendResize = setTimeout(renderTrends, 200);
+});
 
 // 한 포켓몬만 강조한다. 다시 그리지 않고 표시만 바꾼다.
 function focusTrend(name) {
@@ -2198,7 +2219,7 @@ function focusTrend(name) {
 // 랭킹 상세의 ‘추이’ 탭. 세 기간을 차례로 받아 채운다.
 async function renderPokemonTrend(p) {
   const format = state.format;
-  const scopes = ['regulation', 'season', 'current'].map(scope => ({
+  const scopes = Object.keys(TREND_SCOPES).map(scope => ({
     scope,
     title: TREND_SCOPES[scope],
     points: state.index ? trendPoints(state.index.seasons, scope) : [],
@@ -2209,8 +2230,10 @@ async function renderPokemonTrend(p) {
     $('category-content').innerHTML = pokemonTrendView(scopes);
   };
   draw();
+  if (!state.index) return;
   for (const section of scopes) {
-    const positions = await Promise.all(section.points.map(pt => trendStore.get(pt, format)));
+    const { points, positions } = await trendData(section.scope, format);
+    section.points = points;
     section.ranks = rankOf(positions, p.name);
     draw();
   }

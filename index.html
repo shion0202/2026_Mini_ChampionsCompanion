@@ -31,11 +31,11 @@
     </div>
     <nav class="category-nav" aria-label="주요 메뉴">
       <button id="ranking-link" aria-pressed="true">랭킹</button>
-      <button id="trends-link" aria-pressed="false">사용률 추이</button>
       <button id="speed-link" aria-pressed="false">스피드 랭킹</button>
       <button id="calc-link" aria-pressed="false">계산기</button>
       <button id="builds-link" aria-pressed="false">내 샘플</button>
       <button id="articles-link" aria-pressed="false">구축 기사</button>
+      <button id="trends-link" aria-pressed="false">사용률 추이</button>
       <button id="types-link" aria-pressed="false">상성표</button>
       <button id="dex-link" aria-pressed="false">도감</button>
     </nav>
@@ -141,9 +141,9 @@
       <div class="list-heading"><h2 id="trends-title">사용률 추이</h2></div>
       <div class="trends-controls">
         <div class="segmented" role="group" aria-label="추이 기간">
-          <button type="button" data-trend-scope="regulation" aria-pressed="true">레귤레이션별</button>
+          <button type="button" data-trend-scope="current" aria-pressed="true">현재 시즌</button>
           <button type="button" data-trend-scope="season" aria-pressed="false">시즌별</button>
-          <button type="button" data-trend-scope="current" aria-pressed="false">현재 시즌</button>
+          <button type="button" data-trend-scope="regulation" aria-pressed="false">레귤레이션별</button>
         </div>
         <div class="segmented" role="group" aria-label="배틀 형식">
           <button type="button" data-trend-format="Singles" aria-pressed="true">싱글</button>
@@ -152,7 +152,7 @@
       </div>
       <p id="trends-status" class="speed-count" role="status"></p>
       <div id="trends-chart"></div>
-      <p class="speed-help">사용률 100위까지의 포켓몬 순위입니다. 레귤레이션은 마지막 시즌의 최종일, 시즌은 최종일, 현재 시즌은 날짜별 순위입니다. 줄이나 그림을 누르면 그 포켓몬만 강조합니다.<br>통계는 순위만 제공하며 사용률 %는 없습니다. Battle data provided by <a href="https://championsbattledata.com" target="_blank" rel="noopener noreferrer">Pokémon Champions Battle Data</a>.</p>
+      <p class="speed-help">사용률 100위까지의 포켓몬 순위입니다. 레귤레이션은 마지막 시즌의 최종일, 시즌은 최종일, 현재 시즌은 날짜별 순위입니다. 선이나 이미지를 누르면 해당 포켓몬을 강조합니다.<br>통계는 순위만 제공하며 사용률 %는 없습니다.<br>Battle data provided by <a href="https://championsbattledata.com" target="_blank" rel="noopener noreferrer">Pokémon Champions Battle Data</a>.</p>
     </section>
     <section id="calc" class="calc-panel" aria-labelledby="calc-title" hidden>
       <div class="list-heading"><h2 id="calc-title">계산기</h2></div>

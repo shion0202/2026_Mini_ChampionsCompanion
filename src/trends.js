@@ -2,7 +2,8 @@
 // DOM도 fetch도 직접 만지지 않는다. 설계는 docs/trends.md에 있다.
 import { SEASON_REGULATIONS } from './data.js';
 
-export const TREND_SCOPES = { regulation: '레귤레이션별', season: '시즌별', current: '현재 시즌' };
+// 현재 시즌을 먼저 둔다. 가장 자주 보는 것이다.
+export const TREND_SCOPES = { current: '현재 시즌', season: '시즌별', regulation: '레귤레이션별' };
 // 환경 분석용 그래프라 100위까지만 그린다. 포켓몬 하나의 추이에는 한계를 두지 않는다.
 export const TREND_LIMIT = 100;
 
@@ -51,8 +52,10 @@ export function positionsOf(raw) {
   return positions;
 }
 
-// 그래프에 그릴 줄. 어느 한 시점이라도 limit 안에 든 포켓몬만 그린다. 순위는 그대로
-// 두고(limit 밖이거나 자료가 없으면 null), 마지막 시점 순위로 정렬한다.
+// 그래프에 그릴 선. 어느 한 시점이라도 limit 안에 든 포켓몬만 그린다. ranks는 limit
+// 안의 순위(밖이거나 자료가 없으면 null)이고, outside는 순위에는 있었지만 limit 밖이던
+// 시점이다. 그래프는 이것으로 ‘100위 밖에서 들어온 것’과 ‘처음 나온 것’을 가른다.
+// 마지막 시점 순위로 정렬한다.
 export function rankSeries(positionsList, limit = TREND_LIMIT) {
   const names = new Set();
   for (const positions of positionsList)
@@ -68,6 +71,7 @@ export function rankSeries(positionsList, limit = TREND_LIMIT) {
         const rank = positions?.get(name) ?? null;
         return rank !== null && rank <= limit ? rank : null;
       }),
+      outside: positionsList.map(positions => (positions?.get(name) ?? 0) > limit),
     }))
     .sort(
       (a, b) =>
@@ -75,6 +79,27 @@ export function rankSeries(positionsList, limit = TREND_LIMIT) {
         lastRank(a) - lastRank(b) ||
         a.name.localeCompare(b.name),
     );
+}
+
+const samePositions = (a, b) =>
+  !!a && !!b && a.size === b.size && [...a].every(([name, rank]) => b.get(name) === rank);
+
+// 시즌이 바뀐 첫날에는 제공처가 이전 시즌 최종일 자료를 그대로 두기도 한다(M6의 9/11).
+// 현재 시즌 앞쪽에서 이전 시즌 최종일과 순위가 완전히 같은 날을 뺀다. 가운데 날은
+// 건드리지 않는다. 우연히 같을 수는 없으므로 앞에서부터 이어진 날만 본다.
+export function dropCarryOver(points, positionsList, previous) {
+  let start = 0;
+  while (start < points.length - 1 && samePositions(positionsList[start], previous)) start++;
+  return { points: points.slice(start), positionsList: positionsList.slice(start) };
+}
+
+// 이전 시즌의 최종일. 현재 시즌이 첫 시즌이면 null.
+export function previousFinal(seasons) {
+  const ascending = [...(seasons ?? [])].sort(
+    (a, b) => seasonNumber(a.season) - seasonNumber(b.season),
+  );
+  const before = ascending.at(-2);
+  return before ? { season: before.season, date: before.dates[0], label: before.season } : null;
 }
 
 // 포켓몬 하나의 순위. 한계 없이 실제 순위를, 순위에 없으면 null.

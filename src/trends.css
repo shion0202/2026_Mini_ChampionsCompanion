@@ -33,6 +33,7 @@
 .trend-line {
   cursor: pointer;
 }
+.trend-line path,
 .trend-line polyline {
   fill: none;
   stroke-width: 2.5;
@@ -43,7 +44,7 @@
 .trend-chart.is-focused .trend-line:not(.is-on) {
   opacity: 0.12;
 }
-.trend-chart .trend-line.is-on polyline {
+.trend-chart .trend-line.is-on path {
   stroke-width: 4.5;
 }
 
