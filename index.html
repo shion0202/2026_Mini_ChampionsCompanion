@@ -10,6 +10,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./src/styles.css">
   <link rel="stylesheet" href="./src/speed.css">
+  <link rel="stylesheet" href="./src/calc.css">
   <title>챔피언스 컴패니언 · 배틀 통계</title>
 </head>
 <body>
@@ -34,6 +35,7 @@
       <button id="dex-link" aria-pressed="false">도감</button>
       <button id="builds-link" aria-pressed="false">내 샘플</button>
       <button id="articles-link" aria-pressed="false">구축 기사</button>
+      <button id="calc-link" aria-pressed="false">계산기</button>
     </nav>
   </header>
   <main class="page">
@@ -132,6 +134,14 @@
       <p id="speed-count" class="speed-count" role="status"></p>
       <div id="speed-rows"></div>
       <button id="speed-more" class="load-more" hidden>더 보기</button>
+    </section>
+    <section id="calc" class="calc-panel" aria-labelledby="calc-title" hidden>
+      <div class="list-heading"><h2 id="calc-title">계산기</h2></div>
+      <div class="segmented" role="group" aria-label="계산기 종류">
+        <button type="button" data-calc-tab="speed" aria-pressed="true">스피드 계산기</button>
+        <button type="button" data-calc-tab="damage" aria-pressed="false">데미지 계산기</button>
+      </div>
+      <div id="calc-body"></div>
     </section>
     <section id="articles" class="articles-panel" aria-labelledby="articles-title" hidden>
       <div class="list-heading"><h2 id="articles-title">구축 기사</h2></div>

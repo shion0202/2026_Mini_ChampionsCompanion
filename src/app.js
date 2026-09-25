@@ -11,6 +11,14 @@ import {
 import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
+import { emptySide, finalSpeed, compareSpeed, sideFromSample } from './speed-calc.js';
+import {
+  speedCalcView,
+  speedVerdict,
+  abilityChoices,
+  itemChoices,
+  effectText,
+} from './calc-view.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
@@ -55,6 +63,7 @@ import {
   readShare,
   mergeThreeWay,
   sameItems,
+  natureAdjust,
 } from './builds.js';
 import {
   newSyncCode,
@@ -184,6 +193,13 @@ const state = {
   syncStatus: 'off',
   // 사람이 골라야 하는 충돌. { remote, conflicts }. 없으면 null.
   syncConflict: null,
+  // 계산기. 스피드 계산기의 양쪽 칸과 둘이 함께 쓰는 날씨·필드.
+  calc: {
+    tab: 'speed',
+    mine: emptySide(),
+    theirs: emptySide(),
+    field: { weather: '', terrain: '' },
+  },
   // 링크로 연 공유. { id, status, data }. 메뉴에는 없고 #share=<id>로만 연다.
   share: null,
   buildsTab: 'sample',
@@ -534,6 +550,7 @@ function showPage(page) {
     dex: 'dex',
     types: 'type-chart',
     articles: 'articles',
+    calc: 'calc',
     speed: 'speed',
     builds: 'builds',
     shared: 'shared',
@@ -1401,6 +1418,7 @@ async function loadReference() {
   renderSpeed();
   renderBuilds();
   renderShare();
+  renderCalc();
 }
 
 function selectPokemon(id, { navigate = true, preserveCategory = false } = {}) {
@@ -1457,6 +1475,7 @@ async function load(force = false) {
       renderSpeed();
       renderBuilds();
       renderShare();
+      renderCalc();
     }
     let indexResult;
     try {
@@ -2054,6 +2073,172 @@ $('speed-more').onclick = () => {
   state.speedLimit += 80;
   renderSpeed();
 };
+// 계산기. 스피드 계산기는 계산을 speed-calc.js에, 마크업을 calc-view.js에 둔다.
+const CALC_TABS = ['speed', 'damage'];
+
+function openCalc(tab = 'speed', { navigate = true } = {}) {
+  state.calc.tab = CALC_TABS.includes(tab) ? tab : 'speed';
+  showPage('calc');
+  if (navigate) history.pushState({ calc: state.calc.tab }, '', `#calc=${state.calc.tab}`);
+  renderCalc();
+  window.scrollTo(0, 0);
+}
+
+const calcBase = pokemon => state.reference?.species?.[pokemon]?.stats?.spe;
+const calcSpeciesLabel = id => state.locale.pokemon(state.reference.species[id]?.name ?? id).label;
+
+function calcResults() {
+  const { mine, theirs, field } = state.calc;
+  const results = {
+    mine: mine.pokemon ? finalSpeed(mine, field, calcBase(mine.pokemon)) : null,
+    theirs: theirs.pokemon ? finalSpeed(theirs, field, calcBase(theirs.pokemon)) : null,
+  };
+  const order =
+    results.mine && results.theirs ? compareSpeed(results.mine.speed, results.theirs.speed) : null;
+  return { results, order };
+}
+
+function renderCalc() {
+  if (state.page !== 'calc') return;
+  document
+    .querySelectorAll('[data-calc-tab]')
+    .forEach(b => b.setAttribute('aria-pressed', String(b.dataset.calcTab === state.calc.tab)));
+  if (state.calc.tab === 'damage') {
+    $('calc-body').innerHTML =
+      '<div class="empty-state"><p>데미지 계산기는 준비 중입니다.</p></div>';
+    return;
+  }
+  if (!state.reference || !state.locale) {
+    $('calc-body').innerHTML = loadingState('도감과 한국어 명칭을 불러오는 중입니다.');
+    return;
+  }
+  const { results, order } = calcResults();
+  $('calc-body').innerHTML = speedCalcView(state.calc, results, order, {
+    reference: state.reference,
+    locale: state.locale,
+    index: state.index,
+    samples: state.builds.samples.filter(s => s.pokemon),
+    speciesLabel: calcSpeciesLabel,
+    speciesRows: speedRows(state.reference, state.locale, { includeMega: true }).sort((a, b) =>
+      a.label.localeCompare(b.label, 'ko'),
+    ),
+  });
+}
+
+// 숫자를 칠 때마다 전체를 다시 그리면 커서가 튄다. 결과 칸만 고친다.
+function renderCalcOutputs() {
+  const { results, order } = calcResults();
+  $('calc-body').querySelector('[data-calc-verdict]').innerHTML = speedVerdict(
+    results.mine,
+    results.theirs,
+    order,
+  );
+  for (const key of ['mine', 'theirs']) {
+    const panel = $('calc-body').querySelector(`[data-calc-side="${key}"]`);
+    const result = results[key];
+    panel.querySelector('[data-calc-out="stat"]').textContent = result?.stat ?? '—';
+    panel.querySelector('[data-calc-out="final"]').textContent = result?.speed ?? '—';
+    panel.querySelector('[data-calc-out="effects"]').textContent = result
+      ? effectText(state.reference, result.effects, result.paralyzed)
+      : '';
+  }
+}
+
+// 포켓몬을 바꾸면 그 포켓몬이 가질 수 없는 특성과 도구를 비운다.
+function fitCalcSide(side) {
+  const next = { ...side };
+  if (next.ability && !abilityChoices(state.reference, next.pokemon).includes(next.ability))
+    next.ability = '';
+  if (next.item && !itemChoices(next.pokemon).includes(next.item)) next.item = '';
+  return next;
+}
+
+function findSpecies(text) {
+  const wanted = text.trim();
+  if (!wanted) return null;
+  const rows = speedRows(state.reference, state.locale, { includeMega: true });
+  return (
+    rows.find(r => r.label === wanted) ??
+    rows.find(r => r.label.replace(/\s/g, '') === wanted.replace(/\s/g, ''))
+  )?.id;
+}
+
+$('calc-link').onclick = () => {
+  if (state.page !== 'calc') openCalc(state.calc.tab);
+};
+document
+  .querySelectorAll('[data-calc-tab]')
+  .forEach(button => button.addEventListener('click', () => openCalc(button.dataset.calcTab)));
+$('calc-body').addEventListener('click', event => {
+  const target = event.target;
+  if (target.closest('[data-calc-swap]')) {
+    const { mine, theirs } = state.calc;
+    state.calc = { ...state.calc, mine: theirs, theirs: mine };
+    return renderCalc();
+  }
+  if (target.closest('[data-calc-reset]')) {
+    state.calc = {
+      ...state.calc,
+      mine: emptySide(),
+      theirs: emptySide(),
+      field: { weather: '', terrain: '' },
+    };
+    return renderCalc();
+  }
+  const key = target.closest('[data-calc-side]')?.dataset.calcSide;
+  if (!key) return;
+  const side = state.calc[key];
+  const points = target.closest('[data-calc-points]');
+  const nature = target.closest('[data-calc-nature]');
+  const stage = target.closest('[data-calc-stage]');
+  if (points) state.calc[key] = { ...side, points: Number(points.dataset.calcPoints) };
+  else if (nature) state.calc[key] = { ...side, nature: Number(nature.dataset.calcNature) };
+  else if (stage)
+    state.calc[key] = {
+      ...side,
+      stage: Math.max(-6, Math.min(6, side.stage + Number(stage.dataset.calcStage))),
+    };
+  else return;
+  renderCalc();
+});
+$('calc-body').addEventListener('input', event => {
+  const input = event.target.closest('[data-calc-field="points"]');
+  const key = input?.closest('[data-calc-side]')?.dataset.calcSide;
+  if (!key) return;
+  const value = Number(input.value);
+  if (!Number.isInteger(value) || value < 0 || value > 32) return;
+  state.calc[key] = { ...state.calc[key], points: value };
+  renderCalcOutputs();
+});
+$('calc-body').addEventListener('change', event => {
+  const target = event.target;
+  const key = target.closest('[data-calc-side]')?.dataset.calcSide;
+  if (!key) return;
+  if (target.matches('[data-calc-sample]')) {
+    const sample = state.builds.samples.find(s => s.id === target.value);
+    if (sample) state.calc[key] = fitCalcSide(sideFromSample(sample, natureAdjust));
+    return renderCalc();
+  }
+  const field = target.dataset.calcField;
+  const side = state.calc[key];
+  if (field === 'pokemon')
+    state.calc[key] = fitCalcSide({ ...side, pokemon: findSpecies(target.value) ?? null });
+  else if (field === 'points') {
+    // 칸을 벗어날 때 범위를 맞춘다. 다시 그리지 않는다. 이 change는 다른 단추를 누르는
+    // 순간에 오므로, 다시 그리면 누른 단추가 사라져 그 클릭이 먹히지 않는다.
+    const value = Math.max(0, Math.min(32, Math.round(Number(target.value) || 0)));
+    state.calc[key] = { ...side, points: value };
+    target.value = value;
+    return renderCalcOutputs();
+  } else if (field === 'weather' || field === 'terrain')
+    state.calc.field = { ...state.calc.field, [field]: target.value };
+  else if (field === 'abilityOn' || field === 'tailwind')
+    state.calc[key] = { ...side, [field]: target.checked };
+  else if (['ability', 'item', 'status'].includes(field))
+    state.calc[key] = { ...side, [field]: target.value };
+  else return;
+  renderCalc();
+});
 $('articles-link').onclick = () => {
   if (state.page !== 'articles') openArticles();
 };
@@ -2409,6 +2594,10 @@ window.addEventListener('popstate', () => {
     openSpeed(params.get('speed'), { navigate: false });
     return;
   }
+  if (params.has('calc')) {
+    openCalc(params.get('calc'), { navigate: false });
+    return;
+  }
   if (params.has('articles')) {
     openArticles({ navigate: false });
     return;
@@ -2499,6 +2688,8 @@ if (startupDex) openDex(startupDex, { navigate: false });
 const startupTypes = new URLSearchParams(location.hash.slice(1)).get('types');
 if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });
 if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ navigate: false });
+const startupCalc = new URLSearchParams(location.hash.slice(1)).get('calc');
+if (startupCalc !== null) openCalc(startupCalc, { navigate: false });
 const startupSpeed = new URLSearchParams(location.hash.slice(1)).get('speed');
 if (startupSpeed !== null) openSpeed(startupSpeed, { navigate: false });
 const startupShare = new URLSearchParams(location.hash.slice(1)).get('share');
