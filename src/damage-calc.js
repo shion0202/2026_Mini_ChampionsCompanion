@@ -369,6 +369,50 @@ const weatherDamage = (weather, type) =>
           : 0
       : 0;
 
+// ── 결과 묶음 ─────────────────────────────────────────────────────
+// 화면이 쓰는 값을 한꺼번에 만든다. 계산할 수 없으면 null, 데미지가 없으면 reason을 준다.
+//  결정력 = 공격 실수치(보정 후) × 위력(보정 후) × 자속
+//  내구력 = HP × 방어(보정 후) ÷ 0.411  (내 샘플의 내구력과 같은 식)
+export function damageSummary(input) {
+  const result = damageRolls(input);
+  if (!result) return null;
+  const { reference, defender } = input;
+  const species = reference.species[defender.pokemon];
+  const hpMax = hpStat(species.stats.hp, defender.points?.hp ?? 0);
+  const hpNow = Math.max(1, Math.floor((hpMax * clamp(defender.hpPercent ?? 100, 1, 100)) / 100));
+  if (result.status) return { reason: '변화 기술은 데미지가 없습니다.', hpMax, hpNow };
+  if (result.noPower)
+    return { reason: '위력이 정해지지 않은 기술입니다. 위력을 직접 넣어 주세요.', hpMax, hpNow };
+  if (result.immune) return { reason: '효과가 없습니다.', effectiveness: 0, hpMax, hpNow };
+  if (result.blocked)
+    return { reason: '기술이 실패합니다.', effectiveness: result.effectiveness, hpMax, hpNow };
+  const { rolls, hits } = result;
+  const perAttack = [rolls[0] * hits, rolls[15] * hits];
+  const table = koTable(rolls, hits, hpNow);
+  const bulkOf = key => {
+    const value = stat(
+      species.stats[key],
+      defender.points?.[key] ?? 0,
+      defender.nature?.[key] ?? 10,
+    );
+    return Math.floor((hpMax * value) / 0.411);
+  };
+  return {
+    ...result,
+    hpMax,
+    hpNow,
+    min: perAttack[0],
+    max: perAttack[1],
+    minPercent: (perAttack[0] / hpMax) * 100,
+    maxPercent: (perAttack[1] / hpMax) * 100,
+    table,
+    verdict: koVerdict(table),
+    power: Math.floor(result.attackStat * result.basePower * result.stab),
+    bulk: Math.floor((hpMax * result.defenseStat) / 0.411),
+    bulks: { def: bulkOf('def'), spd: bulkOf('spd') },
+  };
+}
+
 // ── 몇 번에 쓰러지는가 ─────────────────────────────────────────────
 // 한 번 공격 = 타수만큼 따로 굴린 데미지의 합. 난수 16개가 같은 확률이다.
 // n번 공격한 합이 남은 HP 이상일 확률을 1~maxTurns까지 구해 처음으로 0보다 큰 것을 돌려준다.
@@ -384,6 +428,30 @@ export function koChance(rolls, hits, hp, maxTurns = 4) {
   }
   return { turns: null, chance: 0 };
 }
+// 1~maxTurns번 공격했을 때 각각 쓰러뜨릴 확률. 결과창의 ‘KO 정보’가 쓴다.
+export function koTable(rolls, hits, hp, maxTurns = 4) {
+  if (!rolls?.length || hp <= 0) return [];
+  const once = convolveTimes(distribution(rolls), hits);
+  const table = [];
+  let total = new Map([[0, 1]]);
+  for (let n = 1; n <= maxTurns; n++) {
+    total = convolve(total, once);
+    let chance = 0;
+    for (const [damage, p] of total) if (damage >= hp) chance += p;
+    table.push({ turns: n, chance: Math.min(1, chance) });
+  }
+  return table;
+}
+
+// 결과 한 줄. 확정 n타 / 난수 n타(확률) / n타 이상 필요.
+export function koVerdict(table) {
+  const hit = table.find(row => row.chance > 0);
+  if (!hit) return { text: `${table.length + 1}타 이상 필요`, turns: null, chance: 0 };
+  return hit.chance >= 1
+    ? { text: `확정 ${hit.turns}타`, turns: hit.turns, chance: 1 }
+    : { text: `난수 ${hit.turns}타`, turns: hit.turns, chance: hit.chance };
+}
+
 const distribution = rolls => {
   const map = new Map();
   for (const r of rolls) map.set(r, (map.get(r) ?? 0) + 1 / rolls.length);
@@ -399,3 +467,76 @@ const convolveTimes = (dist, times) => {
   for (let i = 1; i < times; i++) out = convolve(out, dist);
   return out;
 };
+
+// ── 화면 상태 ─────────────────────────────────────────────────────
+export const emptyAttacker = () => ({
+  pokemon: null,
+  move: null,
+  power: 0,
+  hits: null,
+  crit: false,
+  spread: null,
+  points: { atk: 32, spa: 32, def: 0 },
+  nature: {},
+  stages: {},
+  ability: '',
+  item: '',
+  status: '',
+  pinch: false,
+  charge: false,
+  helpingHand: false,
+});
+export const emptyDefender = () => ({
+  pokemon: null,
+  points: { hp: 0, def: 0, spd: 0, atk: 0 },
+  nature: {},
+  stages: {},
+  ability: '',
+  item: '',
+  hpPercent: 100,
+  reflect: false,
+  lightScreen: false,
+  auroraVeil: false,
+  friendGuard: false,
+});
+export const emptyDamage = () => ({
+  format: 'singles',
+  attacker: emptyAttacker(),
+  defender: emptyDefender(),
+  field: { weather: '', terrain: '' },
+});
+
+const toKey = name =>
+  String(name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+const POINT_INDEX = { hp: 0, atk: 1, def: 2, spa: 3, spd: 4, spe: 5 };
+const NATURE_NAMES = {
+  atk: 'Attack',
+  def: 'Defense',
+  spa: 'Sp. Atk',
+  spd: 'Sp. Def',
+  spe: 'Speed',
+};
+
+// 샘플에서 계산기 한쪽으로. 공격 측은 첫 번째 채용 기술을 함께 가져온다.
+export function damageSideFromSample(sample, role, natureAdjust) {
+  const [up, down] = natureAdjust(sample.nature);
+  const points = {};
+  const nature = {};
+  for (const key of Object.keys(POINT_INDEX)) {
+    points[key] = sample.points?.[POINT_INDEX[key]] ?? 0;
+    if (key !== 'hp')
+      nature[key] = up === NATURE_NAMES[key] ? 11 : down === NATURE_NAMES[key] ? 9 : 10;
+  }
+  const common = {
+    pokemon: sample.pokemon,
+    points,
+    nature,
+    ability: toKey(sample.ability),
+    item: toKey(sample.item),
+  };
+  if (role === 'defender') return { ...emptyDefender(), ...common };
+  const move = sample.moves?.find(Boolean);
+  return { ...emptyAttacker(), ...common, move: move ? toKey(move) : null };
+}

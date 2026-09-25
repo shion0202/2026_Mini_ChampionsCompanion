@@ -225,3 +225,125 @@
 .calc-sides + .calc-verdict {
   margin: 16px 0 0;
 }
+
+/* 데미지 계산기 결과. 요약 → 결정력·내구력 → 1회 공격. */
+.dmg-result {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.dmg-summary,
+.dmg-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  padding: 16px;
+}
+.dmg-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.dmg-person,
+.dmg-move {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.dmg-person small,
+.dmg-move small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dmg-portrait {
+  width: 64px;
+  height: 64px;
+}
+.dmg-move b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.dmg-verdict {
+  margin: 6px 0 0;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--ink);
+}
+.dmg-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+}
+.dmg-row strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dmg-row small,
+.dmg-sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dmg-sub {
+  display: block;
+  margin-bottom: 6px;
+}
+.dmg-box {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+.dmg-box > small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dmg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dmg-chip {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.dmg-chip.is-sure {
+  border-color: var(--teal);
+  color: var(--teal);
+  font-weight: 700;
+}
+.dmg-chip.is-maybe {
+  color: var(--ink);
+  font-weight: 700;
+}
+.calc-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.calc-clear {
+  justify-self: start;
+  font-size: 12px;
+}
+.calc-actions .segmented {
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .dmg-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dmg-move {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+}

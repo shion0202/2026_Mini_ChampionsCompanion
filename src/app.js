@@ -32,6 +32,16 @@ import {
   itemChoices,
   effectText,
 } from './calc-view.js';
+import {
+  damageSummary,
+  defaultHits,
+  emptyDamage,
+  damageSideFromSample,
+  stat as damageStat,
+  hpStat,
+} from './damage-calc.js';
+import { damageCalcView, damageResult, statKeys } from './damage-view.js';
+import { NFE_SPECIES, SPREAD_MOVES } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
@@ -216,6 +226,7 @@ const state = {
     mine: emptySide(),
     theirs: emptySide(),
     field: { weather: '', terrain: '' },
+    damage: emptyDamage(),
   },
   // 링크로 연 공유. { id, status, data }. 메뉴에는 없고 #share=<id>로만 연다.
   share: null,
@@ -1113,8 +1124,11 @@ const buildLabel = (category, name) =>
 const byLabel = (a, b) => a.label.localeCompare(b.label, 'ko');
 
 // 고르는 자리. 계산기에서 연 창이면 그 쪽(mine·theirs)의 포켓몬을 초안처럼 쓴다.
+// 계산기 쪽 대상. { page: 'speed' | 'damage', side }.
+const calcSide = target =>
+  target.page === 'damage' ? state.calc.damage[target.side] : state.calc[target.side];
 const pickerDraft = () =>
-  picker?.calc ? { pokemon: state.calc[picker.calc].pokemon } : state.buildsEditing?.draft;
+  picker?.calc ? { pokemon: calcSide(picker.calc).pokemon } : state.buildsEditing?.draft;
 
 function pickerSource() {
   const draft = pickerDraft();
@@ -1128,7 +1142,9 @@ function pickerSource() {
       label: row.label,
       sub: [
         row.types.map(t => TYPE_LABELS[t] ?? t).join(' · '),
-        picker.calc ? `스피드 ${state.reference.species[row.id]?.stats?.spe ?? '—'}` : null,
+        picker.calc?.page === 'speed'
+          ? `스피드 ${state.reference.species[row.id]?.stats?.spe ?? '—'}`
+          : null,
       ]
         .filter(Boolean)
         .join(' · '),
@@ -1229,7 +1245,7 @@ function renderPicker() {
 }
 
 function openPicker(kind, slot = null, calc = null) {
-  const draft = calc ? { pokemon: state.calc[calc].pokemon } : state.buildsEditing?.draft;
+  const draft = calc ? { pokemon: calcSide(calc).pokemon } : state.buildsEditing?.draft;
   if (!draft) return;
   if (kind === 'move' && !draft.pokemon) {
     toast('먼저 포켓몬을 선택하세요.');
@@ -1260,8 +1276,30 @@ function openPicker(kind, slot = null, calc = null) {
 }
 
 function applyPicked(value) {
+  if (picker?.calc?.page === 'damage') {
+    const { side } = picker.calc;
+    const current = state.calc.damage[side];
+    const sample = state.builds.samples.find(s => s.id === value);
+    const next =
+      picker.kind === 'member'
+        ? sample
+          ? damageSideFromSample(sample, side, natureAdjust)
+          : current
+        : picker.kind === 'species'
+          ? { ...current, pokemon: value }
+          : picker.kind === 'item'
+            ? { ...current, item: toId(value) }
+            : { ...current, move: toId(value), power: 0, hits: null, spread: null };
+    // 포켓몬이 바뀌면 그 포켓몬이 가질 수 없는 특성은 비운다.
+    const own = (state.reference.species[next.pokemon]?.abilities ?? []).map(toId);
+    if (next.ability && !own.includes(next.ability)) next.ability = '';
+    state.calc.damage[side] = next;
+    picker = null;
+    $('picker-dialog').close();
+    return renderCalc();
+  }
   if (picker?.calc) {
-    const key = picker.calc;
+    const key = picker.calc.side;
     const sample = state.builds.samples.find(s => s.id === value);
     state.calc[key] =
       picker.kind === 'member'
@@ -2286,15 +2324,11 @@ function renderCalc() {
   document
     .querySelectorAll('[data-calc-tab]')
     .forEach(b => b.setAttribute('aria-pressed', String(b.dataset.calcTab === state.calc.tab)));
-  if (state.calc.tab === 'damage') {
-    $('calc-body').innerHTML =
-      '<div class="empty-state"><p>데미지 계산기는 준비 중입니다.</p></div>';
-    return;
-  }
   if (!state.reference || !state.locale) {
     $('calc-body').innerHTML = loadingState('도감과 한국어 명칭을 불러오는 중입니다.');
     return;
   }
+  if (state.calc.tab === 'damage') return renderDamage();
   const { results, order } = calcResults();
   $('calc-body').innerHTML = speedCalcView(state.calc, results, order, {
     reference: state.reference,
@@ -2359,7 +2393,7 @@ $('calc-body').addEventListener('click', event => {
   if (pick) {
     if (pick.dataset.calcPick === 'member' && !state.builds.samples.some(s => s.pokemon))
       return toast('샘플이 없습니다.');
-    return openPicker(pick.dataset.calcPick, null, key);
+    return openPicker(pick.dataset.calcPick, null, { page: 'speed', side: key });
   }
   const side = state.calc[key];
   const points = target.closest('[data-calc-points]');
@@ -2375,6 +2409,201 @@ $('calc-body').addEventListener('click', event => {
   else return;
   renderCalc();
 });
+// 데미지 계산기. 계산은 damage-calc.js, 마크업은 damage-view.js다.
+function damageContext() {
+  const dmg = state.calc.damage;
+  const { attacker, defender } = dmg;
+  const rawMove = attacker.move ? state.reference.move[attacker.move] : null;
+  const move = rawMove ? { ...rawMove, id: attacker.move } : null;
+  const keys = statKeys(move);
+  const species = id => state.reference.species[id];
+  const actual = (side, key) =>
+    species(side.pokemon)
+      ? damageStat(
+          species(side.pokemon).stats[key],
+          side.points?.[key] ?? 0,
+          side.nature?.[key] ?? 10,
+        )
+      : null;
+  // 전체기인지는 기술로 정한다. 칸을 직접 바꿨으면 그것을 따른다.
+  const spread = attacker.spread ?? (move ? SPREAD_MOVES.has(move.id) : false);
+  const input = move && {
+    reference: state.reference,
+    attacker,
+    defender: { ...defender, nfe: NFE_SPECIES.has(defender.pokemon) },
+    field: { ...dmg.field, format: dmg.format, spread },
+    move,
+    crit: attacker.crit,
+  };
+  return {
+    keys,
+    spread,
+    summary: input && attacker.pokemon && defender.pokemon ? damageSummary(input) : null,
+    defaultHits: move ? defaultHits(move, attacker.ability) : 1,
+    attackerStats: { attack: actual(attacker, keys.attack) },
+    defenderStats: {
+      hp: species(defender.pokemon)
+        ? hpStat(species(defender.pokemon).stats.hp, defender.points?.hp ?? 0)
+        : null,
+      defense: actual(defender, keys.defense),
+      foul: actual(defender, 'atk'),
+    },
+  };
+}
+
+const damageViewContext = context => ({
+  ...context,
+  reference: state.reference,
+  index: state.index,
+  speciesLabel: calcSpeciesLabel,
+});
+
+function renderDamage() {
+  const context = damageContext();
+  $('calc-body').innerHTML = damageCalcView(
+    state.calc.damage,
+    context.summary,
+    damageViewContext(context),
+  );
+}
+
+// 숫자를 칠 때는 결과만 고친다. 입력 칸을 다시 그리면 커서가 튄다.
+function renderDamageResult() {
+  const context = damageContext();
+  const html = damageResult(context.summary, {
+    ...damageViewContext(context),
+    state: state.calc.damage,
+  });
+  $('calc-body')
+    .querySelectorAll('[data-dmg-result]')
+    .forEach(box => (box.innerHTML = html));
+}
+
+const clampNumber = (value, low, high) => Math.min(high, Math.max(low, value));
+// 칸 이름 → 넣을 값. undefined면 무시한다(잘못 친 중간값).
+const DAMAGE_NUMBERS = {
+  power: text => (text.trim() === '' ? 0 : +text >= 0 ? Math.floor(+text) : undefined),
+  hits: text =>
+    text.trim() === ''
+      ? null
+      : Number.isInteger(+text) && +text >= 1
+        ? Math.min(10, +text)
+        : undefined,
+  hpPercent: text => (Number.isFinite(+text) ? clampNumber(Math.round(+text), 1, 100) : undefined),
+};
+
+// 숫자 칸 하나를 상태에 넣는다. 숫자 칸이 아니면 false.
+function damageInput(target, commit) {
+  const sideKey = target.closest('[data-dmg-side]')?.dataset.dmgSide;
+  if (!sideKey) return false;
+  const side = state.calc.damage[sideKey];
+  if (target.dataset.dmgPoints) {
+    const key = target.dataset.dmgPoints;
+    const value = Number(target.value);
+    if (!commit && !(Number.isInteger(value) && value >= 0 && value <= 32)) return true;
+    const points = clampNumber(Math.round(value) || 0, 0, 32);
+    state.calc.damage[sideKey] = { ...side, points: { ...side.points, [key]: points } };
+    if (commit) target.value = points;
+    return true;
+  }
+  const field = target.dataset.dmgNumber;
+  if (!DAMAGE_NUMBERS[field]) return false;
+  const value = DAMAGE_NUMBERS[field](target.value);
+  if (value === undefined) return true;
+  state.calc.damage[sideKey] = { ...side, [field]: value };
+  if (field === 'hpPercent') {
+    const out = target.closest('.calc-line')?.querySelector('[data-dmg-out="hpPercent"]');
+    if (out) out.textContent = `${value}%`;
+  }
+  return true;
+}
+
+$('calc-body').addEventListener('input', event => {
+  if (state.calc.tab !== 'damage') return;
+  if (damageInput(event.target, false)) renderDamageResult();
+});
+$('calc-body').addEventListener('change', event => {
+  if (state.calc.tab !== 'damage') return;
+  const target = event.target;
+  // 숫자 칸은 벗어날 때 실수치까지 다시 그린다. 다만 다른 단추를 누르는 순간에 오는
+  // change라 전체를 다시 그리면 그 클릭이 사라진다. 결과만 고치고 실수치는 제자리에서 둔다.
+  if (damageInput(target, true)) return renderDamageResult();
+  const field = target.dataset.dmgField;
+  if (!field) return;
+  const dmg = state.calc.damage;
+  const sideKey = target.closest('[data-dmg-side]')?.dataset.dmgSide;
+  if (field === 'weather' || field === 'terrain')
+    dmg.field = { ...dmg.field, [field]: target.value };
+  else if (sideKey && target.type === 'checkbox')
+    dmg[sideKey] = { ...dmg[sideKey], [field]: target.checked };
+  else if (sideKey) dmg[sideKey] = { ...dmg[sideKey], [field]: target.value };
+  renderDamage();
+});
+$('calc-body').addEventListener('click', event => {
+  if (state.calc.tab !== 'damage') return;
+  const target = event.target;
+  const dmg = state.calc.damage;
+  const format = target.closest('[data-dmg-format]');
+  if (format) {
+    dmg.format = format.dataset.dmgFormat;
+    return renderDamage();
+  }
+  // 교체: 두 쪽의 포켓몬·특성·도구를 맞바꾼다. 기술은 새 공격 측 것이 아니므로 비운다.
+  if (target.closest('[data-dmg-swap]')) {
+    const { attacker, defender } = dmg;
+    dmg.attacker = {
+      ...attacker,
+      pokemon: defender.pokemon,
+      ability: defender.ability,
+      item: defender.item,
+      move: null,
+      power: 0,
+      hits: null,
+    };
+    dmg.defender = {
+      ...defender,
+      pokemon: attacker.pokemon,
+      ability: attacker.ability,
+      item: attacker.item,
+    };
+    return renderDamage();
+  }
+  if (target.closest('[data-dmg-reset]')) {
+    state.calc.damage = { ...emptyDamage(), format: dmg.format };
+    return renderDamage();
+  }
+  const sideKey = target.closest('[data-dmg-side]')?.dataset.dmgSide;
+  if (!sideKey) return;
+  const side = dmg[sideKey];
+  const pick = target.closest('[data-dmg-pick]');
+  if (pick) {
+    const kind = pick.dataset.dmgPick;
+    if (kind === 'member' && !state.builds.samples.some(s => s.pokemon))
+      return toast('샘플이 없습니다.');
+    return openPicker(kind, null, { page: 'damage', side: sideKey });
+  }
+  if (target.closest('[data-dmg-clear]')) {
+    dmg[sideKey] = { ...side, item: '' };
+    return renderDamage();
+  }
+  const button = target.closest('[data-dmg-set-points], [data-dmg-nature], [data-dmg-stage]');
+  if (!button) return;
+  const [attr, raw] = Object.entries(button.dataset).find(([k]) =>
+    ['dmgSetPoints', 'dmgNature', 'dmgStage'].includes(k),
+  );
+  const [key, text] = raw.split(':');
+  const value = Number(text);
+  if (attr === 'dmgSetPoints') dmg[sideKey] = { ...side, points: { ...side.points, [key]: value } };
+  else if (attr === 'dmgNature')
+    dmg[sideKey] = { ...side, nature: { ...side.nature, [key]: value } };
+  else
+    dmg[sideKey] = {
+      ...side,
+      stages: { ...side.stages, [key]: clampNumber((side.stages?.[key] ?? 0) + value, -6, 6) },
+    };
+  renderDamage();
+});
+
 // 숫자 칸. 칠 때마다 결과만 고친다. 전체를 다시 그리면 커서가 튄다.
 const calcNumber = {
   points: text => {

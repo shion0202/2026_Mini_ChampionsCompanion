@@ -7,6 +7,9 @@ import { readFile } from 'node:fs/promises';
 import {
   damageRolls,
   koChance,
+  koTable,
+  koVerdict,
+  damageSummary,
   defaultHits,
   effectivenessOf,
   hpStat,
@@ -189,4 +192,44 @@ test('KO chances add independent rolls over several turns', () => {
   assert.equal(koChance(rolls, 1, 1000).turns, null, '네 번으로도 못 쓰러뜨린다');
   const two = koChance(rolls, 1, 100);
   assert.ok(two.chance > 0 && two.chance < 1);
+});
+
+test('KO table and the one-line verdict', () => {
+  const rolls = Array.from({ length: 16 }, (_, i) => 40 + i); // 40~55
+  const table = koTable(rolls, 1, 100);
+  assert.deepEqual(
+    table.map(r => r.turns),
+    [1, 2, 3, 4],
+  );
+  assert.equal(table[0].chance, 0);
+  assert.ok(table[1].chance > 0 && table[1].chance < 1);
+  assert.equal(table[2].chance, 1);
+  assert.deepEqual(koVerdict(table), { text: '난수 2타', turns: 2, chance: table[1].chance });
+  assert.equal(koVerdict(koTable(rolls, 1, 40)).text, '확정 1타');
+  assert.equal(koVerdict(koTable(rolls, 1, 1000)).text, '5타 이상 필요');
+});
+
+test('the summary gives range, percent of max HP, KO table, power and bulk', () => {
+  const summary = damageSummary({
+    reference,
+    attacker: side('garchomp', { atk: 31 }, { item: 'choiceband' }),
+    defender: side('dragonite', { hp: 31, def: 10 }, { hpPercent: 100 }),
+    field: { format: 'singles', weather: '', terrain: '' },
+    move: { ...reference.move.outrage, id: 'outrage' },
+  });
+  assert.equal(summary.min, 294);
+  assert.equal(summary.max, 348);
+  assert.equal(summary.hpMax, 91 + 31 + 75);
+  assert.equal(summary.verdict.text, '확정 1타');
+  assert.ok(summary.maxPercent > 100);
+  assert.equal(summary.power, summary.attackStat * summary.basePower * 1.5);
+  const halfHp = damageSummary({
+    reference,
+    attacker: side('garchomp'),
+    defender: side('dragonite', {}, { hpPercent: 50 }),
+    field: { format: 'singles', weather: '', terrain: '' },
+    move: { ...reference.move.earthquake, id: 'earthquake' },
+  });
+  assert.equal(halfHp.reason, '효과가 없습니다.');
+  assert.equal(halfHp.hpNow, Math.floor(halfHp.hpMax / 2));
 });
