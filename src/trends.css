@@ -1,0 +1,90 @@
+/* 사용률 추이. 그래프는 가로로 길어질 수 있어 틀 안에서만 옆으로 넘긴다. */
+.trends-panel {
+  border-top: 1px solid var(--line);
+  padding: 17px 0 24px;
+  min-width: 0;
+}
+.trends-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.trend-chart-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  padding: 8px 0;
+}
+.trend-chart {
+  display: block;
+}
+.trend-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.trend-rank,
+.trend-x {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.trend-line {
+  cursor: pointer;
+}
+.trend-line polyline {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+/* 한 포켓몬을 강조하면 나머지를 흐리게 한다. */
+.trend-chart.is-focused .trend-line:not(.is-on) {
+  opacity: 0.12;
+}
+.trend-chart .trend-line.is-on polyline {
+  stroke-width: 4.5;
+}
+
+/* 랭킹 상세의 추이 탭. */
+.trend-section {
+  margin: 12px 0 18px;
+}
+.trend-section h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.trend-mini {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--white);
+}
+.trend-mini polyline {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.trend-mini circle {
+  fill: var(--teal);
+}
+.trend-value {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+.trend-out {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.trend-none {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}

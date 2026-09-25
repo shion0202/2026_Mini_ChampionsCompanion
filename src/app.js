@@ -4,6 +4,7 @@ import {
   formatDate,
   CATEGORY_LABELS,
   SEASON_REGULATIONS,
+  SOURCE,
   matchesQuery,
   withWa,
   toId,
@@ -12,6 +13,15 @@ import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
 import { pruneItems } from './item-exclusions.js';
+import {
+  TREND_SCOPES,
+  TREND_LIMIT,
+  trendPoints,
+  rankSeries,
+  rankOf,
+  createTrendStore,
+} from './trends.js';
+import { rankChart, pokemonTrendView } from './trends-view.js';
 import { emptySide, finalSpeed, compareSpeed, sideFromSample } from './speed-calc.js';
 import {
   speedCalcView,
@@ -159,11 +169,12 @@ const DETAIL_ORDER = [
   'teammate',
   'learnset',
   'articles',
+  'trend',
 ];
 const DETAIL_LABELS = Object.fromEntries(
   DETAIL_ORDER.map(key => [
     key,
-    { overview: '기본 정보', learnset: '배우는 기술', articles: '구축 기사' }[key] ??
+    { overview: '기본 정보', learnset: '배우는 기술', articles: '구축 기사', trend: '추이' }[key] ??
       CATEGORY_LABELS[key],
   ]),
 );
@@ -194,6 +205,8 @@ const state = {
   syncStatus: 'off',
   // 사람이 골라야 하는 충돌. { remote, conflicts }. 없으면 null.
   syncConflict: null,
+  // 사용률 추이. focus는 강조한 포켓몬 이름이다.
+  trends: { scope: 'regulation', format: null, focus: null },
   // 계산기. 스피드 계산기의 양쪽 칸과 둘이 함께 쓰는 날씨·필드.
   calc: {
     tab: 'speed',
@@ -412,6 +425,7 @@ function renderCategory() {
     button.tabIndex = selected ? 0 : -1;
   });
   $('category-content').setAttribute('aria-labelledby', `tab-${category}`);
+  if (category === 'trend') return renderPokemonTrend(p);
   if (category === 'articles') {
     const filters = { season: state.season, format: state.format, pokemon: p.id };
     $('category-content').innerHTML =
@@ -552,6 +566,7 @@ function showPage(page) {
     types: 'type-chart',
     articles: 'articles',
     calc: 'calc',
+    trends: 'trends',
     speed: 'speed',
     builds: 'builds',
     shared: 'shared',
@@ -1516,6 +1531,7 @@ async function load(force = false) {
     }
     if (requestId !== state.requestId) return;
     state.index = indexResult.data;
+    renderTrends();
     state.season = resolveSeason(state.index, state.season);
     const context = resolveContext(state.index, state);
     const result = await client.getSnapshot(context, { force });
@@ -2102,6 +2118,121 @@ $('speed-more').onclick = () => {
   state.speedLimit += 80;
   renderSpeed();
 };
+// 사용률 추이. 날짜별 스냅샷에서 순위만 뽑아 견준다(trends.js). 받은 자료는
+// 메모리에만 둔다. 제공처 규칙상 영구 보관은 하지 않는다.
+const trendStore = createTrendStore(path =>
+  fetch(SOURCE + path, { credentials: 'omit', signal: AbortSignal.timeout(20000) }).then(r =>
+    r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
+  ),
+);
+let trendRequest = 0;
+const trendFormat = () => state.trends.format ?? state.format;
+
+function openTrends(scope = state.trends.scope, { navigate = true } = {}) {
+  state.trends.scope = TREND_SCOPES[scope] ? scope : 'regulation';
+  showPage('trends');
+  if (navigate)
+    history.pushState({ trends: state.trends.scope }, '', `#trends=${state.trends.scope}`);
+  renderTrends();
+  window.scrollTo(0, 0);
+}
+
+async function renderTrends() {
+  if (state.page !== 'trends') return;
+  const { scope, focus } = state.trends;
+  const format = trendFormat();
+  document
+    .querySelectorAll('[data-trend-scope]')
+    .forEach(b => b.setAttribute('aria-pressed', String(b.dataset.trendScope === scope)));
+  document
+    .querySelectorAll('[data-trend-format]')
+    .forEach(b => b.setAttribute('aria-pressed', String(b.dataset.trendFormat === format)));
+  if (!state.index || !state.locale) {
+    $('trends-status').textContent = '';
+    $('trends-chart').innerHTML = loadingState('시즌 목록을 불러오는 중입니다.');
+    return;
+  }
+  const points = trendPoints(state.index.seasons, scope);
+  const request = ++trendRequest;
+  let done = 0;
+  const progress = () =>
+    ($('trends-status').textContent = `자료를 불러오는 중입니다 (${done}/${points.length})`);
+  progress();
+  $('trends-chart').innerHTML = loadingState('날짜별 순위를 모으는 중입니다.');
+  const positions = await Promise.all(
+    points.map(point =>
+      trendStore.get(point, format).then(result => {
+        done++;
+        if (request === trendRequest) progress();
+        return result;
+      }),
+    ),
+  );
+  if (request !== trendRequest || state.page !== 'trends') return;
+  const missing = positions.filter(p => !p).length;
+  $('trends-status').textContent =
+    `${points.length}개 시점 · ${format === 'Singles' ? '싱글' : '더블'}` +
+    (missing ? ` · ${missing}개 시점을 불러오지 못해 비워 두었습니다` : '');
+  $('trends-chart').innerHTML = rankChart(points, rankSeries(positions, TREND_LIMIT), {
+    label: name => state.locale.pokemon(name).label,
+    sprite: name => state.index.pokemon[name]?.sprite ?? null,
+    limit: TREND_LIMIT,
+  });
+  if (focus) focusTrend(focus);
+}
+
+// 한 포켓몬만 강조한다. 다시 그리지 않고 표시만 바꾼다.
+function focusTrend(name) {
+  state.trends.focus = name;
+  const svg = $('trends-chart').querySelector('svg');
+  if (!svg) return;
+  svg.classList.toggle('is-focused', !!name);
+  svg.querySelectorAll('.trend-line').forEach(line => {
+    const on = line.dataset.trend === name;
+    line.classList.toggle('is-on', on);
+    // 강조한 줄을 맨 위에 그린다. SVG는 나중에 온 것이 위에 보인다.
+    if (on) line.parentNode.append(line);
+  });
+}
+
+// 랭킹 상세의 ‘추이’ 탭. 세 기간을 차례로 받아 채운다.
+async function renderPokemonTrend(p) {
+  const format = state.format;
+  const scopes = ['regulation', 'season', 'current'].map(scope => ({
+    scope,
+    title: TREND_SCOPES[scope],
+    points: state.index ? trendPoints(state.index.seasons, scope) : [],
+    ranks: null,
+  }));
+  const draw = () => {
+    if (state.category !== 'trend' || selectedEntry()?.name !== p.name) return;
+    $('category-content').innerHTML = pokemonTrendView(scopes);
+  };
+  draw();
+  for (const section of scopes) {
+    const positions = await Promise.all(section.points.map(pt => trendStore.get(pt, format)));
+    section.ranks = rankOf(positions, p.name);
+    draw();
+  }
+}
+
+$('trends-link').onclick = () => {
+  if (state.page !== 'trends') openTrends();
+};
+document
+  .querySelectorAll('[data-trend-scope]')
+  .forEach(button => button.addEventListener('click', () => openTrends(button.dataset.trendScope)));
+document.querySelectorAll('[data-trend-format]').forEach(button =>
+  button.addEventListener('click', () => {
+    state.trends.format = button.dataset.trendFormat;
+    renderTrends();
+  }),
+);
+$('trends-chart').addEventListener('click', event => {
+  const line = event.target.closest('[data-trend]');
+  focusTrend(!line || line.dataset.trend === state.trends.focus ? null : line.dataset.trend);
+});
+
 // 계산기. 스피드 계산기는 계산을 speed-calc.js에, 마크업을 calc-view.js에 둔다.
 const CALC_TABS = ['speed', 'damage'];
 
@@ -2622,6 +2753,10 @@ window.addEventListener('popstate', () => {
     openSpeed(params.get('speed'), { navigate: false });
     return;
   }
+  if (params.has('trends')) {
+    openTrends(params.get('trends'), { navigate: false });
+    return;
+  }
   if (params.has('calc')) {
     openCalc(params.get('calc'), { navigate: false });
     return;
@@ -2716,6 +2851,8 @@ if (startupDex) openDex(startupDex, { navigate: false });
 const startupTypes = new URLSearchParams(location.hash.slice(1)).get('types');
 if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });
 if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ navigate: false });
+const startupTrends = new URLSearchParams(location.hash.slice(1)).get('trends');
+if (startupTrends !== null) openTrends(startupTrends, { navigate: false });
 const startupCalc = new URLSearchParams(location.hash.slice(1)).get('calc');
 if (startupCalc !== null) openCalc(startupCalc, { navigate: false });
 const startupSpeed = new URLSearchParams(location.hash.slice(1)).get('speed');
