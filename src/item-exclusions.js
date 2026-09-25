@@ -117,6 +117,28 @@ export const EXCLUDED_ITEMS = new Set([
   'rarebone', // 귀중한뼈
   'galaricacuff', // 가라두구팔찌
   'galaricawreath', // 가라두구머리장식
+  // 열매 중 포켓몬스넥(포핀·포로크) 재료로만 쓰이는 것. 배틀 효과가 없다.
+  'razzberry', // 라즈열매
+  'blukberry', // 블리열매
+  'nanabberry', // 나나열매
+  'wepearberry', // 서배열매
+  'pinapberry', // 파인열매
+  'cornnberry', // 수숙열매
+  'magostberry', // 고스티열매
+  'rabutaberry', // 라부탐열매
+  'nomelberry', // 노멜열매
+  'spelonberry', // 메호키열매
+  'pamtreberry', // 자야열매
+  'watmelberry', // 슈박열매
+  'durinberry', // 두리열매
+  'belueberry', // 루베열매
+  // 기초 포인트를 낮추는 열매. 배틀 밖에서 먹이는 것이고 지녀도 배틀 효과가 없다.
+  'pomegberry', // 유석열매
+  'kelpsyberry', // 시마열매
+  'qualotberry', // 파비열매
+  'hondewberry', // 로매열매
+  'grepaberry', // 또뽀열매
+  'tamatoberry', // 토망열매
 ]);
 
 // 불러온 도감에서 뺀다. 원본을 바꾸지 않고 도구만 새로 만든다.

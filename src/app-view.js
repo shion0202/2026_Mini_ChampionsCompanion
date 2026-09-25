@@ -288,7 +288,7 @@ export const dexKindSwitch = kind =>
 
 export const dexEmpty = kind =>
   `<div class="empty-state"><span class="empty-symbol">⌕</span>` +
-  `<h3>조건에 맞는 ${DEX_SUBJECTS[kind]} 없어요</h3>` +
+  `<h3>조건에 맞는 ${DEX_SUBJECTS[kind]} 없습니다</h3>` +
   `<p>검색어와 적용한 필터를 확인해 주세요.</p></div>`;
 
 // Rows reuse data-effect-type/data-effect-id, so the existing popup handler opens

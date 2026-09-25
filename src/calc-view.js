@@ -166,16 +166,17 @@ const verdictBox = (results, order) =>
 
 export function speedCalcView(state, results, order, context) {
   return (
+    // 교체·초기화는 탭 바로 아래, 결과보다 위에 둔다.
+    `<div class="calc-actions">` +
+    `<button type="button" class="text-button" data-calc-swap>교체</button>` +
+    `<button type="button" class="text-button" data-calc-reset>초기화</button></div>` +
     verdictBox(results, order) +
     `<div class="calc-sides">` +
     sidePanel('mine', state.mine, results.mine, { ...context, field: state.field }) +
     sidePanel('theirs', state.theirs, results.theirs, { ...context, field: state.field }) +
     `</div>` +
     verdictBox(results, order).replace('role="status"', '') +
-    `<div class="calc-actions">` +
-    `<button type="button" class="text-button" data-calc-swap>교체</button>` +
-    `<button type="button" class="text-button" data-calc-reset>초기화</button></div>` +
-    `<p class="speed-help">레벨 50, 개체값 최대 기준입니다. 특성·도구·순풍의 배율은 한 번에 곱한 뒤 반올림하고, 마비는 그 뒤에 절반, 배수는 맨 마지막에 곱합니다.</p>`
+    `<p class="speed-help">특성·도구·순풍의 배율은 한 번에 곱한 뒤 반올림하고, 마비는 그 뒤에 절반, 배수는 맨 마지막에 곱합니다.</p>`
   );
 }
 

@@ -9,7 +9,7 @@ const reference = JSON.parse(
 );
 
 test('every excluded item exists, is not in Champions, and is not a mega stone', () => {
-  assert.equal(EXCLUDED_ITEMS.size, 109);
+  assert.equal(EXCLUDED_ITEMS.size, 129);
   for (const id of EXCLUDED_ITEMS) {
     const item = reference.held_item[id];
     assert.ok(item, `${id}는 도감에 있어야 한다`);
@@ -33,6 +33,9 @@ test('items that do something in battle stay', () => {
     'razorfang',
     'eviolite',
     'mewtwonitex',
+    'custapberry',
+    'salacberry',
+    'enigmaberry',
   ])
     assert.ok(!EXCLUDED_ITEMS.has(id), id);
 });
