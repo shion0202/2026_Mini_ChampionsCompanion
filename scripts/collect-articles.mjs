@@ -260,6 +260,8 @@ const entries = [];
 const skipped = { robots: 0, fetch: 0, 'not-an-article': 0, season: 0, format: 0 };
 for (const [url, link] of found) {
   if (!(await allowed(url))) {
+    // 사람이 넘긴 주소가 왜 빠졌는지 알 수 있게 주소를 남긴다.
+    console.error(`받지 않음 (robots.txt): ${url}`);
     skipped.robots++;
     continue;
   }
