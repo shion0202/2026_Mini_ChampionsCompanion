@@ -2714,6 +2714,16 @@ select optgroup {
   margin: 0 auto;
   padding: 0 32px 10px;
   overflow-x: auto;
+  /* 넘치면 옆으로 밀어 넘기되 스크롤바는 보이지 않게 한다. 터치는 손가락으로,
+     PC는 app.js의 끌기로 넘긴다. */
+  scrollbar-width: none;
+}
+.category-nav::-webkit-scrollbar {
+  display: none;
+}
+.category-nav.is-dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 .category-nav button {
   flex-shrink: 0;

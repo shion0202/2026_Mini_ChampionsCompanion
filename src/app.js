@@ -1099,7 +1099,8 @@ function openDex(kind, { navigate = true } = {}) {
   showPage('dex');
   renderDex();
   window.scrollTo(0, 0);
-  $('dex-search').focus({ preventScroll: true });
+  // 검색창에 초점을 두지 않는다. 모바일에서 키보드가 올라와 화면을 가리고, 다른
+  // 탭도 들어갈 때 초점을 옮기지 않는다.
 }
 function closeDex() {
   showPage('ranking');
@@ -1390,6 +1391,51 @@ function openFilters(kind) {
 }
 $('ranking-filter').onclick = () => openFilters('ranking');
 $('builds-filter').onclick = () => openFilters('builds');
+
+// 상단 메뉴를 마우스로 끌어 옆으로 넘긴다. 터치는 브라우저가 이미 해 주므로 마우스만
+// 다룬다. 조금만 움직여도 끌기로 치면 누르려던 탭이 안 눌리므로 몇 픽셀은 봐준다.
+// 끌고 나서 뗀 자리의 탭이 눌리지 않도록 그 한 번의 클릭은 삼킨다.
+{
+  const nav = document.querySelector('.category-nav');
+  let press = null;
+  let dragged = false;
+  nav.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    press = { x: event.clientX, left: nav.scrollLeft, id: event.pointerId };
+    dragged = false;
+  });
+  nav.addEventListener('pointermove', event => {
+    if (!press || event.pointerId !== press.id) return;
+    const moved = event.clientX - press.x;
+    if (!dragged && Math.abs(moved) < 6) return;
+    if (!dragged) {
+      dragged = true;
+      nav.setPointerCapture(press.id);
+      nav.classList.add('is-dragging');
+    }
+    nav.scrollLeft = press.left - moved;
+  });
+  const release = () => {
+    press = null;
+    nav.classList.remove('is-dragging');
+    // 클릭은 떼는 순간 바로 뒤따른다. 그 뒤에도 표시가 남으면 다음 정상 클릭까지
+    // 삼키므로 한 박자 뒤에 푼다.
+    if (dragged) setTimeout(() => (dragged = false));
+  };
+  nav.addEventListener('pointerup', release);
+  nav.addEventListener('pointercancel', release);
+  nav.addEventListener(
+    'click',
+    event => {
+      if (!dragged) return;
+      dragged = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    true,
+  );
+}
+
 $('ranking-link').onclick = () => goToRanking({ top: true });
 $('speed-link').onclick = () => {
   if (state.page !== 'speed') openSpeed(state.speed.mode);
