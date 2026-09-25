@@ -3501,6 +3501,20 @@ select optgroup {
 .builds-status:empty {
   display: none;
 }
+/* 동기화 줄. 목록 위에 한 줄로 두고 좁으면 단추가 아래로 내려간다. */
+.builds-sync {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.builds-sync p {
+  margin: 0;
+  flex: 1 1 auto;
+}
 .builds-actions {
   display: flex;
   gap: 0.75rem;

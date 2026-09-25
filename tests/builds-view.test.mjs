@@ -11,6 +11,7 @@ import {
   partyEditor,
   pickerRows,
   fmtDay,
+  syncBar,
 } from '../src/builds-view.js';
 
 const read = file =>
@@ -254,4 +255,45 @@ test('수정일은 날짜만 적고, 저장한 적 없으면 그렇게 알린다
   const html = sampleList([{ ...sample, updatedAt: Date.UTC(2026, 8, 24, 3) }], locale, reference);
   assert.ok(html.includes('2026.09.24'));
   assert.ok(sampleEditor(sample, { reference, locale }).includes('수정일 저장 안 함'));
+});
+
+const synced = { code: 'ABCDEFGHJKMNPQRSTV01', dirty: false };
+
+test('sync bar: off, checking, synced, offline and conflict', t => {
+  t.assert.snapshot(
+    [
+      syncBar(null, 'off'),
+      syncBar(synced, 'checking'),
+      syncBar(synced, 'ok'),
+      syncBar(synced, 'offline'),
+      syncBar(synced, 'conflict'),
+    ].join('\n'),
+  );
+});
+
+test('sync bar buttons never submit a form', () => {
+  for (const [sync, status] of [
+    [null, 'off'],
+    [synced, 'ok'],
+    [synced, 'conflict'],
+  ]) {
+    const buttons = syncBar(sync, status).match(/<button[^>]*>/g);
+    assert.ok(buttons.length >= 2, status);
+    assert.ok(
+      buttons.every(b => b.includes('type="button"')),
+      status,
+    );
+  }
+});
+
+test('the sync bar never prints the code itself', () => {
+  for (const status of ['ok', 'offline', 'conflict'])
+    assert.ok(!syncBar(synced, status).includes('ABCD'), status);
+});
+
+test('a conflict offers exactly the two ways out', () => {
+  const actions = [...syncBar(synced, 'conflict').matchAll(/data-sync="(\w+)"/g)].map(m => m[1]);
+  assert.deepEqual(actions, ['pull', 'push']);
+  const off = [...syncBar(null, 'off').matchAll(/data-sync="(\w+)"/g)].map(m => m[1]);
+  assert.deepEqual(off, ['enable', 'join']);
 });
