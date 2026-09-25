@@ -1240,7 +1240,8 @@ export function damageSummary(input) {
   // 기합의띠·옹골참은 HP가 가득일 때 한 번 버틴다. 탈은 첫 타격을 막고 1/8을 받는다.
   const endure = full && (defender.item === 'focussash' || (d === 'sturdy' && !breaker));
   const disguise = d === 'disguise' && !breaker && !String(defender.pokemon).endsWith('busted');
-  const table = koOdds({ hits, rollsAt, hp: hpStart, maxHp: hpMax, endure, disguise });
+  const berry = healingBerry(defender, input.attacker, input.move.id, hpMax);
+  const table = koOdds({ hits, rollsAt, hp: hpStart, maxHp: hpMax, endure, disguise, berry });
   // 턴 종료 데미지는 공격과 따로 본다. 있으면 포함한 KO 표를 하나 더 만든다.
   const attackerSpecies = reference.species[input.attacker.pokemon];
   const attackerHpMax = hpStat(attackerSpecies.stats.hp, input.attacker.points?.hp ?? 0);
@@ -1255,7 +1256,7 @@ export function damageSummary(input) {
   });
   const residualFirst = residual(1);
   const residualTable = residualFirst.length
-    ? koOdds({ hits, rollsAt, hp: hpStart, maxHp: hpMax, endure, disguise, residual })
+    ? koOdds({ hits, rollsAt, hp: hpStart, maxHp: hpMax, endure, disguise, residual, berry })
     : null;
   const bulkOf = key => {
     const value = stat(
@@ -1272,6 +1273,7 @@ export function damageSummary(input) {
     flow,
     endure,
     disguise,
+    berry,
     min,
     max,
     minPercent: (min / hpMax) * 100,
@@ -1317,6 +1319,8 @@ export function powerOf({
 //  disguise  첫 타격을 막고 최대 HP의 1/8을 받는다(탈).
 // 반환: 1~maxTurns번 공격했을 때 각각 쓰러뜨렸을 확률.
 //  residual  턴마다의 턴 종료 목록(residualEffects). 공격 뒤 차례로 적용한다.
+//  berry     회복 열매({ heal }). HP가 최대의 절반 이하가 되면 한 번 먹는다(타격마다·턴 종료 뒤
+//            살펴본다). 처음부터 절반 이하면 바로 먹는다.
 export function koOdds({
   hits,
   rollsAt,
@@ -1325,36 +1329,42 @@ export function koOdds({
   endure,
   disguise,
   residual,
+  berry,
   maxTurns = 4,
 }) {
   if (!hits || hp <= 0) return [];
+  // 살아 있고 열매가 남아 있으면 절반 이하일 때 먹는다. [HP, 열매가 남았는지]
+  const eat = (h, has) =>
+    has && berry && h > 0 && h <= maxHp / 2 ? [Math.min(maxHp, h + berry.heal), false] : [h, has];
   const dist = new Map();
   const distOf = (hit, full, fresh, turn) => {
     const key = `${hit}|${full}|${fresh}|${turn}`;
     if (!dist.has(key)) dist.set(key, distribution(rollsAt(hit, full, fresh, turn)));
     return dist.get(key);
   };
-  let states = new Map([[stateKey(hp, !!disguise), 1]]);
+  const [startHp, startBerry] = eat(hp, !!berry);
+  let states = new Map([[stateKey(startHp, !!disguise, startBerry), 1]]);
   let fainted = 0;
   const table = [];
   for (let turn = 1; turn <= maxTurns; turn++) {
     for (let hit = 1; hit <= hits; hit++) {
       const next = new Map();
-      const add = (h, masked, p) => {
+      const add = (raw, masked, has, p) => {
+        const [h, left] = eat(raw, has);
         if (h <= 0) fainted += p;
-        else next.set(stateKey(h, masked), (next.get(stateKey(h, masked)) ?? 0) + p);
+        else next.set(stateKey(h, masked, left), (next.get(stateKey(h, masked, left)) ?? 0) + p);
       };
       for (const [key, p] of states) {
-        const [h, masked] = parseState(key);
+        const [h, masked, has] = parseState(key);
         if (masked) {
-          add(h - Math.max(1, Math.floor(maxHp / 8)), false, p);
+          add(h - Math.max(1, Math.floor(maxHp / 8)), false, has, p);
           continue;
         }
         const isFull = h >= maxHp;
         for (const [damage, q] of distOf(hit, isFull, turn === 1, turn)) {
           let left = h - damage;
           if (left <= 0 && endure && isFull) left = 1;
-          add(left, false, p * q);
+          add(left, false, has, p * q);
         }
       }
       states = next;
@@ -1364,13 +1374,14 @@ export function koOdds({
     if (effects.length) {
       const next = new Map();
       for (const [key, p] of states) {
-        let [h, masked] = parseState(key);
+        let [h, masked, has] = parseState(key);
         for (const { amount } of effects) {
           h = Math.min(maxHp, h + amount);
           if (h <= 0) break;
         }
+        [h, has] = eat(h, has);
         if (h <= 0) fainted += p;
-        else next.set(stateKey(h, masked), (next.get(stateKey(h, masked)) ?? 0) + p);
+        else next.set(stateKey(h, masked, has), (next.get(stateKey(h, masked, has)) ?? 0) + p);
       }
       states = next;
     }
@@ -1379,8 +1390,20 @@ export function koOdds({
   }
   return table;
 }
-const stateKey = (hp, masked) => hp * 2 + (masked ? 1 : 0);
-const parseState = key => [Math.floor(key / 2), key % 2 === 1];
+// 상태 = 남은 HP, 탈이 남았는지, 회복 열매가 남았는지.
+const stateKey = (hp, masked, berry) => hp * 4 + (masked ? 1 : 0) + (berry ? 2 : 0);
+const parseState = key => [Math.floor(key / 4), key % 2 === 1, (key & 2) === 2];
+
+// 회복 열매. 자뭉열매는 최대 HP의 1/4, 오랭열매는 10. 숙성이면 두 배, 볼주머니면 1/3을 더
+// 회복한다. 긴장감이 있거나 탁쳐서떨구기로 떨구면 먹지 못한다.
+export function healingBerry(defender, attacker, moveId, hpMax) {
+  const base = { sitrusberry: Math.floor(hpMax / 4), oranberry: 10 }[defender.item];
+  if (!base || attacker.ability === 'unnerve' || moveId === 'knockoff') return null;
+  const heal =
+    base * (defender.ability === 'ripen' ? 2 : 1) +
+    (defender.ability === 'cheekpouch' ? Math.floor(hpMax / 3) : 0);
+  return { id: defender.item, heal };
+}
 
 // 같은 난수로 hits번 때리는 단순한 경우. 테스트와 예전 호출을 위해 둔다.
 export const koTable = (rolls, hits, hp, maxTurns = 4) =>

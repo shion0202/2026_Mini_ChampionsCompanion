@@ -1,4 +1,4 @@
-const CACHE = 'champions-shell-v41';
+const CACHE = 'champions-shell-v42';
 const APP_FILES = [
   './',
   './index.html',

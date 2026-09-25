@@ -499,6 +499,9 @@ export function damageResult(summary, context) {
       : '',
     summary.endure ? '기합의띠·옹골참: HP가 가득일 때 한 번은 HP 1로 버팁니다.' : '',
     summary.disguise ? '탈: 첫 공격을 막고 최대 HP의 1/8만 받습니다.' : '',
+    summary.berry
+      ? `${context.reference.held_item[summary.berry.id]?.label ?? summary.berry.id}: HP가 최대의 절반 이하가 되면 한 번 ${summary.berry.heal} 회복합니다 (KO 정보에 반영).`
+      : '',
   ]
     .filter(Boolean)
     .map(text => `<p class="calc-note">${esc(text)}</p>`)

@@ -15,6 +15,7 @@ import {
   grounded,
   hazardDamage,
   koOdds,
+  healingBerry,
   powerOf,
   hpStat,
   stat,
@@ -676,4 +677,41 @@ test('leech seed on the attacker heals the defender, big root boosts, liquid ooz
       ['뿌리박기', Math.floor(hpMax / 16)],
     ],
   );
+});
+
+test('healing berries are eaten once at half HP and change the KO count', () => {
+  const rolls = Array(16).fill(60);
+  const run = berry => koOdds({ hits: 1, rollsAt: () => rolls, hp: 100, maxHp: 100, berry });
+  // 100 → 40(절반 이하, 25 회복) → 65 → 5 → 쓰러짐
+  assert.deepEqual(
+    run(null).map(r => r.chance),
+    [0, 1, 1, 1],
+  );
+  assert.deepEqual(
+    run({ heal: 25 }).map(r => r.chance),
+    [0, 0, 1, 1],
+  );
+  // 한 번에 쓰러지면 먹지 못한다.
+  assert.equal(
+    koOdds({
+      hits: 1,
+      rollsAt: () => Array(16).fill(120),
+      hp: 100,
+      maxHp: 100,
+      berry: { heal: 25 },
+    })[0].chance,
+    1,
+  );
+  const garchompHp = 108 + 75;
+  assert.deepEqual(healingBerry({ item: 'sitrusberry' }, {}, 'earthquake', garchompHp), {
+    id: 'sitrusberry',
+    heal: Math.floor(garchompHp / 4),
+  });
+  assert.equal(healingBerry({ item: 'oranberry', ability: 'ripen' }, {}, 'x', 200).heal, 20);
+  assert.equal(
+    healingBerry({ item: 'sitrusberry', ability: 'cheekpouch' }, {}, 'x', 200).heal,
+    50 + 66,
+  );
+  assert.equal(healingBerry({ item: 'sitrusberry' }, { ability: 'unnerve' }, 'x', 200), null);
+  assert.equal(healingBerry({ item: 'sitrusberry' }, {}, 'knockoff', 200), null);
 });
