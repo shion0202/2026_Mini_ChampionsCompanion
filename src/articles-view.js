@@ -1,5 +1,5 @@
 import { esc } from './html.js';
-import { SEASON_REGULATIONS } from './data.js';
+import { SEASON_REGULATIONS, isMegaForme } from './data.js';
 import { megaSprite, itemArtwork } from './images.js';
 
 export const articleSeasonLabel = season =>
@@ -32,7 +32,7 @@ export function renderArticleCards(articles, reference, locale, pokemon = '') {
       .map(member => {
         const species = reference.species[member.pokemon];
         const name = locale.pokemon(species.name).label;
-        const isMega = species.forme.startsWith('Mega');
+        const isMega = isMegaForme(species.forme);
         const sprite = isMega
           ? megaSprite(species.name)
           : species.forme

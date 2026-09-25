@@ -1,4 +1,4 @@
-import { toId } from './data.js';
+import { isMegaForme, toId } from './data.js';
 
 const text = value => typeof value === 'string' && value.trim().length > 0;
 function publicUrl(value) {
@@ -42,7 +42,7 @@ export function usesPokemon(article, id, reference) {
   return article.team.some(member => {
     if (member.pokemon === id) return true;
     const species = reference.species[member.pokemon];
-    return species?.forme?.startsWith('Mega') && toId(species.baseSpecies) === id;
+    return isMegaForme(species?.forme) && toId(species.baseSpecies) === id;
   });
 }
 

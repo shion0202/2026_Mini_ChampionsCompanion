@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createLocale } from '../src/locale.js';
+import { isMegaForme } from '../src/data.js';
 import { speedRows, speedGroups, battleSpeedRows } from '../src/speed.js';
 import { renderSpeedRows, renderSpeedLines } from '../src/speed-view.js';
 
@@ -34,9 +35,7 @@ test('only forms with Champions reference data are included; filters combine', (
   assert.ok(
     !speedRows(reference, locale, { includeMega: false }).some(r => r.id === 'meowsticfmega'),
   );
-  assert.ok(
-    speedRows(reference, locale, { includeMega: false }).every(r => !r.forme.startsWith('Mega')),
-  );
+  assert.ok(speedRows(reference, locale, { includeMega: false }).every(r => !isMegaForme(r.forme)));
   assert.equal(
     speedRows(reference, locale, { query: 'ㅂㅁㄷ', type: 'Flying', includeMega: false }).length,
     1,

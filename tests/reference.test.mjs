@@ -320,3 +320,13 @@ test('mega stones name the form they produce, in both directions', () => {
   const forms = stones.map(([, v]) => v.megaStone);
   assert.equal(new Set(forms).size, forms.length, '두 스톤이 같은 폼을 가리킴');
 });
+
+test('Meowstic reaches its mega from each gender, and the megas keep a learnset', () => {
+  // 메가 폼은 'M-Mega'처럼 성별이 앞에 붙는다. Showdown이 수컷 메가는 Meowstic에,
+  // 암컷 메가는 Meowstic-F에 잇는다. 이 연결이 없으면 랭킹 상세에서 메가를 고를 수 없다.
+  assert.deepEqual(data.species.meowstic.megas, ['meowsticmmega']);
+  assert.deepEqual(data.species.meowsticf.megas, ['meowsticfmega']);
+  // 메가 폼은 기본 폼의 기술을 물려받는다. 비어 있으면 샘플 편집기에서 고를 기술이 없다.
+  assert.ok(data.species.meowsticmmega.learnset?.length > 40);
+  assert.ok(data.species.meowsticfmega.learnset?.length > 40);
+});

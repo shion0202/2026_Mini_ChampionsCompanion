@@ -1,7 +1,7 @@
-import { matchesQuery, toId } from './data.js';
+import { isMegaForme, matchesQuery, toId } from './data.js';
 import { statRanges } from './reference.js';
 import { SPEED_SPECIES } from './speed-catalog.js';
-import { megaSprite } from './images.js';
+import { speciesSprite } from './images.js';
 
 export const SPEED_PRESETS = [
   { label: '최속' },
@@ -27,13 +27,11 @@ export function speedRows(
       label: locale.pokemon(species.name).label,
       dex: species.dex,
       forme: species.forme,
-      isMega: /(^|-)Mega($|-)/.test(species.forme),
+      isMega: isMegaForme(species.forme),
       types: species.types,
       base: species.stats.spe,
       values: statRanges(species.stats).spe,
-      sprite: /(^|-)Mega($|-)/.test(species.forme)
-        ? megaSprite(species.name)
-        : (index?.pokemon?.[species.name]?.sprite ?? null),
+      sprite: speciesSprite(reference, index, id),
     }))
     .filter(
       row =>

@@ -12,7 +12,6 @@ import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
-import { megaSprite } from './images.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
@@ -291,7 +290,12 @@ function renderHero() {
       ? state.reference.species[state.form]
       : null;
   const shown = mega
-    ? { ...p, ...mega, ...state.locale.pokemon(mega.name), sprite: megaSprite(mega.name) }
+    ? {
+        ...p,
+        ...mega,
+        ...state.locale.pokemon(mega.name),
+        sprite: speciesSprite(state.reference, state.index, state.form),
+      }
     : p;
   const key = `${shown.name}:${favorites.has(p.id)}`;
   if (container.dataset.shown === key) return;

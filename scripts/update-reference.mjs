@@ -2,6 +2,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { moveTraits } from '../src/move-traits.js';
+import { isMegaForme } from '../src/data.js';
 import { supplementCatalog } from './reference-catalog.mjs';
 import {
   supplementZaItems,
@@ -191,7 +192,7 @@ for (const [key, record] of Object.entries(species)) {
   const battleBase = typeof record.battleOnly === 'string' ? id(record.battleOnly) : baseId;
   const learnset =
     learnsets[key]?.learnset ??
-    (record.forme?.startsWith('Mega') ? learnsets[battleBase]?.learnset : undefined);
+    (isMegaForme(record.forme) ? learnsets[battleBase]?.learnset : undefined);
   result.species[key] = {
     name: record.name,
     dex: record.num,
@@ -205,7 +206,7 @@ for (const [key, record] of Object.entries(species)) {
     megas: Object.entries(species)
       .filter(
         ([, s]) =>
-          s.forme?.startsWith('Mega') &&
+          isMegaForme(s.forme) &&
           [s.battleOnly ?? s.baseSpecies].flat().some(name => name && id(name) === key),
       )
       .map(([key]) => key),

@@ -1,5 +1,6 @@
 // Save verified remote paths, not image copies. Re-run when upstream adds forms.
 import { readFile, writeFile } from 'node:fs/promises';
+import { isMegaForme } from '../src/data.js';
 const root = new URL('../', import.meta.url);
 const base = 'https://api.github.com/repos/PokeAPI/sprites/contents/';
 async function get(url, json = true) {
@@ -28,7 +29,7 @@ const reference = JSON.parse(await readFile(new URL('public/data/reference.json'
 const megas = {};
 const missing = [];
 for (const [key, entry] of Object.entries(reference.species)) {
-  if (!entry.forme.startsWith('Mega')) continue;
+  if (!isMegaForme(entry.forme)) continue;
   const file = `${ids[key]}.png`;
   const folder = championsFiles.has(file)
     ? 'versions/generation-ix/champions'

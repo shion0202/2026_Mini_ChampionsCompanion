@@ -17,6 +17,9 @@ export const CATEGORY_LABELS = {
   ability: '특성',
 };
 export const STAT_LABELS = ['HP', '공격', '방어', '특공', '특방', '스피드'];
+// 메가 폼은 대부분 'Mega', 'Mega-X' 꼴이지만 폼이 나뉜 종족은 'M-Mega', 'Curly-Mega'처럼
+// 앞에 붙는다. startsWith('Mega')로 판정하면 메가냐오닉스가 빠진다.
+export const isMegaForme = forme => /(^|-)Mega($|-)/.test(forme ?? '');
 export const toId = text =>
   String(text)
     .normalize('NFKD')
@@ -81,9 +84,25 @@ export function normalizeIndex(raw) {
           : null,
     };
   }
+  // 인덱스에는 통계에 잡힌 폼만 있다. 킬가르도 블레이드폼, 캐스퐁 날씨폼, 메가냐오닉스는
+  // 없지만 그림 파일은 사이트에 있고, 별칭이 그 파일의 표시 이름을 알려준다. 다만
+  // 'Floette Form 5' 같은 번호 별칭은 실제 파일 이름과 달라 쓰지 않는다. 측정해 보니
+  // 별칭 43개 중 이 꼴 4개만 파일 이름과 어긋났다.
+  const formSprites = {};
+  if (raw.assetRoot === 'pokemon_champions_assets' && isObject(raw.aliases))
+    for (const [shown, name] of Object.entries(raw.aliases))
+      if (
+        typeof shown === 'string' &&
+        typeof name === 'string' &&
+        !/\bForm \d+$/.test(shown) &&
+        !/[/\\]|\.\./.test(shown)
+      )
+        formSprites[name] ??=
+          `${SOURCE}/pokemon_champions_assets/pokemon/${encodeURIComponent(`${shown}.png`)}`;
   return {
     seasons,
     pokemon,
+    formSprites,
     generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : null,
     dataVersion: raw.dataVersion,
   };
