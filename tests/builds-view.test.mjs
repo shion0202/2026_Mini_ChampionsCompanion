@@ -398,9 +398,9 @@ test('the conflict list names each item and what each side did', () => {
     { kind: 'party', id: 'p', local: { name: '파티' }, server: null },
   ]);
   assert.ok(html.includes('샘플 · &lt;보만다&gt;'));
-  assert.ok(html.includes('이 기기: 고침 / 서버: 고침'));
+  assert.ok(html.includes('이 기기: 수정 / 서버: 수정'));
   assert.ok(html.includes('파티 · 파티'));
-  assert.ok(html.includes('이 기기: 고침 / 서버: 지움'));
+  assert.ok(html.includes('이 기기: 수정 / 서버: 삭제'));
 });
 
 test('editor buttons read save, reset, delete, share, back to list', () => {

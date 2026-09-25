@@ -464,7 +464,7 @@ const SYNC_TEXT = {
   offline: '연결이 없어 올리지 못했습니다. 연결되면 다시 올립니다.',
   retry: '서버가 바빠 올리지 못했습니다. 다음 저장이나 다음 실행 때 다시 올립니다.',
   error: '서버가 받지 않았습니다. 저장 내용이 너무 크거나 형식이 맞지 않습니다.',
-  conflict: '다른 기기에서 바뀌었습니다. 어느 쪽을 남길지 고르세요.',
+  conflict: '다른 기기에서 바뀌었습니다. 어느 쪽을 남길지 선택하세요.',
 };
 const syncButton = (action, label) =>
   `<button type="button" class="text-button" data-sync="${action}">${label}</button>`;
@@ -483,7 +483,7 @@ export function syncActions(sync, status) {
 // 충돌 팝업의 목록. 어느 항목을 양쪽에서 어떻게 바꿨는지 보여 고를 수 있게 한다.
 // 이름은 남아 있는 쪽에서 가져온다(한쪽이 지웠으면 다른 쪽 이름).
 export function conflictList(conflicts) {
-  const did = item => (item ? '고침' : '지움');
+  const did = item => (item ? '수정' : '삭제');
   return `<ul class="sync-conflicts">${conflicts
     .map(c => {
       const name = (c.local ?? c.server)?.name || '이름 없음';
