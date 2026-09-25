@@ -490,3 +490,7 @@
 .dmg-sub-end {
   text-align: right;
 }
+/* 턴 종료 데미지 줄은 위의 KO 정보 칸과 띄운다. */
+.dmg-residual {
+  margin-top: 14px;
+}

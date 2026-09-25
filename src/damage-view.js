@@ -40,6 +40,7 @@ const TOGGLE_LABELS = {
   hangry: '배고픈 모습 (악 타입)',
   flashFire: '타오르는불꽃 발동 (불꽃 기술 ×1.5)',
   plusMinus: '아군이 플러스·마이너스 (특수 기술 ×1.5)',
+  throughProtect: '방어를 뚫음 (접촉 기술, 데미지 1/4)',
 };
 const COUNT_FIELDS = {
   timesHit: { label: '공격받은 횟수', max: 6 },
@@ -66,6 +67,18 @@ const SPIKES = [
   ['3', '3중첩'],
 ];
 
+// 고르는 조건. 투쟁심은 상대와의 성별을 묻는다.
+const CHOICE_FIELDS = {
+  rivalry: {
+    label: '상대와 성별',
+    options: [
+      ['', '성별 없음 (보정 없음)'],
+      ['same', '같음 (×1.25)'],
+      ['different', '다름 (×0.75)'],
+    ],
+  },
+};
+
 // 이 기술과 특성이 묻는 조건. 둘이 같은 것을 물으면 한 번만 보인다. species가 붙은 조건은
 // 그 포켓몬일 때만 묻는다(오라휠의 배고픈 모습은 모르페코만).
 export function conditionsOf(moveId, ability, pokemon = '', item = '') {
@@ -75,6 +88,7 @@ export function conditionsOf(moveId, ability, pokemon = '', item = '') {
   return {
     toggles: [...new Set(list.map(c => c.toggle).filter(Boolean))],
     counts: [...new Set(list.map(c => c.count).filter(Boolean))],
+    choices: [...new Set(list.map(c => c.choice).filter(Boolean))],
     hp: list.some(c => c.hp),
     speed: list.some(c => c.speed),
     weight: list.find(c => c.weight)?.weight ?? null,
@@ -281,8 +295,8 @@ function attackerPanel(state, context) {
 // 기술·특성이 묻는 조건(대가의 행동 순서, 분노의주먹의 맞은 횟수, 분화·목숨걸기의 HP 등).
 // 묻는 것이 없으면 칸을 두지 않는다.
 function conditionGroup(side, conditions, stats) {
-  const { toggles, counts, hp } = conditions;
-  if (!toggles.length && !counts.length && !hp) return '';
+  const { toggles, counts, choices, hp } = conditions;
+  if (!toggles.length && !counts.length && !choices.length && !hp) return '';
   return (
     `<fieldset class="calc-group is-conditional"><legend>위력 조건</legend>` +
     (hp
@@ -293,6 +307,12 @@ function conditionGroup(side, conditions, stats) {
         key =>
           `<div class="calc-line"><span>${COUNT_FIELDS[key].label}</span>` +
           `<input type="number" min="${COUNT_FIELDS[key].min ?? 0}" max="${COUNT_FIELDS[key].max}" step="1" value="${side[key] ?? COUNT_FIELDS[key].min ?? 0}" data-dmg-number="${key}" aria-label="${COUNT_FIELDS[key].label}"></div>`,
+      )
+      .join('') +
+    choices
+      .map(
+        key =>
+          `<label class="calc-field">${CHOICE_FIELDS[key].label}<select data-dmg-field="${key}">${options(CHOICE_FIELDS[key].options, side[key] ?? '')}</select></label>`,
       )
       .join('') +
     toggles.map(key => check(key, side[key], TOGGLE_LABELS[key])).join('') +
@@ -440,7 +460,7 @@ export function damageResult(summary, context) {
     .join(' · ');
   const residualNet = summary.residual.reduce((sum, e) => sum + e.amount, 0);
   const residualBlock = summary.residualTable
-    ? `<div class="dmg-row"><span>턴 종료</span><strong>${esc(residualText)}</strong></div>` +
+    ? `<div class="dmg-row dmg-residual"><span>턴 종료</span><strong>${esc(residualText)}</strong></div>` +
       `<small class="dmg-sub dmg-sub-end">1턴째 합계 ${residualNet > 0 ? '+' : residualNet < 0 ? '−' : ''}${Math.abs(residualNet)} (최대 HP의 ${percent((Math.abs(residualNet) / summary.hpMax) * 100)})</small>` +
       `<div class="dmg-box is-residual"><small>KO 정보 (턴 종료 데미지 포함) · ${esc(summary.residualVerdict.chance < 1 && summary.residualVerdict.turns ? `${summary.residualVerdict.text} (${percent(summary.residualVerdict.chance * 100)})` : summary.residualVerdict.text)}</small>` +
       `<div class="dmg-chips">${koChips(summary.residualTable)}</div></div>`
@@ -516,7 +536,8 @@ export function powerBox(summary, context) {
     `${quick.parentalBond ? ' (두 번째 타격 1/4)' : ''}` +
     // 마지막에 곱하는 도구는 곱으로, 위력·공격에 이미 들어간 도구는 ‘반영’으로 알린다.
     `${quick.itemPower ? ` × ${itemLabel(context.reference, quick.itemPower.id)} ${Math.round(quick.itemPower.factor * 10) / 10}` : ''}` +
-    `${quick.itemFolded ? ` (${itemLabel(context.reference, quick.itemFolded)} 반영)` : ''}`;
+    `${quick.itemFolded ? ` (${itemLabel(context.reference, quick.itemFolded)} 반영)` : ''}` +
+    `${quick.throughProtect ? ' × 방어 뚫음 0.25' : ''}`;
   return (
     `<div class="dmg-quick"><span>결정력</span><strong>${quick.power.toLocaleString()}</strong>` +
     `<small>${formula}</small></div>`

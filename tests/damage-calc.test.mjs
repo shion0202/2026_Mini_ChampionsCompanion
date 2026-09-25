@@ -614,3 +614,31 @@ test('metronome grows one step each turn and shows in power', () => {
   const plain = damageSummary({ ...input(1) });
   assert.equal(third.power, Math.floor(plain.power * (5734 / 4096)));
 });
+
+test('rivalry by gender and hitting through protect', () => {
+  const run = (attacker, move = 'wildcharge', from = 'luxray') =>
+    damageRolls({
+      reference,
+      attacker: side(from, { atk: 32 }, attacker),
+      defender: side('snorlax', {}, { hpPercent: 100 }),
+      field: { format: 'singles', weather: '', terrain: '' },
+      move: { ...reference.move[move], id: move },
+    });
+  const plain = run({ ability: 'rivalry' }).basePower;
+  assert.equal(run({ ability: 'rivalry', rivalry: 'same' }).basePower, Math.floor(plain * 1.25));
+  assert.equal(run({ ability: 'rivalry', rivalry: 'different' }).basePower, 67);
+  const open = run({ ability: 'piercingdrill' }, 'ironhead', 'excadrillmega');
+  const through = run(
+    { ability: 'piercingdrill', throughProtect: true },
+    'ironhead',
+    'excadrillmega',
+  );
+  assert.ok(through.rolls[15] <= Math.ceil(open.rolls[15] / 4));
+  assert.equal(through.throughProtect, true);
+  // 접촉하지 않는 기술은 뚫지 못한다.
+  assert.equal(
+    run({ ability: 'piercingdrill', throughProtect: true }, 'earthquake', 'excadrillmega')
+      .throughProtect,
+    false,
+  );
+});

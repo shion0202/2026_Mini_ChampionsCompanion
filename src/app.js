@@ -36,15 +36,14 @@ import {
   damageSummary,
   defaultHits,
   emptyDamage,
+  emptyDefender,
   damageSideFromSample,
   stat as damageStat,
   stageStat,
   hpStat,
   grounded,
   isSpreadMove,
-  powerOf as damagePower,
   hitRange,
-  itemPowerOf,
 } from './damage-calc.js';
 import {
   damageCalcView,
@@ -55,7 +54,7 @@ import {
   powerBox,
   bulkBox,
 } from './damage-view.js';
-import { NFE_SPECIES, FLING_POWER } from './damage-catalog.js';
+import { NFE_SPECIES } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
@@ -2460,33 +2459,18 @@ function damageContext() {
   const summary = input && attacker.pokemon && defender.pokemon ? damageSummary(input) : null;
   // 쓰는 능력치는 계산이 정한 분류를 따른다(셸사이드암은 물리가 될 수 있다).
   const keys = statKeys(move, summary?.category ?? move?.category);
-  // 방어 측을 고르기 전(또는 효과가 없을 때)에도 결정력은 보인다. 도구·특성 배율은 뺀 값이다.
-  const quickAttack = keys.fromDefender ? null : staged(attacker, keys.attack);
-  // 내던지기는 지닌 도구의 위력이다.
-  const quickBase =
-    attacker.power || (move?.id === 'fling' ? FLING_POWER[attacker.item] : move?.power) || 0;
-  const quickStab = attackerSpecies?.types.includes(move?.type)
-    ? attacker.ability === 'adaptability'
-      ? 2
-      : 1.5
-    : 1;
-  // 급소와 타수도 넣는다. 트리플악셀은 타격마다 20·40·60이다.
-  const quickHits = attacker.hits || (move ? defaultHits(move, attacker.ability) : 1);
-  const quickPowers =
-    move?.id === 'tripleaxel' && !attacker.power
-      ? Array.from({ length: quickHits }, (_, i) => 20 * (i + 1))
-      : Array(quickHits).fill(quickBase);
-  const quickInput = {
-    attackStat: quickAttack,
-    basePower: quickBase,
-    hitPowers: quickPowers,
-    stab: quickStab,
-    crit: !!attacker.crit,
-    parentalBond: false,
-    itemPower: itemPowerOf(attacker),
-  };
+  // 방어 측을 고르기 전에도 결정력은 보인다. 같은 계산을 쓰도록 공격 측과 같은 포켓몬을
+  // 기본값으로 세운 자리 표시 상대로 계산하고, 결정력만 가져온다(상대에 따라 바뀌는 스피드·
+  // 몸무게 근거와 고정 데미지, 상대의 공격을 쓰는 속임수는 뺀다).
+  const placeholder =
+    input && attacker.pokemon && !defender.pokemon && !keys.fromDefender
+      ? damageSummary({
+          ...input,
+          defender: { ...emptyDefender(), pokemon: attacker.pokemon },
+        })
+      : null;
   const quickPower =
-    quickAttack && quickBase ? { ...quickInput, power: damagePower(quickInput) } : null;
+    placeholder?.power != null ? { ...placeholder, speeds: null, weights: null } : null;
   // 두 쪽의 모든 능력치(실수치·랭크 적용). 화면이 고른 칸의 값을 꺼내 쓴다.
   const allStats = side =>
     Object.fromEntries(

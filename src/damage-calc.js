@@ -151,7 +151,11 @@ export const ITEM_CONDITIONS = {
   metronome: { count: 'metronome' },
 };
 // 특성의 조건. 위와 같은 모양이다.
+//  choice  여럿 가운데 고르는 조건(attacker[키]). 투쟁심의 성별.
 export const ABILITY_CONDITIONS = {
+  piercingdrill: { toggle: 'throughProtect' },
+  unseenfist: { toggle: 'throughProtect' },
+  rivalry: { choice: 'rivalry' },
   flashfire: { toggle: 'flashFire' },
   plus: { toggle: 'plusMinus' },
   minus: { toggle: 'plusMinus' },
@@ -265,6 +269,9 @@ export function basePowerMods(ctx) {
     (a === 'punkrock' && traits.includes('sound'))
   )
     mods.push(MOD.x1_3);
+  // 투쟁심. 상대와 성별이 같으면 ×1.25, 다르면 ×0.75(성별이 없으면 그대로).
+  if (a === 'rivalry' && attacker.rivalry === 'same') mods.push(MOD.x1_25);
+  if (a === 'rivalry' && attacker.rivalry === 'different') mods.push(MOD.x0_75);
   if (move.typeChanged) mods.push(MOD.x1_2);
   if (
     (a === 'reckless' && (traits.includes('recoil') || CRASH_MOVES.has(move.id))) ||
@@ -942,6 +949,10 @@ export function damageRolls(input) {
   const burned =
     attacker.status === 'brn' && physical && attacker.ability !== 'guts' && move.id !== 'facade';
   const weatherMod = weatherDamage(moveWeather, move.type);
+  const throughProtect =
+    ['piercingdrill', 'unseenfist'].includes(attacker.ability) &&
+    !!attacker.throughProtect &&
+    contact;
 
   // 타격 하나의 난수 16개. hit는 1부터, full은 방어 측 HP가 가득인지, fresh는 싸움의 첫 타격인지.
   const cache = new Map();
@@ -970,6 +981,8 @@ export function damageRolls(input) {
       for (let m = effectiveness; m < 1 && m > 0; m *= 2) x = Math.floor(x / 2);
       if (burned) x = applyMod(x, MOD.x0_5);
       x = applyMod(x, final);
+      // 방어를 뚫은 접촉 기술(관통드릴·보이지않는주먹)은 1/4이다.
+      if (throughProtect) x = applyMod(x, MOD.x0_25);
       rolls.push(Math.max(1, x));
     }
     cache.set(key, rolls);
@@ -997,6 +1010,7 @@ export function damageRolls(input) {
     defenseStat,
     crit,
     itemPower: itemPowerOf(attacker, effectiveness),
+    throughProtect,
     itemFolded: itemFoldedOf(attacker, move, physical, attackerSpecies),
     speeds: env.speeds || null,
     weights: env.weights || null,
@@ -1172,6 +1186,7 @@ export function damageSummary(input) {
       crit: open.crit,
       parentalBond: open.parentalBond,
       itemPower: open.itemPower,
+      throughProtect: open.throughProtect,
       itemFolded: open.itemFolded,
       hits: open.hits,
       speeds: open.speeds,
@@ -1249,11 +1264,24 @@ export function damageSummary(input) {
 // 결정력 = 공격 실수치 × 위력 × 자속 보정 × 급소(1.5)를 타격마다 더한 값.
 // 부자유친의 두 번째 타격은 1/4이다. 트리플악셀은 20·40·60을 모두 더한다.
 // 생명의구슬·달인의띠·메트로놈처럼 마지막에 곱하는 도구도 넣는다(itemPower).
-export function powerOf({ attackStat, hitPowers, stab, crit, parentalBond, itemPower }) {
+// 방어를 뚫은 공격(관통드릴·보이지않는주먹)은 1/4이다.
+export function powerOf({
+  attackStat,
+  hitPowers,
+  stab,
+  crit,
+  parentalBond,
+  itemPower,
+  throughProtect,
+}) {
   const perHit = hitPowers.map(
     (bp, i) => attackStat * bp * stab * (crit ? 1.5 : 1) * (parentalBond && i > 0 ? 0.25 : 1),
   );
-  return Math.floor(perHit.reduce((sum, value) => sum + value, 0) * (itemPower?.factor ?? 1));
+  return Math.floor(
+    perHit.reduce((sum, value) => sum + value, 0) *
+      (itemPower?.factor ?? 1) *
+      (throughProtect ? 0.25 : 1),
+  );
 }
 
 // ── 몇 번에 쓰러지는가 ─────────────────────────────────────────────
