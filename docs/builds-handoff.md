@@ -34,8 +34,18 @@ Bubblewrap으로 만들었다. 패키지 이름은 `io.github.shion0202.champion
 ## 3단계 동기화
 
 `functions/api/[[path]].js`가 `/api/doc`을, `src/sync.js`가 앱 쪽 판단을 맡는다.
-KV 바인딩 `BUILDS`(네임스페이스 `champions-builds`)가 Production과 Preview에 모두
-있어야 한다. 없으면 서버가 503 `storage not bound`를 돌려준다.
+KV 바인딩 `BUILDS`가 Production과 Preview에 모두 있어야 한다. 없으면 서버가 503
+`storage not bound`를 돌려준다. 두 환경은 네임스페이스를 나눠 쓴다.
+
+| 환경 | 네임스페이스 |
+| --- | --- |
+| Production (`main`) | `champions-builds` |
+| Preview (다른 브랜치) | `champions-builds-preview` |
+
+미리보기에서 한 테스트는 preview 쪽에만 쌓이므로 언제든 비워도 운영 자료에 닿지
+않는다. 비우기 전에 테스트한 기기에서 동기화를 먼저 끈다. 켜 둔 기기는 서버가
+비어 있으면 자기 자료를 다시 올린다(`planOnOpen`의 push). 바인딩은 네임스페이스
+ID로 묶이므로 네임스페이스를 새로 만들면 바인딩을 다시 걸고 배포를 다시 해야 한다.
 
 Functions는 로컬 `npm run dev`에서 돌지 않는다. 서버 판단은
 `tests/sync-server.test.mjs`가 가짜 KV로 검사하고, 실제 동작은 브랜치를 올려 만든
