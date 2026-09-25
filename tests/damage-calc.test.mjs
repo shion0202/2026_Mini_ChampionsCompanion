@@ -642,3 +642,38 @@ test('rivalry by gender and hitting through protect', () => {
     false,
   );
 });
+
+test('leech seed on the attacker heals the defender, big root boosts, liquid ooze hurts', () => {
+  const run = (defender, attacker = {}) =>
+    damageSummary({
+      reference,
+      attacker: side('garchomp', { atk: 32, hp: 32 }, { hpPercent: 100, ...attacker }),
+      defender: side('snorlax', {}, { hpPercent: 100, ...defender }),
+      field: { format: 'singles', weather: '', terrain: '' },
+      move: { ...reference.move.dragonclaw, id: 'dragonclaw' },
+    });
+  const garchompHp = 108 + 32 + 75;
+  const drained = Math.floor(garchompHp / 8);
+  assert.deepEqual(run({ seededFoe: true }).residual, [
+    { label: '씨뿌리기 회복', amount: drained },
+  ]);
+  assert.equal(
+    run({ seededFoe: true, item: 'bigroot' }).residual[0].amount,
+    Math.floor((drained * 5324 + 2047) / 4096),
+  );
+  assert.equal(run({ seededFoe: true }, { ability: 'liquidooze' }).residual[0].amount, -drained);
+  assert.equal(run({ seededFoe: true }, { ability: 'magicguard' }).residualTable, null);
+  // 공격 측 남은 HP보다 많이 빼앗지 못한다.
+  assert.equal(
+    run({ seededFoe: true }, { hpPercent: 5 }).residual[0].amount,
+    Math.floor(garchompHp * 0.05),
+  );
+  const hpMax = run({}).hpMax;
+  assert.deepEqual(
+    run({ aquaRing: true, ingrain: true }).residual.map(e => [e.label, e.amount]),
+    [
+      ['아쿠아링', Math.floor(hpMax / 16)],
+      ['뿌리박기', Math.floor(hpMax / 16)],
+    ],
+  );
+});

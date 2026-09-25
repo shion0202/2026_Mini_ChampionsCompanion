@@ -374,9 +374,12 @@ function defenderPanel(state, context) {
       ? `<div class="calc-line"><span>맹독 (N턴째)</span><input type="number" min="1" max="15" step="1" value="${side.toxicTurn ?? 1}" data-dmg-number="toxicTurn" aria-label="맹독 경과 턴"></div>`
       : '') +
     check('bound', side.bound, '바인드 (김밥말이 등, 공격 측이 조임밴드면 1/6)') +
-    check('leechSeed', side.leechSeed, '씨뿌리기') +
+    check('leechSeed', side.leechSeed, '씨뿌리기를 맞음') +
+    check('seededFoe', side.seededFoe, '공격 측에 씨뿌리기를 심음 (회복)') +
+    check('aquaRing', side.aquaRing, '아쿠아링') +
+    check('ingrain', side.ingrain, '뿌리박기') +
     check('saltCure', side.saltCure, '소금절이') +
-    `<p class="calc-note">상태이상, 날씨, 그래스필드, 먹다남은음식·검은진흙은 고른 값으로 자동 반영합니다.</p>` +
+    `<p class="calc-note">상태이상, 날씨, 그래스필드, 먹다남은음식·검은진흙, 큰뿌리, 공격 측의 해감액은 고른 값으로 자동 반영합니다.</p>` +
     `</fieldset>` +
     `<fieldset class="calc-group"><legend>벽 · 설치 기술 · 반동</legend><div class="calc-grid">` +
     `<label class="calc-field">압정뿌리기<select data-dmg-field="spikes">${options(SPIKES, String(side.spikes ?? 0))}</select></label>` +

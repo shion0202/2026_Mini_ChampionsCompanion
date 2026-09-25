@@ -1104,9 +1104,20 @@ export function hazardDamage(defender, species, chart, hpMax) {
 // ── 턴 종료 ───────────────────────────────────────────────────────
 // 턴이 끝날 때 방어 측이 받는 데미지(−)와 회복(+). Showdown의 onResidualOrder 순서다:
 // 날씨(모래바람, 젖은접시·아이스바디·건조피부·선파워) → 그래스필드 → 먹다남은음식·검은진흙 →
-// 씨뿌리기 → 독·맹독(포이즌힐) → 화상 → 바인드(조임밴드) → 소금절이.
+// 아쿠아링 → 뿌리박기 → 씨뿌리기(맞음·심음) → 독·맹독(포이즌힐) → 화상 → 바인드(조임밴드) →
+// 소금절이. 큰뿌리는 아쿠아링·뿌리박기·씨뿌리기 회복을 1.3배(5324/4096)로 한다.
+// 씨뿌리기를 공격 측에 심었으면 공격 측 최대 HP의 1/8(공격 측 남은 HP까지)만큼 회복하고,
+// 공격 측이 해감액이면 그만큼 데미지를 받는다. 공격 측이 매직가드면 아무 일도 없다.
 // turn은 1부터. 맹독은 toxicTurn번째 턴부터 1/16씩 늘어난다. 매직가드는 데미지를 받지 않는다.
-export function residualEffects({ attacker, defender, field, species, hpMax }) {
+export function residualEffects({
+  attacker,
+  defender,
+  field,
+  species,
+  hpMax,
+  attackerHpMax,
+  attackerHp,
+}) {
   const part = n => Math.max(1, Math.floor(hpMax / n));
   const types = species.types;
   const a = defender.ability;
@@ -1131,7 +1142,18 @@ export function residualEffects({ attacker, defender, field, species, hpMax }) {
   if (defender.item === 'leftovers') heal('먹다남은음식', part(16));
   if (defender.item === 'blacksludge')
     types.includes('Poison') ? heal('검은진흙', part(16)) : damage('검은진흙', part(8));
+  const rooted = amount => (defender.item === 'bigroot' ? applyMod(amount, MOD.lifeOrb) : amount);
+  if (defender.aquaRing) heal('아쿠아링', rooted(part(16)));
+  if (defender.ingrain) heal('뿌리박기', rooted(part(16)));
   if (defender.leechSeed) damage('씨뿌리기', part(8));
+  if (defender.seededFoe && attackerHpMax && attacker.ability !== 'magicguard') {
+    const drained = Math.min(
+      attackerHp ?? attackerHpMax,
+      Math.max(1, Math.floor(attackerHpMax / 8)),
+    );
+    if (attacker.ability === 'liquidooze') damage('씨뿌리기 (해감액)', drained);
+    else heal('씨뿌리기 회복', rooted(drained));
+  }
   const status = defender.status;
   if ((status === 'psn' || status === 'tox') && a === 'poisonheal') heal('포이즌힐', part(8));
   else if (status === 'psn') damage('독', part(8));
@@ -1220,12 +1242,16 @@ export function damageSummary(input) {
   const disguise = d === 'disguise' && !breaker && !String(defender.pokemon).endsWith('busted');
   const table = koOdds({ hits, rollsAt, hp: hpStart, maxHp: hpMax, endure, disguise });
   // 턴 종료 데미지는 공격과 따로 본다. 있으면 포함한 KO 표를 하나 더 만든다.
+  const attackerSpecies = reference.species[input.attacker.pokemon];
+  const attackerHpMax = hpStat(attackerSpecies.stats.hp, input.attacker.points?.hp ?? 0);
   const residual = residualEffects({
     attacker: input.attacker,
     defender,
     field: input.field,
     species,
     hpMax,
+    attackerHpMax,
+    attackerHp: hpFromPercent(attackerHpMax, input.attacker.hpPercent),
   });
   const residualFirst = residual(1);
   const residualTable = residualFirst.length
