@@ -1,4 +1,4 @@
-const CACHE = 'champions-shell-v26';
+const CACHE = 'champions-shell-v27';
 const APP_FILES = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const APP_FILES = [
   './src/speed-calc.js',
   './src/calc-view.js',
   './src/calc.css',
+  './src/item-exclusions.js',
   './src/speed.js',
   './src/speed-catalog.js',
   './src/speed-view.js',

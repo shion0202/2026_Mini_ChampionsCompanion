@@ -273,6 +273,8 @@ export function filterGroup(id, key, title, options, values, mode, disabled, sum
 }
 
 export const DEX_KINDS = { move: '기술', held_item: '도구', ability: '특성' };
+// 조사를 이름에 붙여 만들지 않는다. ‘도구이’처럼 틀린다.
+const DEX_SUBJECTS = { move: '기술이', held_item: '도구가', ability: '특성이' };
 
 export const dexKindSwitch = kind =>
   `<div class="segmented" role="group" aria-label="도감 항목">` +
@@ -286,7 +288,7 @@ export const dexKindSwitch = kind =>
 
 export const dexEmpty = kind =>
   `<div class="empty-state"><span class="empty-symbol">⌕</span>` +
-  `<h3>조건에 맞는 ${DEX_KINDS[kind]}이 없어요</h3>` +
+  `<h3>조건에 맞는 ${DEX_SUBJECTS[kind]} 없어요</h3>` +
   `<p>검색어와 적용한 필터를 확인해 주세요.</p></div>`;
 
 // Rows reuse data-effect-type/data-effect-id, so the existing popup handler opens

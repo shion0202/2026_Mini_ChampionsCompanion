@@ -119,18 +119,19 @@
   font-size: 14px;
 }
 .calc-line > span:first-child {
-  width: 76px;
+  width: 96px;
   flex: none;
   color: var(--muted);
   font-size: 12px;
 }
 .calc-line input[type='number'] {
-  width: 64px;
+  width: 76px;
   min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 6px 8px;
-  text-align: center;
+  padding: 6px 10px;
+  /* 오른쪽에 값을 올리고 내리는 화살표가 붙어 가운데 정렬은 치우쳐 보인다. */
+  text-align: left;
   color: var(--ink);
   background: var(--white);
   font: inherit;
@@ -187,10 +188,12 @@
   width: 18px;
   height: 18px;
 }
+/* 최종 결과. 위 칸들과 띄우고, 칸 안의 글과 같은 자리에서 시작하도록 들여 쓴다. */
 .calc-final {
   display: grid;
   gap: 2px;
-  margin: 0;
+  margin: 10px 0 0;
+  padding: 4px 16px 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -210,4 +213,14 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
+}
+
+/* 샘플 불러오기와 포켓몬 선택. 내 샘플 편집기와 같은 칸 모양(.builds-pick)을 쓴다. */
+.calc-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.calc-sides + .calc-verdict {
+  margin: 16px 0 0;
 }

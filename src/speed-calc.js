@@ -3,7 +3,8 @@
 //   1. 실수치 = 내림((종족값 + 능력 포인트 + 20) × 성격 보정)   (레벨 50, 개체값 고정)
 //   2. 랭크를 곱한다(+면 (2+n)/2, -면 2/(2-n), 내림).
 //   3. 특성·도구·순풍 배율을 4096 기준 고정소수로 이어 곱한 뒤 한 번에 적용한다.
-//   4. 마비면 마지막에 절반(내림). 속보는 마비의 감소를 받지 않는다.
+//   4. 마비면 절반(내림). 속보는 마비의 감소를 받지 않는다.
+//   5. 사람이 넣은 배수를 마지막에 곱하고 내린다. 예상하지 못한 배율을 직접 넣는 칸이다.
 
 // 스피드를 바꾸는 특성. 랭크를 올리는 특성(가속, 전기엔진 등)은 랭크 칸으로 다룬다.
 // weather·terrain은 그 날씨·필드일 때, status는 상태이상일 때, toggle은 사람이 켤 때
@@ -65,6 +66,7 @@ export const emptySide = () => ({
   abilityOn: true,
   status: '',
   tailwind: false,
+  multiplier: 1,
 });
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -116,7 +118,10 @@ export function finalSpeed(side, field, base) {
   let speed = applyModifier(staged, modifier);
   const paralyzed = side.status === 'par' && side.ability !== 'quickfeet';
   if (paralyzed) speed = Math.floor(speed / 2);
-  return { stat, staged, effects, paralyzed, speed };
+  // 0.29 × 100이 28.999…가 되는 부동소수 오차를 내림 전에 걷어낸다.
+  const multiplier = Number.isFinite(side.multiplier) && side.multiplier >= 0 ? side.multiplier : 1;
+  if (multiplier !== 1) speed = Math.floor(speed * multiplier + 1e-9);
+  return { stat, staged, effects, paralyzed, multiplier, speed };
 }
 
 // 누가 먼저 움직이는가. 같으면 매 턴 무작위다.

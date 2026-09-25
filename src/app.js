@@ -11,6 +11,7 @@ import {
 import { createLocale, TYPE_LABELS } from './locale.js';
 import { selectRanking } from './reference.js';
 import { MOVE_TRAITS } from './move-traits.js';
+import { pruneItems } from './item-exclusions.js';
 import { emptySide, finalSpeed, compareSpeed, sideFromSample } from './speed-calc.js';
 import {
   speedCalcView,
@@ -1093,16 +1094,26 @@ const buildLabel = (category, name) =>
 // 사람에게 아무 규칙이 아니다. 포켓몬만 도감 번호순을 지킨다.
 const byLabel = (a, b) => a.label.localeCompare(b.label, 'ko');
 
+// 고르는 자리. 계산기에서 연 창이면 그 쪽(mine·theirs)의 포켓몬을 초안처럼 쓴다.
+const pickerDraft = () =>
+  picker?.calc ? { pokemon: state.calc[picker.calc].pokemon } : state.buildsEditing?.draft;
+
 function pickerSource() {
-  const draft = state.buildsEditing?.draft;
+  const draft = pickerDraft();
   if (!picker || !draft) return [];
   if (picker.kind === 'species')
     // reference.species는 id(예: charizard)로 찾는다. name(예: Charizard)을 값으로
     // 쓰면 특성·기술 목록과 표시 이름이 전부 어긋난다. name은 영문 검색용으로만 남긴다.
+    // 계산기에서는 스피드 종족값을 함께 적는다.
     return speciesOptions(state.reference, state.locale, '', state.index).map(row => ({
       value: row.id,
       label: row.label,
-      sub: row.types.map(t => TYPE_LABELS[t] ?? t).join(' · '),
+      sub: [
+        row.types.map(t => TYPE_LABELS[t] ?? t).join(' · '),
+        picker.calc ? `스피드 ${state.reference.species[row.id]?.stats?.spe ?? '—'}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
       dex: row.dex,
       name: row.name,
       sprite: row.sprite,
@@ -1114,6 +1125,8 @@ function pickerSource() {
         value: name,
         label: buildLabel('held_item', name),
         sub: '',
+        // 기술과 같이 효과를 보인다. 무엇을 지닐지 고민하는 자리다.
+        effect: moveEffect(state.reference.held_item[toId(name)]),
         name,
         art: 'item',
       }))
@@ -1152,15 +1165,18 @@ function pickerSource() {
       })
       .sort(byLabel);
   }
-  return state.builds.samples.map(s => ({
-    value: s.id,
-    label: s.name,
-    sub: s.pokemon
-      ? state.locale.pokemon(state.reference?.species?.[s.pokemon]?.name ?? s.pokemon).label
-      : '',
-    name: s.name,
-    sprite: speciesSprite(state.reference, state.index, s.pokemon),
-  }));
+  // 계산기는 포켓몬을 고른 샘플만 쓸 수 있다.
+  return state.builds.samples
+    .filter(s => !picker.calc || s.pokemon)
+    .map(s => ({
+      value: s.id,
+      label: s.name,
+      sub: s.pokemon
+        ? state.locale.pokemon(state.reference?.species?.[s.pokemon]?.name ?? s.pokemon).label
+        : '',
+      name: s.name,
+      sprite: speciesSprite(state.reference, state.index, s.pokemon),
+    }));
 }
 
 // 기술은 수가 많아 이름만으로는 찾기 어렵다. 도감의 기술 거르개와 같은 세 가지로
@@ -1194,8 +1210,8 @@ function renderPicker() {
   $('picker-more').hidden = rows.length <= picker.limit;
 }
 
-function openPicker(kind, slot = null) {
-  const draft = state.buildsEditing?.draft;
+function openPicker(kind, slot = null, calc = null) {
+  const draft = calc ? { pokemon: state.calc[calc].pokemon } : state.buildsEditing?.draft;
   if (!draft) return;
   if (kind === 'move' && !draft.pokemon) {
     toast('먼저 포켓몬을 선택하세요.');
@@ -1204,6 +1220,7 @@ function openPicker(kind, slot = null) {
   picker = {
     kind,
     slot,
+    calc,
     query: '',
     limit: 50,
     type: [],
@@ -1225,6 +1242,17 @@ function openPicker(kind, slot = null) {
 }
 
 function applyPicked(value) {
+  if (picker?.calc) {
+    const key = picker.calc;
+    const sample = state.builds.samples.find(s => s.id === value);
+    state.calc[key] =
+      picker.kind === 'member'
+        ? fitCalcSide(sample ? sideFromSample(sample, natureAdjust) : state.calc[key])
+        : fitCalcSide({ ...state.calc[key], pokemon: value });
+    picker = null;
+    $('picker-dialog').close();
+    return renderCalc();
+  }
   const editing = state.buildsEditing;
   if (!editing || !picker) return;
   const draft = editing.draft;
@@ -1402,7 +1430,8 @@ async function loadReference() {
   try {
     const response = await fetch('./public/data/reference.json');
     if (!response.ok) throw Error('Reference unavailable');
-    state.reference = await response.json();
+    // 배틀에서 쓸 수 없는 도구(Z 크리스탈, 진화 도구 등)는 불러오면서 뺀다.
+    state.reference = pruneItems(await response.json());
   } catch {
     state.refError = true;
   }
@@ -2117,30 +2146,25 @@ function renderCalc() {
     reference: state.reference,
     locale: state.locale,
     index: state.index,
-    samples: state.builds.samples.filter(s => s.pokemon),
     speciesLabel: calcSpeciesLabel,
-    speciesRows: speedRows(state.reference, state.locale, { includeMega: true }).sort((a, b) =>
-      a.label.localeCompare(b.label, 'ko'),
-    ),
   });
 }
 
 // 숫자를 칠 때마다 전체를 다시 그리면 커서가 튄다. 결과 칸만 고친다.
 function renderCalcOutputs() {
   const { results, order } = calcResults();
-  $('calc-body').querySelector('[data-calc-verdict]').innerHTML = speedVerdict(
-    results.mine,
-    results.theirs,
-    order,
-  );
+  const verdict = speedVerdict(results.mine, results.theirs, order);
+  $('calc-body')
+    .querySelectorAll('[data-calc-verdict]')
+    .forEach(box => (box.innerHTML = verdict));
   for (const key of ['mine', 'theirs']) {
     const panel = $('calc-body').querySelector(`[data-calc-side="${key}"]`);
     const result = results[key];
-    panel.querySelector('[data-calc-out="stat"]').textContent = result?.stat ?? '—';
-    panel.querySelector('[data-calc-out="final"]').textContent = result?.speed ?? '—';
-    panel.querySelector('[data-calc-out="effects"]').textContent = result
-      ? effectText(state.reference, result.effects, result.paralyzed)
-      : '';
+    const out = name => panel.querySelector(`[data-calc-out="${name}"]`);
+    out('stat').textContent = result?.stat ?? '—';
+    out('staged').textContent = result?.staged ?? '—';
+    out('final').textContent = result?.speed ?? '—';
+    out('effects').textContent = result ? effectText(state.reference, result) : '';
   }
 }
 
@@ -2151,16 +2175,6 @@ function fitCalcSide(side) {
     next.ability = '';
   if (next.item && !itemChoices(next.pokemon).includes(next.item)) next.item = '';
   return next;
-}
-
-function findSpecies(text) {
-  const wanted = text.trim();
-  if (!wanted) return null;
-  const rows = speedRows(state.reference, state.locale, { includeMega: true });
-  return (
-    rows.find(r => r.label === wanted) ??
-    rows.find(r => r.label.replace(/\s/g, '') === wanted.replace(/\s/g, ''))
-  )?.id;
 }
 
 $('calc-link').onclick = () => {
@@ -2187,6 +2201,12 @@ $('calc-body').addEventListener('click', event => {
   }
   const key = target.closest('[data-calc-side]')?.dataset.calcSide;
   if (!key) return;
+  const pick = target.closest('[data-calc-pick]');
+  if (pick) {
+    if (pick.dataset.calcPick === 'member' && !state.builds.samples.some(s => s.pokemon))
+      return toast('포켓몬을 고른 샘플이 없습니다.');
+    return openPicker(pick.dataset.calcPick, null, key);
+  }
   const side = state.calc[key];
   const points = target.closest('[data-calc-points]');
   const nature = target.closest('[data-calc-nature]');
@@ -2201,36 +2221,44 @@ $('calc-body').addEventListener('click', event => {
   else return;
   renderCalc();
 });
+// 숫자 칸. 칠 때마다 결과만 고친다. 전체를 다시 그리면 커서가 튄다.
+const calcNumber = {
+  points: text => {
+    const value = Number(text);
+    return Number.isInteger(value) && value >= 0 && value <= 32 ? value : null;
+  },
+  multiplier: text => {
+    const value = Number(text);
+    return text.trim() !== '' && Number.isFinite(value) && value >= 0 ? value : null;
+  },
+};
 $('calc-body').addEventListener('input', event => {
-  const input = event.target.closest('[data-calc-field="points"]');
-  const key = input?.closest('[data-calc-side]')?.dataset.calcSide;
-  if (!key) return;
-  const value = Number(input.value);
-  if (!Number.isInteger(value) || value < 0 || value > 32) return;
-  state.calc[key] = { ...state.calc[key], points: value };
+  const field = event.target.dataset?.calcField;
+  const key = event.target.closest('[data-calc-side]')?.dataset.calcSide;
+  if (!key || !calcNumber[field]) return;
+  const value = calcNumber[field](event.target.value);
+  if (value === null) return;
+  state.calc[key] = { ...state.calc[key], [field]: value };
   renderCalcOutputs();
 });
 $('calc-body').addEventListener('change', event => {
   const target = event.target;
   const key = target.closest('[data-calc-side]')?.dataset.calcSide;
   if (!key) return;
-  if (target.matches('[data-calc-sample]')) {
-    const sample = state.builds.samples.find(s => s.id === target.value);
-    if (sample) state.calc[key] = fitCalcSide(sideFromSample(sample, natureAdjust));
-    return renderCalc();
-  }
   const field = target.dataset.calcField;
   const side = state.calc[key];
-  if (field === 'pokemon')
-    state.calc[key] = fitCalcSide({ ...side, pokemon: findSpecies(target.value) ?? null });
-  else if (field === 'points') {
+  if (calcNumber[field]) {
     // 칸을 벗어날 때 범위를 맞춘다. 다시 그리지 않는다. 이 change는 다른 단추를 누르는
     // 순간에 오므로, 다시 그리면 누른 단추가 사라져 그 클릭이 먹히지 않는다.
-    const value = Math.max(0, Math.min(32, Math.round(Number(target.value) || 0)));
-    state.calc[key] = { ...side, points: value };
+    const value =
+      field === 'points'
+        ? Math.max(0, Math.min(32, Math.round(Number(target.value) || 0)))
+        : (calcNumber.multiplier(target.value) ?? 1);
+    state.calc[key] = { ...side, [field]: value };
     target.value = value;
     return renderCalcOutputs();
-  } else if (field === 'weather' || field === 'terrain')
+  }
+  if (field === 'weather' || field === 'terrain')
     state.calc.field = { ...state.calc.field, [field]: target.value };
   else if (field === 'abilityOn' || field === 'tailwind')
     state.calc[key] = { ...side, [field]: target.checked };

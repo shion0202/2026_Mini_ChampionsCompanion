@@ -31,11 +31,11 @@
     <nav class="category-nav" aria-label="주요 메뉴">
       <button id="ranking-link" aria-pressed="true">랭킹</button>
       <button id="speed-link" aria-pressed="false">스피드 랭킹</button>
-      <button id="types-link" aria-pressed="false">상성표</button>
-      <button id="dex-link" aria-pressed="false">도감</button>
+      <button id="calc-link" aria-pressed="false">계산기</button>
       <button id="builds-link" aria-pressed="false">내 샘플</button>
       <button id="articles-link" aria-pressed="false">구축 기사</button>
-      <button id="calc-link" aria-pressed="false">계산기</button>
+      <button id="types-link" aria-pressed="false">상성표</button>
+      <button id="dex-link" aria-pressed="false">도감</button>
     </nav>
   </header>
   <main class="page">
@@ -138,8 +138,8 @@
     <section id="calc" class="calc-panel" aria-labelledby="calc-title" hidden>
       <div class="list-heading"><h2 id="calc-title">계산기</h2></div>
       <div class="segmented" role="group" aria-label="계산기 종류">
-        <button type="button" data-calc-tab="speed" aria-pressed="true">스피드 계산기</button>
         <button type="button" data-calc-tab="damage" aria-pressed="false">데미지 계산기</button>
+        <button type="button" data-calc-tab="speed" aria-pressed="true">스피드 계산기</button>
       </div>
       <div id="calc-body"></div>
     </section>

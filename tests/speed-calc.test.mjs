@@ -153,3 +153,24 @@ test('every listed ability and item exists in the reference data', async () => {
   for (const id of Object.keys(SPEED_ABILITIES)) assert.ok(reference.ability[id], id);
   for (const id of Object.keys(SPEED_ITEMS)) assert.ok(reference.held_item[id], id);
 });
+
+test('a hand-entered multiplier applies last and 1 changes nothing', () => {
+  const plain = finalSpeed(side({ points: 32 }), calm, 100);
+  assert.equal(plain.multiplier, 1);
+  assert.equal(finalSpeed(side({ points: 32, multiplier: 1.5 }), calm, 100).speed, 228);
+  assert.equal(finalSpeed(side({ points: 32, multiplier: 0 }), calm, 100).speed, 0);
+  assert.equal(
+    finalSpeed(side({ points: 0, multiplier: 0.29 }), { weather: '', terrain: '' }, 80).speed,
+    29,
+  );
+  assert.equal(
+    finalSpeed(side({ points: 32, multiplier: -2 }), calm, 100).speed,
+    152,
+    '음수는 무시한다',
+  );
+  assert.equal(
+    finalSpeed(side({ points: 32, status: 'par', multiplier: 2 }), calm, 100).speed,
+    152,
+    '마비로 절반이 된 뒤에 곱한다',
+  );
+});
