@@ -33,6 +33,8 @@ import {
   toJson,
   fromJson,
   mergeDocs,
+  docFromServer,
+  joinDocs,
   speciesOptions,
   abilityOptions,
   moveOptions,
@@ -898,4 +900,58 @@ test('포켓몬을 바꿔도 원본은 그대로다', () => {
   setSpecies(before, 'pikachu', reference);
   assert.deepEqual(before.moves, ['A', 'B', 'C', 'D']);
   assert.deepEqual(before.altMoves, ['E', 'F', 'G']);
+});
+
+test('the unused form field is gone from new and stored samples', () => {
+  assert.ok(!('form' in emptySample()));
+  const stored = {
+    samples: [{ ...emptySample(), id: 'a', name: '보만다', form: 'Mega' }],
+    parties: [],
+    version: 3,
+  };
+  const doc = readDoc({ getItem: () => JSON.stringify(stored) });
+  assert.ok(!('form' in doc.samples[0]), '예전 저장본의 form도 읽을 때 걷어낸다');
+  assert.equal(doc.samples[0].name, '보만다');
+  assert.equal(doc.version, 3);
+});
+
+test('a document from the server is checked like any stored one', () => {
+  const doc = docFromServer(
+    { samples: [{ ...emptySample(), id: 'a', name: '가' }, { id: 'broken' }], parties: 'x' },
+    7,
+  );
+  assert.deepEqual(
+    doc.samples.map(s => s.id),
+    ['a'],
+  );
+  assert.deepEqual(doc.parties, []);
+  assert.equal(doc.version, 7, '버전은 서버가 알려준 값이다');
+  assert.deepEqual(docFromServer(null, 0), { samples: [], parties: [], version: 0 });
+});
+
+test('joining keeps both sides and lets the later save win', () => {
+  const at = (id, name, updatedAt) => ({ ...emptySample(), id, name, updatedAt });
+  const local = {
+    samples: [at('a', '이 기기 옛것', 100), at('b', '이 기기만', 50)],
+    parties: [],
+    version: 0,
+  };
+  const server = {
+    samples: [at('a', '서버 새것', 200), at('c', '서버만', 10)],
+    parties: [{ ...emptyParty(), id: 'p', name: '파티' }],
+    version: 4,
+  };
+  const joined = joinDocs(local, server);
+  const names = Object.fromEntries(joined.samples.map(s => [s.id, s.name]));
+  assert.deepEqual(names, { a: '서버 새것', b: '이 기기만', c: '서버만' });
+  assert.equal(joined.parties.length, 1);
+  assert.equal(joined.version, 4, '서버 버전 위에 올린다');
+  // 시각이 같으면 이 기기 것을 둔다.
+  assert.equal(
+    joinDocs(
+      { ...local, samples: [at('a', '이쪽', 5)] },
+      { ...server, samples: [at('a', '저쪽', 5)] },
+    ).samples[0].name,
+    '이쪽',
+  );
 });

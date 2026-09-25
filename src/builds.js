@@ -57,7 +57,6 @@ export const emptySample = () => ({
   name: '',
   note: '',
   pokemon: null,
-  form: null,
   item: null,
   ability: null,
   nature: null,
@@ -201,11 +200,14 @@ const isParty = p =>
   p.members.length === 6 &&
   p.members.every(isMoveSlot);
 
+// 예전 저장본의 sample.form은 쓰이지 않던 칸이다. 폼은 pokemon id가 구분한다.
+const dropForm = ({ form, ...sample }) => sample;
+
 const normalizeDoc = raw =>
   !raw || typeof raw !== 'object'
     ? { ...EMPTY_DOC }
     : {
-        samples: Array.isArray(raw.samples) ? raw.samples.filter(isSample) : [],
+        samples: Array.isArray(raw.samples) ? raw.samples.filter(isSample).map(dropForm) : [],
         parties: Array.isArray(raw.parties) ? raw.parties.filter(isParty) : [],
         version: Number.isInteger(raw.version) ? raw.version : 0,
       };
@@ -266,6 +268,29 @@ export function mergeDocs(current, incoming) {
     samples: merge(current.samples, incoming.samples),
     parties: merge(current.parties, incoming.parties),
     version: current.version,
+  };
+}
+
+// 서버에서 받은 문서도 신뢰 경계다. 저장소에서 읽은 것과 같은 검사를 거친다.
+// 버전은 문서 안의 값이 아니라 서버가 따로 알려준 값을 쓴다.
+export const docFromServer = (doc, version) => ({ ...normalizeDoc(doc), version });
+
+// 동기화에 처음 붙을 때 이 기기 것과 서버 것을 합친다. 가져오기(mergeDocs)와 달리
+// 어느 쪽도 ‘새로 들어온 것’이 아니므로 나중에 저장한 쪽을 남긴다. 시각이 같으면
+// 이 기기 것을 둔다. 합친 결과는 서버 버전 위에 올린다.
+export function joinDocs(local, server) {
+  const pick = (mine, theirs) => {
+    const byId = new Map(mine.map(x => [x.id, x]));
+    for (const item of theirs) {
+      const kept = byId.get(item.id);
+      if (!kept || (item.updatedAt ?? 0) > (kept.updatedAt ?? 0)) byId.set(item.id, item);
+    }
+    return [...byId.values()];
+  };
+  return {
+    samples: pick(local.samples, server.samples),
+    parties: pick(local.parties, server.parties),
+    version: server.version,
   };
 }
 
