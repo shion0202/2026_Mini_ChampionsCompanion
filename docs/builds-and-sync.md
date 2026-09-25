@@ -143,8 +143,12 @@ doc  { samples[], parties[], version }
   먼저 만든다.
 
 올릴 때 읽어온 `version`을 함께 보낸다. 서버에 더 새 버전이 있으면 거부하고
-‘다른 기기에서 바뀌었습니다. 새로 불러온 뒤 다시 저장하세요’를 띄운다. 조용히
-덮어쓰지 않는다.
+‘다른 기기에서 바뀌었습니다’를 띄운 뒤 두 길을 준다. ‘서버 것 불러오기’는 이
+기기의 올리지 못한 변경을 버리고, ‘이 기기 것으로 덮어쓰기’는 다른 기기의 변경을
+버린다. 어느 쪽이든 확인을 받는다. 조용히 덮어쓰지 않는다.
+
+처음 ‘코드로 연결’할 때는 이 기기 것과 서버 것을 합친다. 같은 항목은 나중에 저장한
+쪽을 남긴다(`joinDocs`).
 
 `ponytail: 문서를 통째로 저장하고 낙관적 잠금만 건다. 양쪽에서 동시에 자주
 고치게 되면 항목별 키로 쪼갠다`
@@ -158,11 +162,17 @@ Cloudflare Pages Functions로 정적 파일과 같은 프로젝트에서 `/api/*
 Worker를 따로 배포하면 도메인과 CORS 설정이 늘어난다.
 
 ```
-GET  /api/doc?key=<코드>     → { doc, version }
-PUT  /api/doc?key=<코드>     → { version }  /  409 버전 충돌
-POST /api/share?key=<코드>   → { id }
-GET  /api/share/<id>         → 스냅샷 (코드 불필요, 읽기 전용)
+GET  /api/doc               x-sync-code: <코드>   → { doc, version }
+PUT  /api/doc               x-sync-code: <코드>   → { version } / 409 { version } / 429
+POST /api/share             x-sync-code: <코드>   → { id }        (4단계)
+GET  /api/share/<id>                              → 스냅샷 (코드 불필요, 읽기 전용)
 ```
+
+코드는 쿼리가 아니라 `x-sync-code` 헤더로 보낸다. 쿼리는 접속 기록에 남는다.
+
+KV는 같은 키에 초당 한 번만 쓸 수 있다. 앱은 저장을 모아 한 번에 하나만 보내고
+(`createUploader`), 서버는 제한에 걸리면 429를 돌려준다. 앱은 몇 번 다시 보낸 뒤
+멈추고, 다음 저장이나 다음 실행, 연결 복귀 때 다시 보낸다.
 
 KV 키는 `doc:<코드>`와 `share:<id>` 둘뿐이다. 자료가 작아 스키마를 두지 않는다.
 
