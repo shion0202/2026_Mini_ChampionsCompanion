@@ -42,6 +42,7 @@ import {
   hpStat,
   grounded,
   isSpreadMove,
+  powerOf as damagePower,
 } from './damage-calc.js';
 import {
   damageCalcView,
@@ -2464,15 +2465,22 @@ function damageContext() {
       ? 2
       : 1.5
     : 1;
+  // 급소와 타수도 넣는다. 트리플악셀은 타격마다 20·40·60이다.
+  const quickHits = attacker.hits || (move ? defaultHits(move, attacker.ability) : 1);
+  const quickPowers =
+    move?.id === 'tripleaxel' && !attacker.power
+      ? Array.from({ length: quickHits }, (_, i) => 20 * (i + 1))
+      : Array(quickHits).fill(quickBase);
+  const quickInput = {
+    attackStat: quickAttack,
+    basePower: quickBase,
+    hitPowers: quickPowers,
+    stab: quickStab,
+    crit: !!attacker.crit,
+    parentalBond: false,
+  };
   const quickPower =
-    quickAttack && quickBase
-      ? {
-          power: Math.floor(quickAttack * quickBase * quickStab),
-          attackStat: quickAttack,
-          basePower: quickBase,
-          stab: quickStab,
-        }
-      : null;
+    quickAttack && quickBase ? { ...quickInput, power: damagePower(quickInput) } : null;
   const defenses = Object.fromEntries(
     ['def', 'spd'].map(key => [
       key,

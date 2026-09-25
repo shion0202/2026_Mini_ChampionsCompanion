@@ -15,6 +15,7 @@ import {
   grounded,
   hazardDamage,
   koOdds,
+  powerOf,
   hpStat,
   stat,
 } from '../src/damage-calc.js';
@@ -487,4 +488,25 @@ test('a resist berry and multiscale apply only to the first hit', () => {
   const first = result.rollsAt(1, true, true);
   const later = result.rollsAt(1, false, false);
   assert.ok(later[0] >= first[0] * 3, '열매(1/2)와 멀티스케일(1/2)이 모두 빠진다');
+});
+
+test('power adds every hit and the critical hit', () => {
+  const summary = extra =>
+    damageSummary({
+      reference,
+      attacker: side('weavile', { atk: 32 }, extra),
+      defender: side('garchomp', {}, { hpPercent: 100 }),
+      field: { format: 'singles', weather: '', terrain: '' },
+      move: { ...reference.move.tripleaxel, id: 'tripleaxel' },
+      crit: !!extra.crit,
+    });
+  const plain = summary({});
+  // 트리플악셀: 20 + 40 + 60을 모두 더한다(포푸니크는 얼음이라 자속 1.5).
+  assert.equal(plain.power, plain.attackStat * 120 * 1.5);
+  assert.equal(summary({ crit: true }).power, Math.floor(plain.attackStat * 120 * 1.5 * 1.5));
+  assert.equal(
+    powerOf({ attackStat: 100, hitPowers: [80, 80], stab: 1.5, crit: false, parentalBond: true }),
+    Math.floor(100 * 80 * 1.5 * 1.25),
+    '부자유친의 두 번째 타격은 1/4',
+  );
 });

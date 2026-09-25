@@ -341,8 +341,10 @@
   color: var(--muted);
   font-size: 12px;
 }
+/* 도구 비우기는 특성·도구 칸 아래 줄에 따로 둔다. 옆에 두면 칸과 높이가 어긋난다. */
 .calc-clear {
-  justify-self: start;
+  grid-column: 1 / -1;
+  justify-self: end;
   font-size: 12px;
 }
 .calc-actions .segmented {
@@ -438,4 +440,10 @@
 .dmg-quick-part:not(.is-used) strong {
   color: var(--muted);
   font-weight: 600;
+}
+/* 설치 기술·버티기 안내는 KO 정보와 띄운다. */
+.dmg-notes {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
 }

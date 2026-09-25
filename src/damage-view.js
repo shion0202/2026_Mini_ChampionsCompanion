@@ -39,9 +39,9 @@ const COUNT_FIELDS = {
 };
 const SPIKES = [
   ['0', '없음'],
-  ['1', '1겹'],
-  ['2', '2겹'],
-  ['3', '3겹'],
+  ['1', '1중첩'],
+  ['2', '2중첩'],
+  ['3', '3중첩'],
 ];
 
 // 이 기술과 특성이 묻는 조건. 둘이 같은 것을 물으면 한 번만 보인다.
@@ -369,6 +369,7 @@ export function damageResult(summary, context) {
     .filter(Boolean)
     .map(text => `<p class="calc-note">${esc(text)}</p>`)
     .join('');
+  const noteBlock = notes ? `<div class="dmg-notes">${notes}</div>` : '';
   const detail =
     `<div class="dmg-card">` +
     `<div class="dmg-row"><span>${hits > 1 ? `1회 공격 (${hits}타)` : '1회 공격'}</span><small>${TAKEN_WITH[context.keys.defense]}</small></div>` +
@@ -377,7 +378,7 @@ export function damageResult(summary, context) {
     `<div class="dmg-row"><span>결과</span><strong>${esc(verdictText)}</strong></div>` +
     `<div class="dmg-row"><span>1타 확률</span><strong>${percent((summary.table[0]?.chance ?? 0) * 100)}</strong></div>` +
     `<div class="dmg-box"><small>KO 정보</small><div class="dmg-chips">${ko}</div></div>` +
-    notes +
+    noteBlock +
     `</div>`;
   return `<div class="dmg-result">${head}${detail}</div>`;
 }
@@ -393,17 +394,25 @@ export function powerBox(summary, context) {
   const quick = summary?.power != null ? summary : context.quickPower;
   if (!quick)
     return `<div class="dmg-quick"><span>결정력</span><strong>—</strong><small>포켓몬과 기술을 선택하면 보입니다.</small></div>`;
-  const hits = summary?.hits ?? 1;
   // 위력을 정한 값(스피드·무게)도 함께 보인다.
   const basis = summary?.speeds
     ? ` · 스피드 ${summary.speeds.attacker} 대 ${summary.speeds.defender}`
     : summary?.weights
       ? ` · 무게 ${summary.weights.attacker / 10}kg 대 ${summary.weights.defender / 10}kg`
       : '';
+  // 위력이 타격마다 다르면(트리플악셀) 모두, 같으면 한 번 쓰고 타수를 곱한다.
+  const powers = quick.hitPowers ?? [quick.basePower];
+  const varies = powers.some(bp => bp !== powers[0]);
+  const hits = powers.length;
+  const formula =
+    `${STAT_NAMES_KO[context.keys.attack]} ${quick.attackStat} × 위력 ${varies ? powers.join('+') : powers[0]}` +
+    `${quick.stab !== 1 ? ` × 자속 보정 ${quick.stab}` : ''}` +
+    `${quick.crit ? ' × 급소 1.5' : ''}` +
+    `${hits > 1 && !varies ? ` × ${hits}타` : ''}` +
+    `${quick.parentalBond ? ' (두 번째 타격 1/4)' : ''}`;
   return (
     `<div class="dmg-quick"><span>결정력</span><strong>${quick.power.toLocaleString()}</strong>` +
-    `<small>${STAT_NAMES_KO[context.keys.attack]} ${quick.attackStat} × 위력 ${quick.basePower}` +
-    `${quick.stab !== 1 ? ` × 자속 보정 ${quick.stab}` : ''}${hits > 1 ? ` · 타격당, ${hits}회` : ''}${basis}</small></div>`
+    `<small>${formula}${basis}</small></div>`
   );
 }
 

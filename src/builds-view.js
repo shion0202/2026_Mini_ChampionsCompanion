@@ -209,10 +209,11 @@ const pointRow = (value, index) =>
   `<input type="number" min="0" max="32" step="1" value="${value}"` +
   ` data-builds-point="${index}" aria-label="${STAT_LABELS[index]} 능력 포인트">` +
   `<div class="builds-point-row">` +
-  `<button type="button" class="builds-point-step" data-builds-point-max="${index}"` +
-  ` aria-label="${STAT_LABELS[index]} 최대">최대</button>` +
+  // 작은 값이 왼쪽, 큰 값이 오른쪽이다(계산기와 같다).
   `<button type="button" class="builds-point-step" data-builds-point-zero="${index}"` +
   ` aria-label="${STAT_LABELS[index]} 0">0</button>` +
+  `<button type="button" class="builds-point-step" data-builds-point-max="${index}"` +
+  ` aria-label="${STAT_LABELS[index]} 최대">최대</button>` +
   `</div></div>`;
 
 // 파티를 보는 까닭이 여기 있다. 어느 샘플을 넣었는지만으로는 그 자리가 무엇을

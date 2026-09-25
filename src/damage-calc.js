@@ -882,6 +882,10 @@ export function damageRolls(input) {
       move.id === 'tripleaxel' && !(attacker.power > 0)
         ? Array.from({ length: hitCount }, (_, i) => powerOf(i + 1, false))
         : null,
+    // 타격마다의 위력(보정 후). 결정력은 이것을 모두 더한다.
+    hitPowers: Array.from({ length: hitCount }, (_, i) =>
+      i === 0 ? basePower : powerOf(i + 1, false),
+    ),
     attackStat,
     defenseStat,
     crit,
@@ -981,10 +985,19 @@ export function damageSummary(input) {
     maxPercent: (max / hpMax) * 100,
     table,
     verdict: koVerdict(table),
-    power: result.fixed ? null : Math.floor(result.attackStat * result.basePower * result.stab),
+    power: result.fixed ? null : powerOf(result),
     bulk: result.fixed ? null : Math.floor((hpMax * result.defenseStat) / 0.411),
     bulks: { def: bulkOf('def'), spd: bulkOf('spd') },
   };
+}
+
+// 결정력 = 공격 실수치 × 위력 × 자속 보정 × 급소(1.5)를 타격마다 더한 값.
+// 부자유친의 두 번째 타격은 1/4이다. 트리플악셀은 20·40·60을 모두 더한다.
+export function powerOf({ attackStat, hitPowers, stab, crit, parentalBond }) {
+  const perHit = hitPowers.map(
+    (bp, i) => attackStat * bp * stab * (crit ? 1.5 : 1) * (parentalBond && i > 0 ? 0.25 : 1),
+  );
+  return Math.floor(perHit.reduce((sum, value) => sum + value, 0));
 }
 
 // ── 몇 번에 쓰러지는가 ─────────────────────────────────────────────

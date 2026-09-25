@@ -3458,7 +3458,7 @@ body.is-dragging-move {
 .builds-point-name {
   text-align: center;
 }
-/* 최대와 0은 입력칸 아래에 나란히 둔다. 옆에 두면 손가락만 한 크기가 안 나오고,
+/* 0과 최대는 입력칸 아래에 나란히 둔다. 옆에 두면 손가락만 한 크기가 안 나오고,
    여섯 칸이 모두 같은 모양이라 줄도 어긋나지 않는다. */
 .builds-point-row {
   display: grid;
@@ -3472,7 +3472,7 @@ body.is-dragging-move {
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 9px 6px 9px 12px;
+  padding: 9px 6px 9px 18px;
   color: var(--ink);
   background: var(--white);
   font: inherit;
