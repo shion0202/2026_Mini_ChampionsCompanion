@@ -2639,7 +2639,6 @@ $('calc-body').addEventListener('change', event => {
     dmg.field = { ...dmg.field, [field]: target.value };
   else if (sideKey && target.type === 'checkbox')
     dmg[sideKey] = { ...dmg[sideKey], [field]: target.checked };
-  else if (sideKey && field === 'spikes') dmg[sideKey] = { ...dmg[sideKey], spikes: +target.value };
   else if (sideKey) dmg[sideKey] = { ...dmg[sideKey], [field]: target.value };
   renderDamage();
 });
@@ -2685,6 +2684,11 @@ $('calc-body').addEventListener('click', event => {
     if (kind === 'member' && !state.builds.samples.some(s => s.pokemon))
       return toast('샘플이 없습니다.');
     return openPicker(kind, null, { page: 'damage', side: sideKey });
+  }
+  const spikes = target.closest('[data-dmg-spikes]');
+  if (spikes) {
+    dmg[sideKey] = { ...side, spikes: Number(spikes.dataset.dmgSpikes) };
+    return renderDamage();
   }
   // 입력할 능력 고르기. 공격 측은 셸사이드암의 공격·특수공격, 방어 측은 방어·특수방어.
   const statView = target.closest('[data-dmg-stat-view]');

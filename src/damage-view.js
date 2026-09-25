@@ -373,24 +373,37 @@ function defenderPanel(state, context) {
     (side.status === 'tox'
       ? `<div class="calc-line"><span>맹독 (N턴째)</span><input type="number" min="1" max="15" step="1" value="${side.toxicTurn ?? 1}" data-dmg-number="toxicTurn" aria-label="맹독 경과 턴"></div>`
       : '') +
-    check('bound', side.bound, '바인드 (김밥말이 등, 공격 측이 조임밴드면 1/6)') +
-    check('leechSeed', side.leechSeed, '씨뿌리기를 맞음') +
-    check('seededFoe', side.seededFoe, '공격 측에 씨뿌리기를 심음 (회복)') +
+    // 회복을 위에, 데미지를 아래에 묶는다.
+    `<div class="calc-subgroup">` +
+    check('seededFoe', side.seededFoe, '공격 측에 씨뿌리기를 심음') +
     check('aquaRing', side.aquaRing, '아쿠아링') +
     check('ingrain', side.ingrain, '뿌리박기') +
+    `</div><div class="calc-subgroup">` +
+    check('bound', side.bound, '바인드 (김밥말이 등)') +
+    check('leechSeed', side.leechSeed, '씨뿌리기를 맞음') +
     check('saltCure', side.saltCure, '소금절이') +
-    `<p class="calc-note">상태이상, 날씨, 그래스필드, 먹다남은음식·검은진흙, 큰뿌리, 공격 측의 해감액은 고른 값으로 자동 반영합니다.</p>` +
-    `</fieldset>` +
-    `<fieldset class="calc-group"><legend>벽 · 설치 기술 · 반동</legend><div class="calc-grid">` +
-    `<label class="calc-field">압정뿌리기<select data-dmg-field="spikes">${options(SPIKES, String(side.spikes ?? 0))}</select></label>` +
     `</div>` +
-    check('stealthRock', side.stealthRock, '스텔스록') +
-    `<div class="calc-line is-wide"><span>울퉁불퉁멧을 받은 횟수 (1/6)</span><input type="number" min="0" max="9" step="1" value="${side.helmetHits ?? 0}" data-dmg-number="helmetHits" aria-label="울퉁불퉁멧을 받은 횟수"></div>` +
-    `<div class="calc-line is-wide"><span>까칠한피부·철가시를 받은 횟수 (1/8)</span><input type="number" min="0" max="9" step="1" value="${side.roughSkinHits ?? 0}" data-dmg-number="roughSkinHits" aria-label="까칠한피부·철가시를 받은 횟수"></div>` +
+    `<p class="calc-note">상태이상, 날씨, 그래스필드, 먹다남은음식·검은진흙, 큰뿌리, 공격 측의 조임밴드·해감액은 선택한 값을 자동 반영합니다.</p>` +
+    `</fieldset>` +
+    // 벽 → 설치 기술 → 반동 순서로 묶는다. 압정뿌리기는 스텔스록 줄과 모양을 맞춰 단추로 고른다.
+    `<fieldset class="calc-group"><legend>벽 · 설치 기술 · 반동</legend>` +
+    `<div class="calc-subgroup">` +
     check('reflect', side.reflect, '리플렉터') +
     check('lightScreen', side.lightScreen, '빛의장막') +
     check('auroraVeil', side.auroraVeil, '오로라베일') +
     `${doubles ? check('friendGuard', side.friendGuard, '프렌드가드 (×0.75)') : ''}` +
+    `</div><div class="calc-subgroup">` +
+    `<div class="calc-line"><span>압정뿌리기</span><div class="calc-choices" role="group" aria-label="압정뿌리기">` +
+    SPIKES.map(
+      ([value, label]) =>
+        `<button type="button" data-dmg-spikes="${value}" aria-pressed="${String(side.spikes ?? 0) === value}">${label}</button>`,
+    ).join('') +
+    `</div></div>` +
+    check('stealthRock', side.stealthRock, '스텔스록') +
+    `</div><div class="calc-subgroup">` +
+    `<div class="calc-line is-wide"><span>울퉁불퉁멧을 받은 횟수 (1/6)</span><input type="number" min="0" max="9" step="1" value="${side.helmetHits ?? 0}" data-dmg-number="helmetHits" aria-label="울퉁불퉁멧을 받은 횟수"></div>` +
+    `<div class="calc-line is-wide"><span>까칠한피부·철가시를 받은 횟수 (1/8)</span><input type="number" min="0" max="9" step="1" value="${side.roughSkinHits ?? 0}" data-dmg-number="roughSkinHits" aria-label="까칠한피부·철가시를 받은 횟수"></div>` +
+    `</div>` +
     `</fieldset>` +
     `</section>`
   );

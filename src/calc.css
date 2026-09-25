@@ -500,3 +500,11 @@
   /* 두 줄의 숫자 칸이 같은 자리에서 시작하도록 긴 쪽에 맞춘다. */
   min-width: 210px;
 }
+/* 한 칸 안의 묶음. 묶음 사이를 칸 안의 줄 간격보다 조금 더 띄운다. */
+.calc-subgroup {
+  display: grid;
+  gap: 10px;
+}
+.calc-subgroup + .calc-subgroup {
+  margin-top: 8px;
+}
