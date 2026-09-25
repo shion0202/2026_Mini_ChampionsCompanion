@@ -6,6 +6,7 @@ import {
   NO_PARENTAL_BOND,
   SHEER_FORCE_MOVES,
   SPREAD_MOVES,
+  FLING_POWER,
 } from './damage-catalog.js';
 import { SPEED_ABILITIES, finalSpeed } from './speed-calc.js';
 
@@ -99,11 +100,29 @@ export const FIXED_HITS = {
 const isMultiHit = move => !!FIXED_HITS[move.id] || (move.traits ?? []).includes('multihit');
 export const defaultHits = (move, ability) =>
   FIXED_HITS[move.id] ?? (isMultiHit(move) ? (ability === 'skilllink' ? 5 : 2) : 1);
+// 타수가 범위인 연속기의 [최소, 최대]. 화면은 이것으로 타수 막대를 보인다.
+// 트리플악셀·찍찍베기는 타격마다 명중을 따로 굴려 1회부터 끝날 수 있다.
+export function hitRange(move) {
+  if (!move) return null;
+  if (move.id === 'tripleaxel') return [1, 3];
+  if (move.id === 'populationbomb') return [1, 10];
+  if (FIXED_HITS[move.id]) return null;
+  return (move.traits ?? []).includes('multihit') ? [2, 5] : null;
+}
 
 // 기술 위력이 상황에 따라 바뀌는 기술과 그 조건. 화면은 이 표로 입력 칸을 보인다.
 //  toggle  사람이 켜는 조건(attacker[키])   count  세는 값(attacker[키])
-//  hp      공격 측 남은 HP   speed  두 쪽 스피드   weight  두 쪽 무게(자동)
+//  hp      공격 측 HP(능력 포인트·남은 HP)   speed  두 쪽 스피드
+//  weight  무게(자동, 'defender'면 방어 측만)   species  그 포켓몬일 때만 묻는다
 export const MOVE_CONDITIONS = {
+  aurawheel: { toggle: 'hangry', species: 'morpeko' },
+  spitup: { count: 'stockpile' },
+  counter: { count: 'damageTaken' },
+  mirrorcoat: { count: 'damageTaken' },
+  metalburst: { count: 'damageTaken' },
+  comeuppance: { count: 'damageTaken' },
+  finalgambit: { hp: true },
+  endeavor: { hp: true },
   payback: { toggle: 'movesLast' },
   avalanche: { toggle: 'wasHit' },
   assurance: { toggle: 'targetHurt' },
@@ -124,8 +143,8 @@ export const MOVE_CONDITIONS = {
   electroball: { speed: true },
   heavyslam: { weight: true },
   heatcrash: { weight: true },
-  lowkick: { weight: true },
-  grassknot: { weight: true },
+  lowkick: { weight: 'defender' },
+  grassknot: { weight: 'defender' },
 };
 // 특성의 조건. 위와 같은 모양이다.
 export const ABILITY_CONDITIONS = {
@@ -512,7 +531,13 @@ function resolveMove(raw, env) {
         taurospaldeablaze: 'Fire',
         taurospaldeaaqua: 'Water',
       }[attacker.pokemon] ?? type;
-  if (raw.id === 'aurawheel' && attacker.pokemon === 'morpekohangry') type = 'Dark';
+  // 오라휠은 배고픈 모습이면 악 타입. 배고픈 모습은 싸움 중에만 되므로 칸으로 묻는다.
+  if (
+    raw.id === 'aurawheel' &&
+    (attacker.pokemon === 'morpekohangry' ||
+      (String(attacker.pokemon).startsWith('morpeko') && attacker.hangry))
+  )
+    type = 'Dark';
   const a = attacker.ability;
   if (!NO_TYPE_CHANGE.has(raw.id)) {
     if (a === 'normalize') {
@@ -621,6 +646,10 @@ function variablePower(move, env, hit) {
       return attacker.allyRound ? bp * 2 : bp;
     case 'tripleaxel':
       return 20 * hit;
+    case 'spitup':
+      return 100 * clamp(attacker.stockpile ?? 0, 0, 3) || null;
+    case 'fling':
+      return FLING_POWER[attacker.item] ?? null;
     default:
       return bp || null;
   }
@@ -697,22 +726,42 @@ export function damageRolls(input) {
     defenderGrounded,
   );
   const base = { effectiveness, moveType: move.type, category: move.category };
-  if (effectiveness === 0) return { ...base, immune: true };
-  // 특성으로 막히는 기술(타오르는불꽃·저수·피뢰침·방탄·방음 등). 불가사의부적은 약점만 맞는다.
+  // ignoreImmunity: 효과가 없어도 결정력은 보이도록 막힘을 건너뛰고 계산한다(damageSummary).
+  const bypass = !!input.ignoreImmunity;
   const d = defender.ability;
-  if (
-    ABILITY_IMMUNE_TYPES[d] === move.type ||
-    traits.includes(ABILITY_IMMUNE_TRAITS[d]) ||
-    (d === 'wonderguard' && effectiveness <= 1)
-  )
-    return { ...base, immune: true, byAbility: d };
-  // 사이코필드에서는 땅에 붙은 상대에게 선제기가 막힌다.
-  if (field.terrain === 'psychic' && move.priority > 0 && defenderGrounded)
-    return { ...base, blocked: true };
-  if (NEEDS_TERRAIN.has(move.id) && !field.terrain) return { ...base, blocked: true };
-  // 폴터가이스트는 도구가 없는 상대에게 실패한다.
-  if (move.id === 'poltergeist' && !defender.item) return { ...base, blocked: true };
-  if (OHKO_MOVES.has(move.id)) return { ...base, ohko: true, sturdy: d === 'sturdy' };
+  const stops = stopReason();
+  if (stops && !bypass) return { ...base, ...stops };
+  function stopReason() {
+    if (effectiveness === 0) return { immune: true };
+    return blockedBy();
+  }
+  function blockedBy() {
+    // 특성으로 막히는 기술(타오르는불꽃·저수·피뢰침·방탄·방음 등). 불가사의부적은 약점만 맞는다.
+    if (
+      ABILITY_IMMUNE_TYPES[d] === move.type ||
+      traits.includes(ABILITY_IMMUNE_TRAITS[d]) ||
+      (d === 'wonderguard' && effectiveness <= 1)
+    )
+      return { immune: true, byAbility: d };
+    // 사이코필드에서는 땅에 붙은 상대에게 선제기가 막힌다.
+    if (field.terrain === 'psychic' && move.priority > 0 && defenderGrounded)
+      return { blocked: true };
+    if (NEEDS_TERRAIN.has(move.id) && !field.terrain) return { blocked: true };
+    // 폴터가이스트는 도구가 없는 상대에게 실패한다.
+    if (move.id === 'poltergeist' && !defender.item) return { blocked: true };
+    // 내던지기는 던질 수 있는 도구가 없으면(자기 메가스톤 포함) 실패한다.
+    if (move.id === 'fling' && !(attacker.power > 0) && !flingable()) return { blocked: true };
+    if (OHKO_MOVES.has(move.id)) return { ohko: true, sturdy: d === 'sturdy' };
+    return null;
+  }
+  function flingable() {
+    const item = reference.held_item?.[attacker.item];
+    if (!FLING_POWER[attacker.item]) return false;
+    return !(
+      item?.megaStone &&
+      reference.species[item.megaStone]?.baseSpecies === attackerSpecies.baseSpecies
+    );
+  }
 
   const hits = attacker.hits > 0 ? Math.floor(attacker.hits) : defaultHits(move, attacker.ability);
   const spreadHit = field.format === 'doubles' && !!field.spread;
@@ -725,16 +774,21 @@ export function damageRolls(input) {
     !NO_PARENTAL_BOND.has(move.id);
   const hitCount = parentalBond ? 2 : hits;
 
-  // 고정 데미지(지구던지기·나이트헤드). 배율을 받지 않는다.
-  if (LEVEL_DAMAGE.has(move.id) || move.id === 'superfang' || move.id === 'finalgambit') {
-    const fixed =
-      move.id === 'superfang'
-        ? Math.max(1, Math.floor(env.defenderHp / 2))
-        : move.id === 'finalgambit'
-          ? env.attackerHp
-          : 50;
+  // 고정 데미지. 배율을 받지 않는다. 0이면 기술이 실패한다.
+  const fixed = fixedDamage(move.id, attacker, env);
+  if (fixed !== null) {
+    if (fixed <= 0) return { ...base, blocked: true };
     const rolls = Array(16).fill(fixed);
-    return { ...base, fixed, rolls, hits: hitCount, rollsAt: () => rolls, crit: false };
+    return {
+      ...base,
+      fixed,
+      rolls,
+      hits: hitCount,
+      rollsAt: () => rolls,
+      crit: false,
+      attackerHp: env.attackerHp,
+      attackerHpMax,
+    };
   }
 
   const crit =
@@ -859,8 +913,10 @@ export function damageRolls(input) {
       let x = Math.floor((dmg * r) / 100);
       if (stab !== 1) x = applyMod(x, toMod(stab));
       // 상성은 배율이 아니라 2배·절반을 되풀이한다.
+      // 무효(0)는 결정력만 볼 때(ignoreImmunity) 오며, 되풀이가 끝나지 않으므로 따로 둔다.
+      if (effectiveness === 0) x = 0;
       for (let m = effectiveness; m > 1; m /= 2) x = x * 2;
-      for (let m = effectiveness; m < 1; m *= 2) x = Math.floor(x / 2);
+      for (let m = effectiveness; m < 1 && m > 0; m *= 2) x = Math.floor(x / 2);
       if (burned) x = applyMod(x, MOD.x0_5);
       x = applyMod(x, final);
       rolls.push(Math.max(1, x));
@@ -894,6 +950,29 @@ export function damageRolls(input) {
     attackerHp: env.attackerHp,
     attackerHpMax,
   };
+}
+
+// 고정 데미지 기술. 해당하지 않으면 null.
+//  지구던지기·나이트헤드 50(레벨), 분노의앞니 상대 남은 HP 절반, 목숨걸기 자신의 남은 HP,
+//  죽기살기 상대 남은 HP − 자신의 남은 HP, 카운터·미러코트 받은 데미지 2배,
+//  메탈버스트·앙갚음 1.5배.
+const REFLECT_FACTORS = { counter: 2, mirrorcoat: 2, metalburst: 1.5, comeuppance: 1.5 };
+// 고정 데미지 기술 모두. 화면은 이 기술에 공격 능력치 칸을 보이지 않는다.
+export const FIXED_DAMAGE_MOVES = new Set([
+  ...LEVEL_DAMAGE,
+  'superfang',
+  'finalgambit',
+  'endeavor',
+  ...Object.keys(REFLECT_FACTORS),
+]);
+function fixedDamage(id, attacker, env) {
+  if (LEVEL_DAMAGE.has(id)) return 50;
+  if (id === 'superfang') return Math.max(1, Math.floor(env.defenderHp / 2));
+  if (id === 'finalgambit') return env.attackerHp;
+  if (id === 'endeavor') return env.defenderHp - env.attackerHp;
+  if (REFLECT_FACTORS[id])
+    return Math.floor(Math.max(0, attacker.damageTaken ?? 0) * REFLECT_FACTORS[id]);
+  return null;
 }
 
 const weatherDamage = (weather, type) =>
@@ -939,11 +1018,30 @@ export function damageSummary(input) {
   const hazard = hazardDamage(defender, species, reference.types, hpMax);
   const hpStart = hpNow - hazard;
   const common = { hpMax, hpNow, hazard, hpStart, effectiveness: result.effectiveness };
+  // 데미지가 없어도(무효·실패·설치 기술로 쓰러짐) 결정력은 넣은 값대로 보인다.
+  const powerOnly = () => {
+    const open = result.rollsAt ? result : damageRolls({ ...input, ignoreImmunity: true });
+    if (!open?.rollsAt) return {};
+    return {
+      fixed: open.fixed,
+      power: open.fixed ? null : powerOf(open),
+      attackStat: open.attackStat,
+      basePower: open.basePower,
+      hitPowers: open.hitPowers,
+      stab: open.stab,
+      crit: open.crit,
+      parentalBond: open.parentalBond,
+      hits: open.hits,
+      speeds: open.speeds,
+      weights: open.weights,
+    };
+  };
+  const stopped = reason => ({ reason, ...powerOnly(), ...common });
   if (result.status) return { reason: '변화 기술은 데미지가 없습니다.', ...common };
   if (result.noPower)
     return { reason: '위력이 정해지지 않은 기술입니다. 위력을 직접 넣어 주세요.', ...common };
-  if (result.immune) return { reason: '효과가 없습니다.', ...common, effectiveness: 0 };
-  if (result.blocked) return { reason: '기술이 실패합니다.', ...common };
+  if (result.immune) return { ...stopped('효과가 없습니다.'), effectiveness: 0 };
+  if (result.blocked) return stopped('기술이 실패합니다.');
   if (result.ohko)
     return {
       reason: result.sturdy
@@ -951,7 +1049,7 @@ export function damageSummary(input) {
         : '일격필살 기술입니다. 맞으면 쓰러집니다.',
       ...common,
     };
-  if (hpStart <= 0) return { reason: '설치 기술만으로 쓰러집니다.', ...common };
+  if (hpStart <= 0) return stopped('설치 기술만으로 쓰러집니다.');
   const { hits, rollsAt } = result;
   // 1회 공격의 흐름. 첫 타격만 방어 측 HP가 가득일 수 있다.
   const full = hpStart >= hpMax;

@@ -510,3 +510,34 @@ test('power adds every hit and the critical hit', () => {
     '부자유친의 두 번째 타격은 1/4',
   );
 });
+
+test('fixed damage, fling, spit up and power without damage', () => {
+  const summary = (attacker, move, extra = {}, defender = {}) =>
+    damageSummary({
+      reference,
+      attacker: side(attacker, { atk: 32 }, { hpPercent: 100, ...extra }),
+      defender: side('garchomp', {}, { hpPercent: 100, ...defender }),
+      field: { format: 'singles', weather: '', terrain: '' },
+      move: { ...reference.move[move], id: move },
+    });
+  assert.equal(summary('machamp', 'counter', { damageTaken: 80 }).fixed, 160);
+  assert.equal(
+    summary('machamp', 'counter').reason,
+    '기술이 실패합니다.',
+    '받은 데미지가 없으면 실패',
+  );
+  assert.equal(summary('lucario', 'metalburst', { damageTaken: 81 }).fixed, 121);
+  const gambit = summary('staraptor', 'finalgambit', { hpPercent: 50 });
+  assert.equal(gambit.fixed, Math.floor(gambit.attackerHpMax / 2));
+  // 죽기살기: 상대 남은 HP − 내 남은 HP. 내가 더 많으면 실패한다.
+  assert.equal(summary('pikachu', 'endeavor', { hpPercent: 1 }).fixed > 0, true);
+  assert.equal(summary('pikachu', 'endeavor', {}, { hpPercent: 1 }).reason, '기술이 실패합니다.');
+  assert.equal(summary('charizard', 'fling', { item: 'ironball' }).basePower, 130);
+  assert.equal(summary('charizard', 'fling').reason, '기술이 실패합니다.');
+  assert.equal(summary('arbok', 'spitup', { stockpile: 3 }).basePower, 300);
+  assert.equal(summary('morpeko', 'aurawheel', { hangry: true }).moveType, 'Dark');
+  // 효과가 없어도 결정력은 보인다.
+  const immune = summary('garchomp', 'earthquake', {}, { item: 'airballoon' });
+  assert.equal(immune.reason, '효과가 없습니다.');
+  assert.ok(immune.power > 0);
+});

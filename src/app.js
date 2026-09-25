@@ -43,6 +43,7 @@ import {
   grounded,
   isSpreadMove,
   powerOf as damagePower,
+  hitRange,
 } from './damage-calc.js';
 import {
   damageCalcView,
@@ -53,7 +54,7 @@ import {
   powerBox,
   bulkBox,
 } from './damage-view.js';
-import { NFE_SPECIES } from './damage-catalog.js';
+import { NFE_SPECIES, FLING_POWER } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
@@ -2427,7 +2428,6 @@ function damageContext() {
   const { attacker, defender } = dmg;
   const rawMove = attacker.move ? state.reference.move[attacker.move] : null;
   const move = rawMove ? { ...rawMove, id: attacker.move } : null;
-  const keys = statKeys(move);
   const species = id => state.reference.species[id];
   const actual = (side, key) =>
     species(side.pokemon)
@@ -2447,7 +2447,7 @@ function damageContext() {
   const spread =
     attacker.spread ??
     isSpreadMove(move, dmg.field, attackerSpecies ? grounded(attackerSpecies, attacker) : true);
-  const conditions = conditionsOf(move?.id, attacker.ability);
+  const conditions = conditionsOf(move?.id, attacker.ability, attacker.pokemon);
   const input = move && {
     reference: state.reference,
     attacker,
@@ -2457,9 +2457,13 @@ function damageContext() {
     crit: attacker.crit,
   };
   const summary = input && attacker.pokemon && defender.pokemon ? damageSummary(input) : null;
+  // 쓰는 능력치는 계산이 정한 분류를 따른다(셸사이드암은 물리가 될 수 있다).
+  const keys = statKeys(move, summary?.category ?? move?.category);
   // 방어 측을 고르기 전(또는 효과가 없을 때)에도 결정력은 보인다. 도구·특성 배율은 뺀 값이다.
   const quickAttack = keys.fromDefender ? null : staged(attacker, keys.attack);
-  const quickBase = attacker.power || move?.power || 0;
+  // 내던지기는 지닌 도구의 위력이다.
+  const quickBase =
+    attacker.power || (move?.id === 'fling' ? FLING_POWER[attacker.item] : move?.power) || 0;
   const quickStab = attackerSpecies?.types.includes(move?.type)
     ? attacker.ability === 'adaptability'
       ? 2
@@ -2481,12 +2485,16 @@ function damageContext() {
   };
   const quickPower =
     quickAttack && quickBase ? { ...quickInput, power: damagePower(quickInput) } : null;
-  const defenses = Object.fromEntries(
-    ['def', 'spd'].map(key => [
-      key,
-      { actual: actual(defender, key), staged: staged(defender, key) },
-    ]),
-  );
+  // 두 쪽의 모든 능력치(실수치·랭크 적용). 화면이 고른 칸의 값을 꺼내 쓴다.
+  const allStats = side =>
+    Object.fromEntries(
+      ['atk', 'def', 'spa', 'spd', 'spe'].map(key => [
+        key,
+        { actual: actual(side, key), staged: staged(side, key) },
+      ]),
+    );
+  const hpOf = side =>
+    species(side.pokemon) ? hpStat(species(side.pokemon).stats.hp, side.points?.hp ?? 0) : null;
   return {
     quickPower,
     keys,
@@ -2495,23 +2503,9 @@ function damageContext() {
     summary,
     // 부자유친은 한 번 때리는 기술을 두 번 때린다. 계산이 정한 타수를 보인다.
     defaultHits: summary?.hits ?? (move ? defaultHits(move, attacker.ability) : 1),
-    attackerStats: {
-      attack: actual(attacker, keys.attack),
-      staged: staged(attacker, keys.attack),
-      hp: attackerSpecies ? hpStat(attackerSpecies.stats.hp, attacker.points?.hp ?? 0) : null,
-      speed: actual(attacker, 'spe'),
-      speedStaged: staged(attacker, 'spe'),
-    },
-    defenderStats: {
-      speed: actual(defender, 'spe'),
-      speedStaged: staged(defender, 'spe'),
-      hp: species(defender.pokemon)
-        ? hpStat(species(defender.pokemon).stats.hp, defender.points?.hp ?? 0)
-        : null,
-      defenses,
-      foul: actual(defender, 'atk'),
-      foulStaged: staged(defender, 'atk'),
-    },
+    hitRange: hitRange(move),
+    attackerStats: { all: allStats(attacker), hp: hpOf(attacker) },
+    defenderStats: { all: allStats(defender), hp: hpOf(defender) },
   };
 }
 
@@ -2555,10 +2549,26 @@ function renderDamageResult() {
           : damageStat(species.stats[key], side.points?.[key] ?? 0, side.nature?.[key] ?? 10);
       out.textContent = out.dataset.dmgStat ? value : stageStat(value, side.stages?.[key] ?? 0);
     });
+  // HP 능력 포인트가 바뀌면 남은 HP 글자의 최대 HP도 바뀐다.
+  for (const [key, stats] of [
+    ['attacker', context.attackerStats],
+    ['defender', context.defenderStats],
+  ]) {
+    const out = $('calc-body').querySelector(`[data-dmg-side="${key}"] [data-dmg-out="hpPercent"]`);
+    if (out) {
+      out.dataset.hpMax = stats.hp ?? '';
+      out.textContent = hpText(state.calc.damage[key].hpPercent ?? 100, stats.hp);
+    }
+  }
   // 결정력·내구력 칸도 같은 값으로 고친다.
   const view = damageViewContext(context);
   const power = $('calc-body').querySelector('[data-dmg-quick="power"]');
-  if (power) power.innerHTML = powerBox(context.summary, { ...view, stats: context.attackerStats });
+  if (power)
+    power.innerHTML = powerBox(context.summary, {
+      ...view,
+      state: state.calc.damage,
+      stats: context.attackerStats,
+    });
   const bulk = $('calc-body').querySelector('[data-dmg-quick="bulk"]');
   if (bulk) bulk.innerHTML = bulkBox({ ...view, stats: context.defenderStats });
 }
@@ -2577,6 +2587,8 @@ const DAMAGE_NUMBERS = {
   timesHit: text => countValue(text, 6),
   fainted: text => countValue(text, 5),
   boostTotal: text => countValue(text, 42),
+  stockpile: text => countValue(text, 3),
+  damageTaken: text => countValue(text, 9999),
 };
 // 세는 칸(맞은 횟수 등). 비우면 0.
 function countValue(text, max) {
@@ -2604,10 +2616,10 @@ function damageInput(target, commit) {
   const value = DAMAGE_NUMBERS[field](target.value);
   if (value === undefined) return true;
   state.calc.damage[sideKey] = { ...side, [field]: value };
-  if (field === 'hpPercent') {
-    const out = target.closest('.calc-line')?.querySelector('[data-dmg-out="hpPercent"]');
-    if (out) out.textContent = hpText(value, Number(out.dataset.hpMax) || 0);
-  }
+  // 막대 옆의 글자는 옮기는 동안 제자리에서 고친다.
+  const out = target.closest('.calc-line')?.querySelector(`[data-dmg-out="${field}"]`);
+  if (out && field === 'hpPercent') out.textContent = hpText(value, Number(out.dataset.hpMax) || 0);
+  if (out && field === 'hits') out.textContent = `${value}타`;
   return true;
 }
 
@@ -2684,9 +2696,11 @@ $('calc-body').addEventListener('click', event => {
       return toast('샘플이 없습니다.');
     return openPicker(kind, null, { page: 'damage', side: sideKey });
   }
-  const defenseView = target.closest('[data-dmg-defense-view]');
-  if (defenseView) {
-    dmg[sideKey] = { ...side, defenseView: defenseView.dataset.dmgDefenseView };
+  // 입력할 능력 고르기. 공격 측은 셸사이드암의 공격·특수공격, 방어 측은 방어·특수방어.
+  const statView = target.closest('[data-dmg-stat-view]');
+  if (statView) {
+    const field = sideKey === 'attacker' ? 'attackView' : 'defenseView';
+    dmg[sideKey] = { ...side, [field]: statView.dataset.dmgStatView };
     return renderDamage();
   }
   if (target.closest('[data-dmg-clear]')) {

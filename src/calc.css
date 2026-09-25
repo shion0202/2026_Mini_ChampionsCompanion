@@ -341,10 +341,22 @@
   color: var(--muted);
   font-size: 12px;
 }
-/* 도구 비우기는 특성·도구 칸 아래 줄에 따로 둔다. 옆에 두면 칸과 높이가 어긋난다. */
+/* 도구 칸과 도구 비우기. 도구 비우기는 도구 칸 바로 옆, 칸 높이의 가운데에 붙인다. */
+.calc-item {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+.calc-item .calc-field {
+  flex: 1;
+  min-width: 0;
+}
 .calc-clear {
-  grid-column: 1 / -1;
-  justify-self: end;
+  flex: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   font-size: 12px;
 }
 .calc-actions .segmented {
@@ -385,9 +397,10 @@
   gap: 8px;
 }
 .dmg-rolls > small {
-  /* details는 grid를 받지 않는 브라우저가 있어 글자 정렬로 오른쪽에 붙인다. */
+  /* details는 grid를 받지 않는 브라우저가 있어 글자 정렬로 오른쪽에 붙인다.
+     난수 칩과 붙어 보이지 않게, 칩은 그대로 두고 글자만 위로 올린다. */
   display: block;
-  margin-top: 6px;
+  margin: -2px 0 10px;
   text-align: right;
   color: var(--muted);
   font-size: 12px;
@@ -446,4 +459,11 @@
   display: grid;
   gap: 4px;
   margin-top: 12px;
+}
+/* 기술·특성이 묻는 칸(위력 조건·스피드). 늘 있는 칸과 구분되도록 테두리를 점선 청록으로. */
+.calc-group.is-conditional {
+  border: 1px dashed var(--teal);
+}
+.calc-group.is-conditional legend {
+  color: var(--teal);
 }
