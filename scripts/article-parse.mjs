@@ -244,7 +244,7 @@ export function digest(page, index) {
 export const GAME_TERMS = ['ポケモンチャンピオンズ', 'ポケモン チャンピオンズ', 'ポケチャン'];
 
 // 형식은 검색어에 넣지 않는다. 측정하니 シングル을 더하는 것만으로 하테나의 AND
-// 검색이 고유 URL을 44건에서 5건으로 깎았다. 구축기사 제목이 형식을 밝히지 않는
+// 검색이 고유 URL을 44건에서 5건으로 깎았다. 구축 기사 제목이 형식을 밝히지 않는
 // 경우가 흔하기 때문이다. 형식은 받아온 뒤 제목으로 거른다.
 export function searchQueries({ season }) {
   const number = Number(String(season).replace(/[^0-9]/g, ''));

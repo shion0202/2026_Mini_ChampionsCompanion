@@ -87,5 +87,5 @@ test('cards escape external text, retain item details and mark original links', 
   assert.ok(markup.includes('메가화염레오'));
   assert.ok(markup.includes('화염레오나이트'));
   assert.ok(markup.includes('data-effect-type="held_item"'));
-  assert.ok(renderArticleCards([], reference, locale).includes('확인한 구축기사가 없습니다'));
+  assert.ok(renderArticleCards([], reference, locale).includes('확인한 구축 기사가 없습니다'));
 });

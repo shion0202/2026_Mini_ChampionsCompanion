@@ -23,7 +23,7 @@ export function articleControls(articles, filters) {
 
 export function renderArticleCards(articles, reference, locale, pokemon = '') {
   if (!articles.length)
-    return '<div class="empty-state"><p>이 조건으로 확인한 구축기사가 없습니다.</p><p class="muted">아직 수록하지 않은 기사가 있을 수 있습니다.</p></div>';
+    return '<div class="empty-state"><p>이 조건으로 확인한 구축 기사가 없습니다.</p><p class="muted">아직 수록하지 않은 기사가 있을 수 있습니다.</p></div>';
   return `<div class="article-list">${articles
     .map(
       a => `<article class="team-article">

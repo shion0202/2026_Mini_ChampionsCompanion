@@ -51,7 +51,7 @@ node scripts/build.mjs
 node scripts/serve.mjs --dist --port 4174
 ```
 
-`npm run articles -- --season M3 --format singles`는 구축기사 후보를 검색해 `.cache/article-queue.json`에 쌓습니다. `GOOGLE_API_KEY`와 `GOOGLE_CSE_ID`를 환경변수로 넣으면 구글 검색 채널이 함께 돌고, 없으면 하테나 북마크 검색만 씁니다. `robots.txt`로 AI 목적 수집을 금지한 사이트(네이버 블로그·카페, 포케DB)는 받아오지 않습니다. 원문과 이미지는 `.cache/`에만 남고 커밋되지 않으며, 수집 결과는 `pending` 상태로만 등록되어 사람이 확인해야 공개됩니다. 자세한 동작은 [docs/article-collection.md](docs/article-collection.md)에 있습니다.
+`npm run articles -- --season M3 --format singles`는 구축 기사 후보를 검색해 `.cache/article-queue.json`에 쌓습니다. `GOOGLE_API_KEY`와 `GOOGLE_CSE_ID`를 환경변수로 넣으면 구글 검색 채널이 함께 돌고, 없으면 하테나 북마크 검색만 씁니다. `robots.txt`로 AI 목적 수집을 금지한 사이트(네이버 블로그·카페, 포케DB)는 받아오지 않습니다. 원문과 이미지는 `.cache/`에만 남고 커밋되지 않으며, 수집 결과는 `pending` 상태로만 등록되어 사람이 확인해야 공개됩니다. 자세한 동작은 [docs/article-collection.md](docs/article-collection.md)에 있습니다.
 
 `dist/`에 정적 배포 파일을 생성합니다. HTTPS 정적 호스팅에 올릴 수 있지만 이 작업에서는 외부 공개/배포를 하지 않았습니다. 사용자 데이터 서버는 없습니다.
 

@@ -234,7 +234,7 @@ test('queries pair every game term with the season in both notations', () => {
 
 test('the format never enters the query, only the filter', () => {
   // 측정: 형식 토큰을 넣으면 하테나의 AND 검색이 고유 URL을 44건에서 5건으로
-  // 깎는다. 구축기사 제목이 싱글을 밝히지 않는 경우가 흔하기 때문이다.
+  // 깎는다. 구축 기사 제목이 싱글을 밝히지 않는 경우가 흔하기 때문이다.
   assert.ok(searchQueries({ season: 'M5' }).every(q => !/シングル|ダブル/.test(q)));
   assert.deepEqual(
     searchQueries({ season: 'M5', format: 'Singles' }),

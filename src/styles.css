@@ -1604,6 +1604,10 @@ dialog .icon-button {
 .actual-stats td {
   font-size: 12px !important;
 }
+/* 끝 칸(최소)은 표 공통 규칙으로 굵다. 양 끝이 범위를 이루므로 최대도 같이 굵게 둔다. */
+.actual-stats tbody td:first-of-type {
+  font-weight: 700;
+}
 .reference-section {
   font-size: 14px;
   margin: 24px 0 3px;
@@ -3167,7 +3171,7 @@ select optgroup {
 .builds-field select {
   min-height: 44px;
   width: 100%;
-  /* 전역 select가 max-width를 180px로 묶는다. 스피드·구축기사 화면과 같이 푼다. */
+  /* 전역 select가 max-width를 180px로 묶는다. 스피드·구축 기사 화면과 같이 푼다. */
   max-width: none;
   border: 1px solid var(--line);
   border-radius: 10px;

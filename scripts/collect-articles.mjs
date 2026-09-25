@@ -35,7 +35,7 @@ const format = argument('format');
 const wanted = format ? (format.toLowerCase().startsWith('d') ? 'Doubles' : 'Singles') : null;
 
 // 하테나 북마크는 note, pokesol, fc2, 개인 도메인 기사를 모두 색인한다. users 기본값이
-// 3이라 그대로 두면 북마크가 적은 개인 구축기사가 거의 전부 빠진다. 다만 누군가
+// 3이라 그대로 두면 북마크가 적은 개인 구축 기사가 거의 전부 빠진다. 다만 누군가
 // 북마크한 글만 들어 있어 재현율이 낮다. M-5 실측에서 300건 중 21건만 보였다.
 const feedUrl = query =>
   `https://b.hatena.ne.jp/q/${encodeURIComponent(query)}?mode=rss&target=text&users=1&sort=recent`;
@@ -154,7 +154,7 @@ for (const [url, link] of found) {
   const page = readPage(html);
   const title = parseTitle(page.title || link.title);
   const { candidates, flags } = digest(page, index);
-  // 제목에 최종 순위가 없으면 구축기사가 아닐 확률이 높다. 챔피언스 후보가 여섯
+  // 제목에 최종 순위가 없으면 구축 기사가 아닐 확률이 높다. 챔피언스 후보가 여섯
   // 미만인 글까지 큐에 넣으면 판정 비용만 늘어난다.
   if (title.rank === null && candidates.filter(c => c.champions).length < 6) {
     skipped['not-an-article']++;

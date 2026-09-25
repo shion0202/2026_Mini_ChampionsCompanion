@@ -129,12 +129,26 @@ import {
   sortLabel,
   activeFilters,
 } from './app-state.js';
-const DETAIL_LABELS = {
-  overview: '기본 정보',
-  ...CATEGORY_LABELS,
-  learnset: '배우는 기술',
-  articles: '구축기사',
-};
+// 상세 탭 순서. 배치를 정하는 순서(보정 → 포인트 → 특성 → 기술 → 도구)를 따르고,
+// 파티를 짜는 데 쓰는 같은 팀과 참고 자료는 뒤에 둔다.
+const DETAIL_ORDER = [
+  'overview',
+  'stat_alignment',
+  'stat_points',
+  'ability',
+  'move',
+  'held_item',
+  'teammate',
+  'learnset',
+  'articles',
+];
+const DETAIL_LABELS = Object.fromEntries(
+  DETAIL_ORDER.map(key => [
+    key,
+    { overview: '기본 정보', learnset: '배우는 기술', articles: '구축 기사' }[key] ??
+      CATEGORY_LABELS[key],
+  ]),
+);
 
 const $ = id => document.getElementById(id);
 history.scrollRestoration = 'manual';
@@ -374,7 +388,7 @@ function renderCategory() {
   if (category === 'articles') {
     const filters = { season: state.season, format: state.format, pokemon: p.id };
     $('category-content').innerHTML =
-      `<div class="category-heading"><h3>구축기사</h3></div>
+      `<div class="category-heading"><h3>구축 기사</h3></div>
       <p class="category-tip">${esc(articleSeasonLabel(state.season))} / ${state.format === 'Singles' ? '싱글배틀' : '더블배틀'} 기준입니다.</p>` +
       articleContent(filters) +
       `<button class="load-more" data-article-pokemon="${esc(p.id)}">이 포켓몬의 다른 시즌 기사 보기</button>`;
@@ -524,8 +538,8 @@ function showPage(page) {
 
 function articleContent(filters) {
   if (state.articleError)
-    return '<div class="empty-state"><p>구축기사를 불러오지 못했습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
-  if (!state.articleData) return loadingState('구축기사를 불러오는 중');
+    return '<div class="empty-state"><p>구축 기사를 불러오지 못했습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
+  if (!state.articleData) return loadingState('구축 기사를 불러오는 중');
   if (!state.reference) return referenceStatus(state.refError);
   if (!state.locale)
     return '<div class="empty-state"><p>한국어 명칭을 준비하고 있습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
