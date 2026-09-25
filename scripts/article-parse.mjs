@@ -338,18 +338,31 @@ const BLOG_POST = [
   /^(m\.)?cafe\.naver\.com\/(ca-fe\/web\/cafes\/[^/]+\/articles\/\d+|[^/]+\/\d+)/,
   /^yakkun\.com\/bbs\/party\/n\d+/,
   /^(mobile\.)?(x|twitter)\.com\/[^/]+\/status\/\d+/,
+  /^((www|m)\.)?youtube\.com\/(watch$|shorts\/|live\/)|^youtu\.be\/./,
 ];
 
 // X 게시물은 로그인 없이 본문이 나오지 않아 수집기가 읽을 수 없다. 받지 않고 사람이
 // 검토할 목록으로 보낸다. 계정 프로필이나 영상처럼 기사가 아닌 링크는 리드가 아니다.
+// 유튜브 영상도 같다. 팀은 영상 속에만 있어 본문과 이미지로 대조할 수 없다.
+const YOUTUBE_VIDEO = /^((www|m)\.)?youtube\.com\/(watch$|shorts\/|live\/)|^youtu\.be\/./;
 const X_POST = /^(www\.|mobile\.)?(x|twitter)\.com\/[^/]+\/status\/\d+/;
 const NOT_ARTICLE_HOST =
   /^(www\.|mobile\.|m\.)?(x|twitter|youtube|youtu|twitch|discord|instagram|tiktok)\.(com|be|tv|gg)$/;
+
+// SNS 프로필, 채널, 재생목록처럼 기사가 될 수 없는 링크. 사람이 붙여 넣은 목록에서도 뺀다.
+export const isNonArticle = value => {
+  try {
+    return NOT_ARTICLE_HOST.test(new URL(value).host) && !isBlogPost(value);
+  } catch {
+    return true;
+  }
+};
 
 export function humanOnly(value) {
   try {
     const url = new URL(value);
     if (X_POST.test(url.host + url.pathname)) return 'X 게시물';
+    if (YOUTUBE_VIDEO.test(url.host + url.pathname)) return 'YouTube 영상';
   } catch {
     return null;
   }
@@ -365,7 +378,8 @@ export const isBlogPost = value => {
 };
 
 const SCRIPTS = /<(script|style)\b[^]*?<\/\1>/gi;
-const TRACKING = /^(utm_|fbclid$|gclid$|ref$|ref_src$)/;
+// si는 유튜브 공유 링크의 추적 값이다. 영상 주소(v)와 시각(t)은 남긴다.
+const TRACKING = /^(utm_|fbclid$|gclid$|ref$|ref_src$|si$)/;
 const cleanUrl = (value, base) => {
   try {
     const url = new URL(decode(value.trim()), base);
@@ -451,7 +465,7 @@ export const isLeadLink = (link, pageUrl) => {
     return false;
   }
   if (isBlogPost(link.url)) return true;
-  if (NOT_ARTICLE_HOST.test(url.host)) return false;
+  if (isNonArticle(link.url)) return false;
   return parseTitle(`${link.title} ${link.context}`).rank !== null || link.rankHint != null;
 };
 

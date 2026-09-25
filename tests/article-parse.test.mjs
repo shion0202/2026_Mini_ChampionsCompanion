@@ -11,6 +11,7 @@ import {
   googleLinks,
   humanOnly,
   isBlogPost,
+  isNonArticle,
   pageUrlOf,
   isLeadLink,
   robotsAllows,
@@ -524,4 +525,29 @@ test('X posts and blocked hosts go to people, never to the fetcher', () => {
 test('a pasted line gives its bare rank as a hint', () => {
   const [link] = extractLinks('https://x.com/tw/status/1 23位 싱글');
   assert.equal(link.rankHint, 23);
+});
+
+test('YouTube videos are leads for people; channels and playlists are not', () => {
+  for (const url of [
+    'https://www.youtube.com/watch?v=abc123',
+    'https://m.youtube.com/watch?v=abc123',
+    'https://youtu.be/abc123',
+    'https://www.youtube.com/shorts/abc123',
+    'https://www.youtube.com/live/abc123',
+  ]) {
+    assert.equal(humanOnly(url), 'YouTube 영상', url);
+    assert.ok(isLeadLink({ url, title: '', context: '', rankHint: null }), url);
+  }
+  for (const url of [
+    'https://www.youtube.com/@someone',
+    'https://www.youtube.com/playlist?list=PL1',
+    'https://www.youtube.com/channel/UC1',
+  ])
+    assert.ok(!isLeadLink({ url, title: '最終5位', context: '', rankHint: 5 }), url);
+  assert.ok(isNonArticle('https://www.youtube.com/@someone'));
+  assert.ok(isNonArticle('https://x.com/someone'));
+  assert.ok(!isNonArticle('https://youtu.be/abc123'));
+  assert.ok(!isNonArticle('https://note.com/a/n/n1'));
+  const [link] = extractLinks('https://youtu.be/abc123?si=track&t=30 最終5位');
+  assert.equal(link.url, 'https://youtu.be/abc123?t=30', '공유 추적 값만 뗀다');
 });

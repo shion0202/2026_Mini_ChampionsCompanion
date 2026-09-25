@@ -16,6 +16,7 @@ import {
   extractLinks,
   isLeadLink,
   humanOnly,
+  isNonArticle,
   looksLikeArticle,
   pageUrlOf,
   robotsAllows,
@@ -137,7 +138,7 @@ const known = new Set(existing.articles.map(article => article.url));
 const found = new Map();
 const counts = {};
 const take = (link, source, manual = false) => {
-  if (!link.url || known.has(link.url) || found.has(link.url)) return;
+  if (!link.url || known.has(link.url) || found.has(link.url) || isNonArticle(link.url)) return;
   const hint = `${link.title ?? ''} ${link.context ?? ''}`;
   if (!manual) {
     if (!looksRelevant(hint)) return;
@@ -280,6 +281,7 @@ const entries = [];
 // 왜 걸렀는지 세어 둔다. 한 건도 안 남을 때 검색어 탓인지 필터 탓인지 알아야 한다.
 const skipped = {
   'X 게시물': 0,
+  'YouTube 영상': 0,
   '수집 금지 호스트': 0,
   'robots.txt': 0,
   fetch: 0,
