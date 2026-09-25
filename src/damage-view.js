@@ -382,8 +382,8 @@ function defenderPanel(state, context) {
     `<label class="calc-field">압정뿌리기<select data-dmg-field="spikes">${options(SPIKES, String(side.spikes ?? 0))}</select></label>` +
     `</div>` +
     check('stealthRock', side.stealthRock, '스텔스록') +
-    `<div class="calc-line"><span>울퉁불퉁멧 (1/6)</span><input type="number" min="0" max="9" step="1" value="${side.helmetHits ?? 0}" data-dmg-number="helmetHits" aria-label="울퉁불퉁멧 데미지를 받은 횟수"><small class="calc-note">받은 횟수</small></div>` +
-    `<div class="calc-line"><span>까칠한피부·철가시 (1/8)</span><input type="number" min="0" max="9" step="1" value="${side.roughSkinHits ?? 0}" data-dmg-number="roughSkinHits" aria-label="까칠한피부·철가시 데미지를 받은 횟수"><small class="calc-note">받은 횟수</small></div>` +
+    `<div class="calc-line is-wide"><span>울퉁불퉁멧을 받은 횟수 (1/6)</span><input type="number" min="0" max="9" step="1" value="${side.helmetHits ?? 0}" data-dmg-number="helmetHits" aria-label="울퉁불퉁멧을 받은 횟수"></div>` +
+    `<div class="calc-line is-wide"><span>까칠한피부·철가시를 받은 횟수 (1/8)</span><input type="number" min="0" max="9" step="1" value="${side.roughSkinHits ?? 0}" data-dmg-number="roughSkinHits" aria-label="까칠한피부·철가시를 받은 횟수"></div>` +
     check('reflect', side.reflect, '리플렉터') +
     check('lightScreen', side.lightScreen, '빛의장막') +
     check('auroraVeil', side.auroraVeil, '오로라베일') +
@@ -462,6 +462,8 @@ export function damageResult(summary, context) {
   const residualBlock = summary.residualTable
     ? `<div class="dmg-row dmg-residual"><span>턴 종료</span><strong>${esc(residualText)}</strong></div>` +
       `<small class="dmg-sub dmg-sub-end">1턴째 합계 ${residualNet > 0 ? '+' : residualNet < 0 ? '−' : ''}${Math.abs(residualNet)} (최대 HP의 ${percent((Math.abs(residualNet) / summary.hpMax) * 100)})</small>` +
+      // 1회 공격에 1턴째 턴 종료 데미지를 더한 범위(회복이 더 크면 줄어든다).
+      `<div class="dmg-row"><span>데미지 범위 (턴 종료 포함)</span><strong>${summary.min - residualNet} ~ ${summary.max - residualNet} (${percent(((summary.min - residualNet) / summary.hpMax) * 100)} ~ ${percent(((summary.max - residualNet) / summary.hpMax) * 100)})</strong></div>` +
       `<div class="dmg-box is-residual"><small>KO 정보 (턴 종료 데미지 포함) · ${esc(summary.residualVerdict.chance < 1 && summary.residualVerdict.turns ? `${summary.residualVerdict.text} (${percent(summary.residualVerdict.chance * 100)})` : summary.residualVerdict.text)}</small>` +
       `<div class="dmg-chips">${koChips(summary.residualTable)}</div></div>`
     : '';

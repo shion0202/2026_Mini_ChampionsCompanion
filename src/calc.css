@@ -494,3 +494,9 @@
 .dmg-residual {
   margin-top: 14px;
 }
+/* 이름표가 긴 줄. 이름표는 한 줄로 두고 숫자 칸은 그 옆에 붙인다. */
+.calc-line.is-wide > span:first-child {
+  width: auto;
+  /* 두 줄의 숫자 칸이 같은 자리에서 시작하도록 긴 쪽에 맞춘다. */
+  min-width: 210px;
+}
