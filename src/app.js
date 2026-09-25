@@ -40,9 +40,11 @@ import {
   stat as damageStat,
   stageStat,
   hpStat,
+  grounded,
+  isSpreadMove,
 } from './damage-calc.js';
-import { damageCalcView, damageResult, statKeys, hpText } from './damage-view.js';
-import { NFE_SPECIES, SPREAD_MOVES } from './damage-catalog.js';
+import { damageCalcView, damageResult, statKeys, hpText, conditionsOf } from './damage-view.js';
+import { NFE_SPECIES } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { reviewedArticles, selectArticles } from './articles.js';
 import { articleControls, articleSeasonLabel, renderArticleCards } from './articles-view.js';
@@ -2432,7 +2434,11 @@ function damageContext() {
     return value === null ? null : stageStat(value, side.stages?.[key] ?? 0);
   };
   // 전체기인지는 기술로 정한다. 칸을 직접 바꿨으면 그것을 따른다.
-  const spread = attacker.spread ?? (move ? SPREAD_MOVES.has(move.id) : false);
+  const attackerSpecies = species(attacker.pokemon);
+  const spread =
+    attacker.spread ??
+    isSpreadMove(move, dmg.field, attackerSpecies ? grounded(attackerSpecies, attacker) : true);
+  const conditions = conditionsOf(move?.id, attacker.ability);
   const input = move && {
     reference: state.reference,
     attacker,
@@ -2441,16 +2447,24 @@ function damageContext() {
     move,
     crit: attacker.crit,
   };
+  const summary = input && attacker.pokemon && defender.pokemon ? damageSummary(input) : null;
   return {
     keys,
     spread,
-    summary: input && attacker.pokemon && defender.pokemon ? damageSummary(input) : null,
-    defaultHits: move ? defaultHits(move, attacker.ability) : 1,
+    conditions,
+    summary,
+    // 부자유친은 한 번 때리는 기술을 두 번 때린다. 계산이 정한 타수를 보인다.
+    defaultHits: summary?.hits ?? (move ? defaultHits(move, attacker.ability) : 1),
     attackerStats: {
       attack: actual(attacker, keys.attack),
       staged: staged(attacker, keys.attack),
+      hp: attackerSpecies ? hpStat(attackerSpecies.stats.hp, attacker.points?.hp ?? 0) : null,
+      speed: actual(attacker, 'spe'),
+      speedStaged: staged(attacker, 'spe'),
     },
     defenderStats: {
+      speed: actual(defender, 'spe'),
+      speedStaged: staged(defender, 'spe'),
       hp: species(defender.pokemon)
         ? hpStat(species(defender.pokemon).stats.hp, defender.points?.hp ?? 0)
         : null,
@@ -2501,7 +2515,16 @@ const DAMAGE_NUMBERS = {
         ? Math.min(10, +text)
         : undefined,
   hpPercent: text => (Number.isFinite(+text) ? clampNumber(Math.round(+text), 1, 100) : undefined),
+  timesHit: text => countValue(text, 6),
+  fainted: text => countValue(text, 5),
+  boostTotal: text => countValue(text, 42),
 };
+// 세는 칸(맞은 횟수 등). 비우면 0.
+function countValue(text, max) {
+  if (text.trim() === '') return 0;
+  const value = Number(text);
+  return Number.isInteger(value) && value >= 0 ? Math.min(max, value) : undefined;
+}
 
 // 숫자 칸 하나를 상태에 넣는다. 숫자 칸이 아니면 false.
 function damageInput(target, commit) {
@@ -2555,6 +2578,7 @@ $('calc-body').addEventListener('change', event => {
     dmg.field = { ...dmg.field, [field]: target.value };
   else if (sideKey && target.type === 'checkbox')
     dmg[sideKey] = { ...dmg[sideKey], [field]: target.checked };
+  else if (sideKey && field === 'spikes') dmg[sideKey] = { ...dmg[sideKey], spikes: +target.value };
   else if (sideKey) dmg[sideKey] = { ...dmg[sideKey], [field]: target.value };
   renderDamage();
 });

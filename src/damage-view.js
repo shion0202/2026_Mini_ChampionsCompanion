@@ -7,7 +7,7 @@ import { speciesSprite } from './images.js';
 import { TYPE_LABELS } from './locale.js';
 import { CATEGORY_NAMES } from './reference-view.js';
 import { WEATHERS, TERRAINS, STATUSES, NATURE_FACTORS } from './speed-calc.js';
-import { MOVE_STATS } from './damage-calc.js';
+import { MOVE_STATS, MOVE_CONDITIONS, ABILITY_CONDITIONS } from './damage-calc.js';
 
 // 조사를 이름에 붙여 만들지 않는다. ‘방어으로’처럼 틀린다.
 const TAKEN_WITH = { def: '방어로 계산', spd: '특수방어로 계산' };
@@ -17,9 +17,44 @@ export const STAT_NAMES_KO = {
   def: '방어',
   spa: '특수공격',
   spd: '특수방어',
+  spe: '스피드',
 };
 const NATURE_LABELS = { 9: '×0.9', 10: '×1.0', 11: '×1.1' };
-const PINCH = ['overgrow', 'blaze', 'torrent', 'swarm'];
+
+// 기술·특성의 조건 칸 이름. 켜는 것은 체크, 세는 것은 숫자 칸이다.
+const TOGGLE_LABELS = {
+  movesLast: '상대보다 늦게 행동',
+  wasHit: '이번 턴에 상대에게 공격받음',
+  targetHurt: '상대가 이번 턴에 이미 데미지를 받음',
+  lastFailed: '직전에 쓴 기술이 실패함',
+  statsLowered: '이번 턴에 능력이 떨어짐',
+  allyRound: '아군이 먼저 돌림노래를 씀',
+  fickle: '위력 두 배가 발동함 (30%)',
+  targetSwitched: '상대가 이번 턴에 교체해 나옴',
+};
+const COUNT_FIELDS = {
+  timesHit: { label: '공격받은 횟수', max: 6 },
+  fainted: { label: '쓰러진 아군 수', max: 5 },
+  boostTotal: { label: '올라간 랭크 합계', max: 42 },
+};
+const SPIKES = [
+  ['0', '없음'],
+  ['1', '1겹'],
+  ['2', '2겹'],
+  ['3', '3겹'],
+];
+
+// 이 기술과 특성이 묻는 조건. 둘이 같은 것을 물으면 한 번만 보인다.
+export function conditionsOf(moveId, ability) {
+  const list = [MOVE_CONDITIONS[moveId], ABILITY_CONDITIONS[ability]].filter(Boolean);
+  return {
+    toggles: [...new Set(list.map(c => c.toggle).filter(Boolean))],
+    counts: [...new Set(list.map(c => c.count).filter(Boolean))],
+    hp: list.some(c => c.hp),
+    speed: list.some(c => c.speed),
+    weight: list.some(c => c.weight),
+  };
+}
 
 // 기술에 따라 쓰는 능력치. 기술을 고르지 않았으면 물리로 본다.
 export function statKeys(move) {
@@ -156,12 +191,12 @@ function attackerPanel(state, context) {
     (keys.fromDefender
       ? ''
       : rankGroup(STAT_NAMES_KO[keys.attack], side, keys.attack, stats.staged)) +
+    speedGroups(side, context.conditions, stats) +
     `<fieldset class="calc-group"><legend>특성 · 도구</legend><div class="calc-grid">` +
     abilitySelect(side, reference) +
     itemPick(side, reference) +
-    `</div>` +
-    `${PINCH.includes(side.ability) ? check('pinch', side.pinch, 'HP 1/3 이하') : ''}` +
-    `</fieldset>` +
+    `</div></fieldset>` +
+    conditionGroup(side, context.conditions, stats.hp) +
     `<fieldset class="calc-group"><legend>상태 · 날씨 · 필드</legend><div class="calc-grid">` +
     `<label class="calc-field">상태이상<select data-dmg-field="status">${options(Object.entries(STATUSES), side.status)}</select></label>` +
     `<label class="calc-field">날씨<select data-dmg-field="weather">${options(Object.entries(WEATHERS), state.field.weather)}</select></label>` +
@@ -174,6 +209,33 @@ function attackerPanel(state, context) {
   );
 }
 
+// 기술·특성이 묻는 조건(대가의 행동 순서, 분노의주먹의 맞은 횟수, 분화의 남은 HP 등).
+// 묻는 것이 없으면 칸을 두지 않는다.
+function conditionGroup(side, conditions, hpMax) {
+  const { toggles, counts, hp } = conditions;
+  if (!toggles.length && !counts.length && !hp) return '';
+  return (
+    `<fieldset class="calc-group"><legend>위력 조건</legend>` +
+    (hp ? hpSlider(side, hpMax, '공격 측 남은 HP 비율') : '') +
+    counts
+      .map(
+        key =>
+          `<div class="calc-line"><span>${COUNT_FIELDS[key].label}</span>` +
+          `<input type="number" min="0" max="${COUNT_FIELDS[key].max}" step="1" value="${side[key] ?? 0}" data-dmg-number="${key}" aria-label="${COUNT_FIELDS[key].label}"></div>`,
+      )
+      .join('') +
+    toggles.map(key => check(key, side[key], TOGGLE_LABELS[key])).join('') +
+    `</fieldset>`
+  );
+}
+
+// 자이로볼·일렉트릭볼은 두 쪽 스피드로 위력이 정해진다. 그때만 보인다.
+const speedGroups = (side, conditions, stats) =>
+  conditions.speed
+    ? `<fieldset class="calc-group"><legend>스피드 수치</legend>${statBlock('스피드', side, 'spe', stats.speed)}</fieldset>` +
+      rankGroup('스피드', side, 'spe', stats.speedStaged)
+    : '';
+
 function defenderPanel(state, context) {
   const { reference, index, speciesLabel, stats, keys } = context;
   const side = state.defender;
@@ -185,10 +247,7 @@ function defenderPanel(state, context) {
     picks(side, reference, speciesLabel) +
     `<fieldset class="calc-group"><legend>HP 수치</legend>` +
     statBlock('HP', side, 'hp', stats.hp) +
-    // 남은 HP는 %와 실제 값을 함께 보인다. 옮기는 동안 app.js가 글자만 고친다(data-hp-max).
-    `<div class="calc-line"><span>남은 HP</span>` +
-    `<input type="range" min="1" max="100" step="1" value="${side.hpPercent}" data-dmg-number="hpPercent" aria-label="남은 HP 비율">` +
-    `<strong data-dmg-out="hpPercent" data-hp-max="${stats.hp ?? ''}">${hpText(side.hpPercent, stats.hp)}</strong></div>` +
+    hpSlider(side, stats.hp, '방어 측 남은 HP 비율') +
     `</fieldset>` +
     `<fieldset class="calc-group"><legend>${esc(defenseTitle)}</legend>` +
     statBlock(STAT_NAMES_KO[keys.defense], side, keys.defense, stats.defense) +
@@ -198,13 +257,18 @@ function defenderPanel(state, context) {
       ? `<fieldset class="calc-group"><legend>공격 수치 (속임수)</legend>${statBlock('공격', side, 'atk', stats.foul)}</fieldset>` +
         rankGroup('공격', side, 'atk', stats.foulStaged)
       : '') +
+    speedGroups(side, context.conditions, stats) +
     `<fieldset class="calc-group"><legend>특성 · 도구</legend><div class="calc-grid">` +
     abilitySelect(side, reference) +
     itemPick(side, reference) +
     `</div></fieldset>` +
     // 방어 측 상태이상은 병상첨병·베놈쇼크 같은 기술과 이상한비늘이 본다.
-    `<fieldset class="calc-group"><legend>상태 · 벽 · 부가효과</legend>` +
+    // 설치 기술은 교체해 나올 때 받으므로 남은 HP에서 먼저 뺀다.
+    `<fieldset class="calc-group"><legend>상태 · 벽 · 설치 기술</legend><div class="calc-grid">` +
     `<label class="calc-field">상태이상<select data-dmg-field="status">${options(Object.entries(STATUSES), side.status ?? '')}</select></label>` +
+    `<label class="calc-field">압정뿌리기<select data-dmg-field="spikes">${options(SPIKES, String(side.spikes ?? 0))}</select></label>` +
+    `</div>` +
+    check('stealthRock', side.stealthRock, '스텔스록') +
     check('reflect', side.reflect, '리플렉터') +
     check('lightScreen', side.lightScreen, '빛의장막') +
     check('auroraVeil', side.auroraVeil, '오로라베일') +
@@ -215,6 +279,12 @@ function defenderPanel(state, context) {
 }
 
 const percent = value => `${value.toFixed(1)}%`;
+
+// 남은 HP 칸. %와 실제 값을 함께 보인다. 옮기는 동안 app.js가 글자만 고친다(data-hp-max).
+const hpSlider = (side, hpMax, label) =>
+  `<div class="calc-line"><span>남은 HP</span>` +
+  `<input type="range" min="1" max="100" step="1" value="${side.hpPercent ?? 100}" data-dmg-number="hpPercent" aria-label="${esc(label)}">` +
+  `<strong data-dmg-out="hpPercent" data-hp-max="${hpMax ?? ''}">${hpText(side.hpPercent ?? 100, hpMax)}</strong></div>`;
 
 // 남은 HP: ‘100% · 197/197’. 최대 HP를 모르면 %만.
 export const hpText = (pct, hpMax) =>
@@ -236,46 +306,84 @@ export function damageResult(summary, context) {
     : summary.verdict.chance < 1 && summary.verdict.turns
       ? `${summary.verdict.text} (${percent(summary.verdict.chance * 100)})`
       : summary.verdict.text;
+  // 웨더볼·스킨 특성처럼 타입이 바뀌면 바뀐 타입을, 트리플악셀은 타격마다의 위력을 보인다.
+  const power = summary?.fixed
+    ? '고정'
+    : (summary?.basePowers?.join(' · ') ??
+      summary?.basePower ??
+      (attacker.power || move.power || '—'));
   const head =
     `<div class="dmg-summary">` +
     person('attacker', attacker.pokemon) +
     // 이름표와 값을 한 묶음으로 두고 묶음 사이를 띄운다. 모두 같은 간격이면 어느 값이
     // 어느 이름표의 것인지 흐려진다.
     `<div class="dmg-move">` +
-    `<div class="dmg-stat"><strong>${esc(move.label)}</strong>${typeBadges([move.type])}</div>` +
-    `<div class="dmg-stat"><small>기술 위력</small><b>${summary?.basePower ?? (attacker.power || move.power || '—')}</b></div>` +
+    `<div class="dmg-stat"><strong>${esc(move.label)}</strong>${typeBadges([summary?.moveType ?? move.type])}</div>` +
+    `<div class="dmg-stat"><small>기술 위력</small><b>${power}</b></div>` +
     `<div class="dmg-stat"><small>타입 상성</small><b>${summary?.effectiveness ?? '—'}×</b></div>` +
     `<p class="dmg-verdict">${esc(verdictText)}</p></div>` +
     person('defender', defender.pokemon) +
     `</div>`;
   if (!summary || summary.reason) return `<div class="dmg-result">${head}</div>`;
   const hits = summary.hits;
-  const power =
-    `<div class="dmg-card">` +
-    `<div class="dmg-row"><span>공격 측 결정력</span><strong>${summary.power.toLocaleString()}</strong></div>` +
-    `<small class="dmg-sub">${STAT_NAMES_KO[context.keys.attack]} 실수치 ${summary.attackStat} × 위력 ${summary.basePower}${summary.stab !== 1 ? ` × 자속 보정 ${summary.stab}` : ''}${hits > 1 ? ` · 타격당, ${hits}회` : ''}</small>` +
-    `<div class="dmg-row"><span>방어 측 ${STAT_NAMES_KO[context.keys.defense]} 내구력</span><strong>${summary.bulk.toLocaleString()}</strong></div>` +
-    `<small class="dmg-sub">물리 내구력 ${summary.bulks.def.toLocaleString()} · 특수 내구력 ${summary.bulks.spd.toLocaleString()} · HP ${summary.hpNow}/${summary.hpMax}</small>` +
-    `</div>`;
+  // 위력을 정한 값(스피드·무게)도 함께 보인다.
+  const basis = summary.speeds
+    ? ` · 스피드 ${summary.speeds.attacker} 대 ${summary.speeds.defender}`
+    : summary.weights
+      ? ` · 무게 ${summary.weights.attacker / 10}kg 대 ${summary.weights.defender / 10}kg`
+      : '';
+  const bulkLine = `<small class="dmg-sub">물리 내구력 ${summary.bulks.def.toLocaleString()} · 특수 내구력 ${summary.bulks.spd.toLocaleString()} · HP ${summary.hpNow}/${summary.hpMax}</small>`;
+  const powerCard = summary.fixed
+    ? `<div class="dmg-card">` +
+      `<div class="dmg-row"><span>고정 데미지</span><strong>${summary.fixed}</strong></div>` +
+      `<small class="dmg-sub">능력치와 배율을 받지 않는 기술입니다.</small>` +
+      bulkLine +
+      `</div>`
+    : `<div class="dmg-card">` +
+      `<div class="dmg-row"><span>공격 측 결정력</span><strong>${summary.power.toLocaleString()}</strong></div>` +
+      `<small class="dmg-sub">${STAT_NAMES_KO[context.keys.attack]} 실수치 ${summary.attackStat} × 위력 ${summary.basePower}${summary.stab !== 1 ? ` × 자속 보정 ${summary.stab}` : ''}${hits > 1 ? ` · 타격당, ${hits}회` : ''}${basis}</small>` +
+      `<div class="dmg-row"><span>방어 측 ${STAT_NAMES_KO[context.keys.defense]} 내구력</span><strong>${summary.bulk.toLocaleString()}</strong></div>` +
+      bulkLine +
+      `</div>`;
   const ko = summary.table
     .map(row => {
       const text = row.chance >= 1 ? '확정' : row.chance > 0 ? percent(row.chance * 100) : '불가';
       return `<span class="dmg-chip${row.chance >= 1 ? ' is-sure' : row.chance > 0 ? ' is-maybe' : ''}">${row.turns}타 ${text}</span>`;
     })
     .join('');
-  // 난수 16개는 데미지 범위 아래 ‘상세 보기’를 눌러야 보인다.
-  const rolls = summary.rolls.map(r => `<span class="dmg-chip">${r}</span>`).join('');
+  // 난수 16개는 데미지 범위 아래 ‘상세 보기’를 눌러야 보인다. 타격마다 다르면(부자유친,
+  // 트리플악셀, 멀티스케일) 타격마다 한 줄씩.
+  const chips = rolls => rolls.map(r => `<span class="dmg-chip">${r}</span>`).join('');
+  const same = summary.flow.every(rolls => rolls.join() === summary.flow[0].join());
+  const rolls = same
+    ? `<small>난수 데미지${hits > 1 ? ' (1타당)' : ''}</small><div class="dmg-chips">${chips(summary.flow[0])}</div>`
+    : summary.flow
+        .map(
+          (r, i) =>
+            `<small>난수 데미지 (${i + 1}타째)</small><div class="dmg-chips">${chips(r)}</div>`,
+        )
+        .join('');
+  const notes = [
+    summary.hazard
+      ? `설치 기술로 ${summary.hazard} 데미지를 먼저 받습니다 (남은 HP ${summary.hpStart}/${summary.hpMax}).`
+      : '',
+    summary.endure ? '기합의띠·옹골참: HP가 가득일 때 한 번은 HP 1로 버팁니다.' : '',
+    summary.disguise ? '탈: 첫 공격을 막고 최대 HP의 1/8만 받습니다.' : '',
+  ]
+    .filter(Boolean)
+    .map(text => `<p class="calc-note">${esc(text)}</p>`)
+    .join('');
   const detail =
     `<div class="dmg-card">` +
     `<div class="dmg-row"><span>${hits > 1 ? `1회 공격 (${hits}타)` : '1회 공격'}</span><small>${TAKEN_WITH[context.keys.defense]}</small></div>` +
     `<div class="dmg-row"><span>데미지 범위</span><strong>${summary.min} ~ ${summary.max} (${percent(summary.minPercent)} ~ ${percent(summary.maxPercent)})</strong></div>` +
-    `<details class="dmg-rolls"${state.rollsOpen ? ' open' : ''}><summary>상세 보기</summary>` +
-    `<small>난수 데미지${hits > 1 ? ' (1타당)' : ''}</small><div class="dmg-chips">${rolls}</div></details>` +
+    `<details class="dmg-rolls"${state.rollsOpen ? ' open' : ''}><summary>상세 보기</summary>${rolls}</details>` +
     `<div class="dmg-row"><span>결과</span><strong>${esc(verdictText)}</strong></div>` +
     `<div class="dmg-row"><span>1타 확률</span><strong>${percent((summary.table[0]?.chance ?? 0) * 100)}</strong></div>` +
     `<div class="dmg-box"><small>KO 정보</small><div class="dmg-chips">${ko}</div></div>` +
+    notes +
     `</div>`;
-  return `<div class="dmg-result">${head}${power}${detail}</div>`;
+  return `<div class="dmg-result">${head}${powerCard}${detail}</div>`;
 }
 
 export function damageCalcView(state, summary, context) {
@@ -293,6 +401,6 @@ export function damageCalcView(state, summary, context) {
     defenderPanel(state, { ...context, stats: context.defenderStats }) +
     `</div>` +
     `<div data-dmg-result>${result}</div>` +
-    `<p class="speed-help">Showdown과 같은 순서로 계산합니다. 위력이 상황에 따라 바뀌는 기술(파워트립, 웨더볼 등)은 위력을 직접 넣어 주세요. 결정력은 공격 실수치 × 위력 × 자속 보정, 내구력은 HP × 방어 ÷ 0.411입니다.</p>`
+    `<p class="speed-help">Showdown과 같은 순서로 계산합니다. 위력이 상황에 따라 바뀌는 기술과 특성은 ‘위력 조건’ 칸이 나타나고, 위력을 직접 넣으면 그 값을 씁니다. 결정력은 공격 실수치 × 위력 × 자속 보정, 내구력은 HP × 방어 ÷ 0.411입니다.</p>`
   );
 }
