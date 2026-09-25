@@ -51,7 +51,20 @@ import {
   validateParty,
   partiesUsing,
   deleteSample,
+  docFromServer,
+  joinDocs,
 } from './builds.js';
+import {
+  newSyncCode,
+  normalizeCode,
+  formatCode,
+  pullDoc,
+  pushDoc,
+  planOnOpen,
+  createUploader,
+  readSync,
+  writeSync,
+} from './sync.js';
 import {
   sampleList,
   partyList,
@@ -60,6 +73,7 @@ import {
   pickerRows,
   comboRows,
   comboOptions,
+  syncBar,
 } from './builds-view.js';
 import {
   renderReference,
@@ -137,6 +151,9 @@ const favorites = saved.favorites;
 const state = {
   page: 'ranking',
   builds: readDoc(storage),
+  // null이면 이 기기에만 저장한다. dirty는 올리지 못한 변경이 남았다는 표시다.
+  sync: readSync(storage),
+  syncStatus: 'off',
   buildsTab: 'sample',
   buildsQuery: '',
   buildsSort: { key: 'updated', desc: true },
@@ -611,11 +628,96 @@ function openSpeed(mode = 'base', { navigate = true } = {}) {
 
 const BUILDS_TABS = ['sample', 'party'];
 
+// 동기화. 이 기기에 먼저 쓰고 서버는 뒤따른다(docs/builds-and-sync.md).
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+const syncFetch = (url, init) => fetch(url, init);
+const uploader = createUploader({
+  push: () => pushDoc(syncFetch, state.sync.code, state.builds, state.builds.version),
+  wait,
+  onState: syncState,
+});
+
+function renderSyncBar() {
+  const bar = $('builds-sync');
+  bar.hidden = !!state.buildsEditing;
+  bar.innerHTML = syncBar(state.sync, state.syncStatus);
+}
+
+// 올리기 결과를 반영한다. 성공하면 서버가 준 버전을 로컬 문서에 적고, 올리는 사이
+// 새 변경이 없었을 때만 dirty를 푼다. 실패하면 dirty를 남겨 다음 기회에 다시 보낸다.
+function syncState(status, result) {
+  state.syncStatus = status;
+  if (status === 'ok' && Number.isInteger(result?.version)) {
+    state.builds = { ...state.builds, version: result.version };
+    writeDoc(storage, state.builds);
+  }
+  if (state.sync && status !== 'uploading') {
+    state.sync = { ...state.sync, dirty: status === 'ok' ? uploader.pending() : true };
+    writeSync(storage, state.sync);
+  }
+  renderSyncBar();
+}
+
+// 서버 것을 그대로 받는다. 지워진 항목의 초안은 돌아갈 곳이 없으므로 털어낸다.
+function adoptServer(server) {
+  state.builds = docFromServer(server.doc, server.version);
+  writeDoc(storage, state.builds);
+  state.buildsDrafts = pruneDrafts(state.buildsDrafts, state.builds);
+  writeDrafts(storage, state.buildsDrafts);
+  state.sync = { ...state.sync, dirty: false };
+  writeSync(storage, state.sync);
+  state.syncStatus = 'ok';
+  renderSyncBar();
+  renderBuilds();
+}
+
+// 받기가 실패하면 dirty를 건드리지 않는다. 올린 적 없는 변경이 생긴 것이 아니다.
+async function syncOnOpen() {
+  if (!state.sync) return;
+  state.syncStatus = 'checking';
+  renderSyncBar();
+  const server = await pullDoc(syncFetch, state.sync.code);
+  if (server.status !== 'ok') {
+    state.syncStatus = server.status;
+    return renderSyncBar();
+  }
+  const plan = planOnOpen({
+    based: state.builds.version,
+    dirty: state.sync.dirty,
+    server: server.version,
+  });
+  if (plan === 'pull') return adoptServer(server);
+  if (plan === 'conflict') return syncState('conflict');
+  if (plan === 'push') {
+    state.builds = { ...state.builds, version: server.version };
+    return uploader.request();
+  }
+  state.syncStatus = 'ok';
+  renderSyncBar();
+}
+
+function showSyncCode() {
+  const text = formatCode(state.sync.code);
+  $('builds-status').textContent =
+    `동기화 코드: ${text} — 다른 기기의 ‘코드로 연결’에 입력하세요. ` +
+    '이 코드를 가진 사람은 샘플을 모두 보고 고칠 수 있습니다.';
+  navigator.clipboard?.writeText(text).then(
+    () => toast('코드를 복사했습니다.'),
+    () => {},
+  );
+}
+
 function buildsSave() {
   if (!writeDoc(storage, state.builds)) {
     $('builds-status').textContent =
       '브라우저 저장 공간에 쓰지 못했습니다. 저장 공간이 가득 찼거나 막혀 있습니다.';
     return false;
+  }
+  // 로컬 저장이 성공한 뒤에만 올린다. 올리지 못해도 저장은 성립한다.
+  if (state.sync) {
+    state.sync = { ...state.sync, dirty: true };
+    writeSync(storage, state.sync);
+    uploader.request();
   }
   return true;
 }
@@ -624,6 +726,7 @@ function buildsSave() {
 // 탭은 눌러도 아무 일도 일어나지 않으면서 눌리는 척한다. 편집기는 renderBuilds를
 // 거치지 않는 경로로도 그려지므로 두 곳이 같은 함수를 부른다.
 function renderBuildsChrome(editing) {
+  renderSyncBar();
   $('builds-controls').hidden = !!editing;
   document.querySelectorAll('[data-builds-tab]').forEach(button => (button.disabled = !!editing));
 }
@@ -1614,6 +1717,86 @@ document.querySelectorAll('[data-builds-tab]').forEach(button =>
     openBuilds(button.dataset.buildsTab);
   }),
 );
+$('builds-sync').addEventListener('click', async event => {
+  const action = event.target.closest('[data-sync]')?.dataset.sync;
+  if (!action) return;
+  if (action === 'enable') {
+    // 새 코드는 서버에 아무것도 없으므로 버전 0에서 올린다.
+    state.sync = { code: newSyncCode(), dirty: true };
+    writeSync(storage, state.sync);
+    state.builds = { ...state.builds, version: 0 };
+    writeDoc(storage, state.builds);
+    uploader.request();
+    return showSyncCode();
+  }
+  if (action === 'join') {
+    const typed = prompt('다른 기기의 ‘코드 보기’에 나온 동기화 코드를 입력하세요.');
+    if (typed === null) return;
+    const code = normalizeCode(typed);
+    if (!code) {
+      $('builds-status').textContent = '동기화 코드가 올바르지 않습니다. 20자를 그대로 입력하세요.';
+      return;
+    }
+    const server = await pullDoc(syncFetch, code);
+    if (server.status !== 'ok') {
+      $('builds-status').textContent =
+        '서버에 연결하지 못했습니다. 연결을 확인한 뒤 다시 시도하세요.';
+      return;
+    }
+    // 이 기기 것을 버리지 않고 합친다. 같은 항목은 나중에 저장한 쪽을 남긴다.
+    const previous = { builds: state.builds, sync: state.sync };
+    state.builds = joinDocs(state.builds, docFromServer(server.doc, server.version));
+    state.sync = { code, dirty: true };
+    writeSync(storage, state.sync);
+    if (!buildsSave()) {
+      state.builds = previous.builds;
+      state.sync = previous.sync;
+      writeSync(storage, previous.sync);
+    }
+    return renderBuilds();
+  }
+  if (action === 'code') return showSyncCode();
+  if (action === 'off')
+    return askConfirm(
+      '이 기기의 동기화를 끕니다. 서버와 다른 기기의 자료는 그대로 남습니다. ' +
+        '다시 켜려면 코드가 필요하니 먼저 적어 두세요.',
+      () => {
+        state.sync = null;
+        writeSync(storage, null);
+        state.syncStatus = 'off';
+        renderSyncBar();
+      },
+      '끄기',
+    );
+  if (action === 'pull')
+    return askConfirm(
+      '서버의 내용으로 바꿉니다. 이 기기에서 올리지 못한 변경은 사라집니다.',
+      async () => {
+        const server = await pullDoc(syncFetch, state.sync.code);
+        if (server.status !== 'ok') {
+          state.syncStatus = server.status;
+          return renderSyncBar();
+        }
+        adoptServer(server);
+      },
+      '불러오기',
+    );
+  if (action === 'push')
+    return askConfirm(
+      '이 기기의 내용으로 서버를 덮어씁니다. 다른 기기에서 바꾼 내용은 사라집니다.',
+      async () => {
+        const server = await pullDoc(syncFetch, state.sync.code);
+        if (server.status !== 'ok') {
+          state.syncStatus = server.status;
+          return renderSyncBar();
+        }
+        state.builds = { ...state.builds, version: server.version };
+        writeDoc(storage, state.builds);
+        uploader.request();
+      },
+      '덮어쓰기',
+    );
+});
 $('builds-export').addEventListener('click', () => {
   const blob = new Blob([toJson(state.builds)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2086,6 +2269,10 @@ window.addEventListener('offline', () =>
 window.addEventListener('online', () =>
   toast('네트워크에 연결됐습니다. 새로고침으로 자료를 확인할 수 있어요.'),
 );
+// 연결이 돌아오면 올리지 못한 변경을 다시 보낸다. 충돌은 사람이 고를 때까지 둔다.
+window.addEventListener('online', () => {
+  if (state.sync?.dirty && state.syncStatus !== 'conflict') uploader.request();
+});
 let installPrompt;
 window.addEventListener('beforeinstallprompt', event => {
   event.preventDefault();
@@ -2110,6 +2297,7 @@ writeDrafts(storage, state.buildsDrafts);
 load();
 loadReference();
 loadArticles();
+syncOnOpen();
 // Opening a shared #dex link lands on the index rather than the ranking.
 const startupDex = new URLSearchParams(location.hash.slice(1)).get('dex');
 if (startupDex) openDex(startupDex, { navigate: false });
