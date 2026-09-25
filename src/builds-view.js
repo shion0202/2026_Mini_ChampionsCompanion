@@ -77,12 +77,12 @@ const errorList = errors =>
 // 경고는 저장 단추 바로 위에 붙인다. 화면 맨 위에 두면 긴 편집기에서는 저장을
 // 누른 자리에서 보이지 않는다.
 // 공유는 저장한 것만, 동기화를 켠 기기에서만 한다(shareable).
-const editorActions = (existing, errors, shareable = false) =>
+const editorActions = (existing, errors, shareable = false, shareLabel = '샘플 공유') =>
   errorList(errors) +
   `<div class="builds-actions">` +
   `<button type="submit" class="primary-button" data-builds-save>저장</button>` +
   `<button type="button" class="text-button" data-builds-reset>초기화</button>` +
-  `${shareable ? '<button type="button" class="text-button" data-builds-share>공유 링크</button>' : ''}` +
+  `${shareable ? `<button type="button" class="text-button" data-builds-share>${shareLabel}</button>` : ''}` +
   `${existing ? '<button type="button" class="text-button builds-delete" data-builds-delete>삭제</button>' : ''}` +
   `<button type="button" class="text-button" data-builds-cancel>목록으로</button>` +
   `</div>`;
@@ -351,7 +351,7 @@ export function sampleEditor(
     `<ul>${sample.altMoves.map(altRow(reference, locale)).join('')}</ul>` +
     `<button type="button" class="text-button" data-builds-alt-add>후보 기술 추가</button></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유 등">${esc(sample.note)}</textarea></label>` +
-    `${editorActions(existing, errors, shareable)}` +
+    `${editorActions(existing, errors, shareable, '샘플 공유')}` +
     `</form>`
   );
 }
@@ -379,7 +379,7 @@ export function partyEditor(
       .map(memberRow(byId, reference, locale, index))
       .join('')}</ul></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="특정 포켓몬을 파티에 채용한 이유 등">${esc(party.note)}</textarea></label>` +
-    `${editorActions(existing, errors, shareable)}` +
+    `${editorActions(existing, errors, shareable, '파티 공유')}` +
     `</form>`
   );
 }
@@ -497,7 +497,7 @@ function partySheet(party, samples, { reference, locale, index }) {
 
 const SHARE_TEXT = {
   loading: '공유받은 내용을 불러오는 중입니다.',
-  missing: '기간이 지났거나 없는 링크입니다. 보내 준 사람에게 새 링크를 부탁하세요.',
+  missing: '기간이 만료되었거나 없는 링크입니다.',
   offline: '연결이 없어 불러오지 못했습니다.',
   retry: '서버가 바빠 불러오지 못했습니다.',
   error: '공유받은 내용을 읽을 수 없습니다.',

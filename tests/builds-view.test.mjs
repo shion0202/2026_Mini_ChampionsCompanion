@@ -319,6 +319,15 @@ test('share button appears only on saved items of a synced device', () => {
     /<button[^>]*data-builds-share[^>]*>/,
   )[0];
   assert.ok(button.includes('type="button"'), '편집기 폼을 보내지 않는다');
+  assert.ok(
+    button.endsWith('>') &&
+      sampleEditor(sample, { reference, locale, shareable: true }).includes('>샘플 공유</button>'),
+  );
+  assert.ok(
+    partyEditor(party, [sample], { reference, locale, shareable: true }).includes(
+      '>파티 공유</button>',
+    ),
+  );
 });
 
 const at = Date.UTC(2026, 9, 25, 3);
@@ -337,7 +346,7 @@ test('a shared sample and party are shown read-only', t => {
 test('share states say what happened and offer a retry only when it can help', () => {
   assert.ok(shareView('loading', null).includes('불러오는 중'));
   assert.ok(!shareView('missing', null).includes('data-share-retry'));
-  assert.ok(shareView('missing', null).includes('기간이 지났거나'));
+  assert.ok(shareView('missing', null).includes('<p>기간이 만료되었거나 없는 링크입니다.</p>'));
   assert.ok(shareView('offline', null).includes('data-share-retry'));
   assert.ok(shareView('missing', null).includes('data-share-home'));
   assert.equal(shareTitle(null), '공유');
