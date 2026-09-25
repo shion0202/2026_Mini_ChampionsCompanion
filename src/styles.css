@@ -3602,6 +3602,8 @@ body.is-dragging-move {
 }
 /* 기술의 효과. 성질은 .picker-sub 한 줄로 적고, 둘 다 있을 때만 그린다. */
 .picker-effect {
+  /* 수치·성질 줄과 설명이 붙어 보이지 않게 조금 띄운다. */
+  margin-top: 4px;
   color: var(--ink);
   font-size: 12px;
   line-height: 1.45;
