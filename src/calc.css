@@ -383,8 +383,13 @@
   gap: 8px;
 }
 .dmg-rolls > small {
+  justify-self: end;
   color: var(--muted);
   font-size: 12px;
+}
+/* 위의 데미지 범위와 같은 오른쪽 끝에 맞춘다. */
+.dmg-rolls .dmg-chips {
+  justify-content: flex-end;
 }
 /* 기술 칸. 이름은 왼쪽, 타입·분류·위력은 오른쪽. */
 .dmg-move-pick {
