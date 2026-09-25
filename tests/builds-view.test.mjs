@@ -13,6 +13,8 @@ import {
   fmtDay,
   syncText,
   syncActions,
+  shareView,
+  shareTitle,
 } from '../src/builds-view.js';
 
 const read = file =>
@@ -300,4 +302,45 @@ test('sync offers turn on or join, copy or off, and exactly two ways out of a co
   assert.deepEqual(actions(synced, 'ok'), ['copy', 'off']);
   assert.deepEqual(actions(synced, 'conflict'), ['pull', 'push']);
   assert.equal(syncText(null, 'ok'), '이 기기에만 저장합니다.', '꺼져 있으면 상태와 상관없다');
+});
+
+test('share button appears only on saved items of a synced device', () => {
+  const has = html => html.includes('data-builds-share');
+  assert.equal(has(sampleEditor(sample, { reference, locale, existing: true })), false);
+  assert.equal(
+    has(sampleEditor(sample, { reference, locale, existing: true, shareable: true })),
+    true,
+  );
+  assert.equal(
+    has(partyEditor(party, [sample], { reference, locale, existing: true, shareable: true })),
+    true,
+  );
+  const button = sampleEditor(sample, { reference, locale, shareable: true }).match(
+    /<button[^>]*data-builds-share[^>]*>/,
+  )[0];
+  assert.ok(button.includes('type="button"'), '편집기 폼을 보내지 않는다');
+});
+
+const at = Date.UTC(2026, 9, 25, 3);
+test('a shared sample and party are shown read-only', t => {
+  const opts = { reference, locale };
+  const one = shareView('ok', { kind: 'sample', sample, expiresAt: at }, opts);
+  const team = shareView('ok', { kind: 'party', party, samples: [sample], expiresAt: at }, opts);
+  t.assert.snapshot([one, team].join('\n'));
+  for (const html of [one, team]) {
+    assert.ok(!/data-builds-|<input|<textarea|<select/.test(html), '고치는 조작이 없다');
+    assert.ok(!html.includes('<4번째>'), '설명은 이스케이프한다');
+    assert.ok(html.includes('2026.10.25까지'));
+  }
+});
+
+test('share states say what happened and offer a retry only when it can help', () => {
+  assert.ok(shareView('loading', null).includes('불러오는 중'));
+  assert.ok(!shareView('missing', null).includes('data-share-retry'));
+  assert.ok(shareView('missing', null).includes('기간이 지났거나'));
+  assert.ok(shareView('offline', null).includes('data-share-retry'));
+  assert.ok(shareView('missing', null).includes('data-share-home'));
+  assert.equal(shareTitle(null), '공유');
+  assert.equal(shareTitle({ kind: 'sample' }), '공유받은 샘플');
+  assert.equal(shareTitle({ kind: 'party' }), '공유받은 파티');
 });

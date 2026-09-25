@@ -11,7 +11,7 @@
 | 2 배포 | **완료** — https://2026-mini-championscompanion.pages.dev/ |
 | 2 APK | **완료** — 실제 폰에서 주소창 없이 열림 |
 | 3 동기화 | **완료** |
-| 4 공유 링크 | 다음 작업 |
+| 4 공유 링크 | **완료** |
 
 배포는 Cloudflare Pages가 GitHub 저장소를 받아 `npm run build`로 `dist/`를 만든다.
 `main`에 올리면 다시 배포된다. 실제 폰에서 오프라인으로 열리는 것까지 확인했다
@@ -55,9 +55,14 @@ Functions는 로컬 `npm run dev`에서 돌지 않는다. 서버 판단은
 두므로 1초 안에 두 번 저장하면 두 번째가 거절된다. 그래서 앱은 연속 저장을 모아
 한 번에 하나만 보내고(`createUploader`), 거절되면 몇 번 다시 보낸다.
 
-## 다음 작업 — 4단계 공유 링크
+## 4단계 공유 링크
 
-설계는 `docs/builds-and-sync.md`의 `저장과 동기화` 끝 문단과 `API` 절에 있다.
+같은 `functions/api/[[path]].js`가 `/api/share`를 맡고, KV 키는 `share:<id>`다.
+Cloudflare 쪽 설정은 3단계의 `BUILDS` 바인딩 그대로다. 스냅샷은
+`src/builds.js`의 `shareSnapshot`·`readShare`, 통신은 `src/sync.js`의
+`createShare`·`pullShare`, 화면은 `src/builds-view.js`의 `shareView`가 만든다.
+기한은 서버의 `SHARE_DAYS` 한 곳에서 바꾼다. 규칙은 `docs/builds-and-sync.md`의
+`저장과 동기화` 끝 문단에 있다.
 
 ## 미룬 것
 

@@ -76,11 +76,13 @@ const errorList = errors =>
 
 // 경고는 저장 단추 바로 위에 붙인다. 화면 맨 위에 두면 긴 편집기에서는 저장을
 // 누른 자리에서 보이지 않는다.
-const editorActions = (existing, errors) =>
+// 공유는 저장한 것만, 동기화를 켠 기기에서만 한다(shareable).
+const editorActions = (existing, errors, shareable = false) =>
   errorList(errors) +
   `<div class="builds-actions">` +
   `<button type="submit" class="primary-button" data-builds-save>저장</button>` +
   `<button type="button" class="text-button" data-builds-reset>초기화</button>` +
+  `${shareable ? '<button type="button" class="text-button" data-builds-share>공유 링크</button>' : ''}` +
   `${existing ? '<button type="button" class="text-button builds-delete" data-builds-delete>삭제</button>' : ''}` +
   `<button type="button" class="text-button" data-builds-cancel>목록으로</button>` +
   `</div>`;
@@ -174,7 +176,7 @@ const pointRow = (value, index) =>
 // 한 줄에 하나씩, 이름표와 값만 둔다. 여기는 고치는 곳이 아니라 훑어보는 곳이라
 // 칸이나 배지로 나눌 이유가 없다. 능력 포인트는 H2 A32 S32처럼 줄여 적는다.
 const STAT_SHORT = ['H', 'A', 'B', 'C', 'D', 'S'];
-const memberFacts = (sample, reference, locale) => {
+const memberFacts = (sample, reference, locale, { moves: withMoves = true } = {}) => {
   const spent = sample.points
     .map((p, i) => (p ? `${STAT_SHORT[i]}${p}` : null))
     .filter(Boolean)
@@ -188,7 +190,7 @@ const memberFacts = (sample, reference, locale) => {
     ['특성', sample.ability ? refLabel(reference, locale, 'ability', sample.ability) : '없음'],
     ['능력 보정', sample.nature ? natureLabel(locale, sample.nature) : '없음'],
     ['능력 포인트', spent || '없음'],
-    ['기술', moves || '없음'],
+    ...(withMoves ? [['기술', moves || '없음']] : []),
   ];
   return (
     `<dl class="builds-member-facts">` +
@@ -281,6 +283,7 @@ export function sampleEditor(
     existing = false,
     resumed = false,
     errors = [],
+    shareable = false,
   },
 ) {
   const total = sample.points.reduce((a, b) => a + b, 0);
@@ -348,7 +351,7 @@ export function sampleEditor(
     `<ul>${sample.altMoves.map(altRow(reference, locale)).join('')}</ul>` +
     `<button type="button" class="text-button" data-builds-alt-add>후보 기술 추가</button></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유 등">${esc(sample.note)}</textarea></label>` +
-    `${editorActions(existing, errors)}` +
+    `${editorActions(existing, errors, shareable)}` +
     `</form>`
   );
 }
@@ -356,7 +359,15 @@ export function sampleEditor(
 export function partyEditor(
   party,
   samples,
-  { locale, reference = null, index = null, existing = false, resumed = false, errors = [] },
+  {
+    locale,
+    reference = null,
+    index = null,
+    existing = false,
+    resumed = false,
+    errors = [],
+    shareable = false,
+  },
 ) {
   const byId = new Map(samples.map(s => [s.id, s]));
   return (
@@ -368,7 +379,7 @@ export function partyEditor(
       .map(memberRow(byId, reference, locale, index))
       .join('')}</ul></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="특정 포켓몬을 파티에 채용한 이유 등">${esc(party.note)}</textarea></label>` +
-    `${editorActions(existing, errors)}` +
+    `${editorActions(existing, errors, shareable)}` +
     `</form>`
   );
 }
@@ -417,4 +428,102 @@ export function syncActions(sync, status) {
   return status === 'conflict'
     ? syncButton('pull', '서버 것 불러오기') + syncButton('push', '이 기기 것으로 덮어쓰기')
     : syncButton('copy', '코드 복사') + syncButton('off', '끄기');
+}
+
+// 공유 화면. 링크로 받은 스냅샷을 보기만 한다. 고치는 단추도, 내 목록으로 가져오는
+// 단추도 두지 않는다. 편집기와 같은 정보를 같은 이름표로 보여 주되 칸 대신 글로 둔다.
+const shareMoves = (reference, locale, moves) =>
+  `<ul class="share-moves">${moves
+    .map(
+      m => `<li>${esc(refLabel(reference, locale, 'move', m))}${moveTypeBadge(reference, m)}</li>`,
+    )
+    .join('')}</ul>`;
+
+const shareNote = note => (note?.trim() ? `<p class="share-note">${esc(note)}</p>` : '');
+
+function sampleSheet(sample, { reference, locale, index }) {
+  const actual = actualStats(reference, sample.pokemon, sample.points, sample.nature);
+  const moves = sample.moves.filter(Boolean);
+  return (
+    `<div class="builds-hero">` +
+    `${portrait({ sprite: speciesSprite(reference, index, sample.pokemon) }, 'builds-hero-art')}` +
+    `<div class="share-heading"><h3 class="share-name">${esc(sample.name)}</h3>` +
+    `<small class="builds-sub">${esc(speciesLabel(locale, reference, sample.pokemon))}</small></div></div>` +
+    memberFacts(sample, reference, locale, { moves: false }) +
+    `${
+      actual
+        ? `<p class="builds-actual-head">실수치</p>` +
+          `<div class="builds-actual-grid">${actual.map((v, i) => actualCard(i, v)).join('')}</div>` +
+          `<div class="builds-bulk">` +
+          `<div class="builds-actual"><small>물리 내구력</small><strong>${bulk(actual, 2)}</strong></div>` +
+          `<div class="builds-actual"><small>특수 내구력</small><strong>${bulk(actual, 4)}</strong></div>` +
+          `</div>`
+        : ''
+    }` +
+    `<h4 class="share-label">채용 기술</h4>` +
+    `${moves.length ? shareMoves(reference, locale, moves) : '<p class="share-none">없음</p>'}` +
+    `${sample.altMoves.length ? `<h4 class="share-label">후보 기술</h4>${shareMoves(reference, locale, sample.altMoves)}` : ''}` +
+    `${sample.note?.trim() ? `<h4 class="share-label">설명</h4>${shareNote(sample.note)}` : ''}`
+  );
+}
+
+function partySheet(party, samples, { reference, locale, index }) {
+  const byId = new Map(samples.map(s => [s.id, s]));
+  const member = (id, slot) => {
+    const sample = id ? byId.get(id) : null;
+    return (
+      `<li class="builds-member"><div class="builds-member-head">` +
+      `<span class="builds-slot">${slot + 1}</span>` +
+      `<span class="share-member">` +
+      `${portrait({ sprite: speciesSprite(reference, index, sample?.pokemon ?? null) }, 'builds-portrait')}` +
+      `<span class="builds-text"><span class="builds-name">${esc(sample ? sample.name : '빈 자리')}</span>` +
+      `${sample ? `<small class="builds-sub">${esc(speciesLabel(locale, reference, sample.pokemon))}</small>` : ''}` +
+      `</span></span></div>` +
+      `${
+        sample
+          ? `<details class="builds-member-more" open><summary>상세</summary>` +
+            `${memberFacts(sample, reference, locale)}${shareNote(sample.note)}</details>`
+          : ''
+      }` +
+      `</li>`
+    );
+  };
+  return (
+    `<h3 class="share-name">${esc(party.name)}</h3>` +
+    shareNote(party.note) +
+    `<ul class="share-members">${party.members.map(member).join('')}</ul>`
+  );
+}
+
+const SHARE_TEXT = {
+  loading: '공유받은 내용을 불러오는 중입니다.',
+  missing: '기간이 지났거나 없는 링크입니다. 보내 준 사람에게 새 링크를 부탁하세요.',
+  offline: '연결이 없어 불러오지 못했습니다.',
+  retry: '서버가 바빠 불러오지 못했습니다.',
+  error: '공유받은 내용을 읽을 수 없습니다.',
+};
+const shareHome = '<button type="button" class="text-button" data-share-home>앱 둘러보기</button>';
+
+// share가 null이면 상태 문장만 보인다. 연결 문제는 다시 시도할 수 있게 한다.
+// 제목(공유받은 샘플·파티)은 app.js가 패널 머리에 단다.
+export const shareTitle = share =>
+  share?.kind === 'party' ? '공유받은 파티' : share ? '공유받은 샘플' : '공유';
+export function shareView(status, share, options) {
+  if (!share)
+    return (
+      `<div class="empty-state"><p>${SHARE_TEXT[status] ?? SHARE_TEXT.error}</p>` +
+      `${['offline', 'retry'].includes(status) ? '<button type="button" class="text-button" data-share-retry>다시 시도</button>' : ''}` +
+      `${status === 'loading' ? '' : shareHome}</div>`
+    );
+  const sheet =
+    share.kind === 'sample'
+      ? sampleSheet(share.sample, options)
+      : partySheet(share.party, share.samples, options);
+  return (
+    `<article class="share-sheet">${sheet}</article>` +
+    `<p class="share-expiry">` +
+    `${share.expiresAt ? `${fmtDay(share.expiresAt)}까지 열 수 있는 링크입니다. ` : ''}` +
+    `보낸 사람이 나중에 고쳐도 이 화면은 바뀌지 않습니다.</p>` +
+    `<div class="share-actions">${shareHome}</div>`
+  );
 }

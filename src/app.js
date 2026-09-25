@@ -50,6 +50,8 @@ import {
   deleteSample,
   docFromServer,
   joinDocs,
+  shareSnapshot,
+  readShare,
 } from './builds.js';
 import {
   newSyncCode,
@@ -61,6 +63,9 @@ import {
   createUploader,
   readSync,
   writeSync,
+  createShare,
+  pullShare,
+  shareLink,
 } from './sync.js';
 import {
   sampleList,
@@ -72,6 +77,9 @@ import {
   comboOptions,
   syncText,
   syncActions,
+  shareView,
+  shareTitle,
+  fmtDay,
 } from './builds-view.js';
 import {
   renderReference,
@@ -152,6 +160,8 @@ const state = {
   // null이면 이 기기에만 저장한다. dirty는 올리지 못한 변경이 남았다는 표시다.
   sync: readSync(storage),
   syncStatus: 'off',
+  // 링크로 연 공유. { id, status, data }. 메뉴에는 없고 #share=<id>로만 연다.
+  share: null,
   buildsTab: 'sample',
   buildsQuery: '',
   buildsSort: { key: 'updated', desc: true },
@@ -502,9 +512,11 @@ function showPage(page) {
     articles: 'articles',
     speed: 'speed',
     builds: 'builds',
+    shared: 'shared',
   })) {
     $(panel).hidden = page !== key;
-    $(`${key}-link`).setAttribute('aria-pressed', String(page === key));
+    // 공유 화면은 메뉴에 없다. 링크로 열었을 때만 보인다.
+    $(`${key}-link`)?.setAttribute('aria-pressed', String(page === key));
   }
   $('toolbar').hidden = page !== 'ranking';
   $('notice').hidden = page !== 'ranking' || !$('notice').textContent;
@@ -719,6 +731,60 @@ async function copySyncCode() {
   }
 }
 
+// 공유 링크. 편집 중인 초안이 아니라 저장된 내용을 스냅샷으로 올린다. 링크를 받은
+// 사람이 보는 것은 저장 단추를 누른 그 상태다.
+async function shareBuild() {
+  const editing = state.buildsEditing;
+  if (!editing?.id || !state.sync) return;
+  const snapshot = shareSnapshot(state.builds, editing.kind, editing.id);
+  if (!snapshot) return;
+  const result = await createShare(syncFetch, state.sync.code, snapshot);
+  if (result.status !== 'ok') {
+    $('builds-status').textContent =
+      result.status === 'notSynced'
+        ? '아직 서버에 올라가지 않았습니다. 동기화가 끝난 뒤 다시 시도하세요.'
+        : result.status === 'offline'
+          ? '연결이 없어 공유 링크를 만들지 못했습니다.'
+          : '공유 링크를 만들지 못했습니다. 잠시 뒤 다시 시도하세요.';
+    return;
+  }
+  const link = shareLink(location, result.id);
+  const until = `${fmtDay(result.expiresAt)}까지 열 수 있습니다.`;
+  try {
+    await navigator.clipboard.writeText(link);
+    toast(`저장된 내용으로 공유 링크를 복사했습니다. ${until}`);
+  } catch {
+    $('builds-status').textContent = `공유 링크: ${link} — ${until}`;
+  }
+}
+
+function renderShare() {
+  if (state.page !== 'shared' || !state.share) return;
+  const { status, data } = state.share;
+  // 이름을 한국어로 보여야 하므로 도감과 한국어 명칭을 기다린다.
+  const waiting = data && !(state.locale && state.reference);
+  $('shared-title').textContent = shareTitle(waiting ? null : data);
+  $('shared-body').innerHTML = shareView(waiting ? 'loading' : status, waiting ? null : data, {
+    reference: state.reference,
+    locale: state.locale,
+    index: state.index,
+  });
+}
+
+async function openShare(id, { navigate = true } = {}) {
+  state.share = { id, status: 'loading', data: null };
+  showPage('shared');
+  if (navigate) history.pushState({ share: id }, '', `#share=${encodeURIComponent(id)}`);
+  renderShare();
+  window.scrollTo(0, 0);
+  const result = await pullShare(syncFetch, id);
+  // 불러오는 사이 다른 링크를 열었으면 늦게 온 결과를 버린다.
+  if (state.share?.id !== id) return;
+  const data = result.status === 'ok' ? readShare(result.share) : null;
+  state.share = { id, status: result.status === 'ok' && !data ? 'error' : result.status, data };
+  renderShare();
+}
+
 function buildsSave() {
   if (!writeDoc(storage, state.builds)) {
     $('builds-status').textContent =
@@ -862,6 +928,7 @@ function renderBuildsEditor() {
     index: state.index,
     combos: state.buildsCombo,
     existing: editing.id !== null,
+    shareable: editing.id !== null && !!state.sync,
     resumed: state.buildsResumed,
     errors: state.buildsErrors,
   };
@@ -1244,6 +1311,7 @@ async function loadReference() {
   if (selectedEntry()) renderCategory();
   renderSpeed();
   renderBuilds();
+  renderShare();
 }
 
 function selectPokemon(id, { navigate = true, preserveCategory = false } = {}) {
@@ -1299,6 +1367,7 @@ async function load(force = false) {
       renderArticles();
       renderSpeed();
       renderBuilds();
+      renderShare();
     }
     let indexResult;
     try {
@@ -1654,6 +1723,7 @@ $('builds-rows').addEventListener('click', event => {
   if (event.target.closest('[data-builds-cancel]')) closeBuildsEditor();
   if (event.target.closest('[data-builds-reset]')) return resetBuild();
   if (event.target.closest('[data-builds-delete]')) return removeBuild();
+  if (event.target.closest('[data-builds-share]')) return shareBuild();
 });
 
 // 검색은 목록만 바꾼다. 편집기를 통째로 다시 그리면 글자마다 커서가 끝으로 튄다.
@@ -1729,6 +1799,11 @@ document.querySelectorAll('[data-builds-tab]').forEach(button =>
     openBuilds(button.dataset.buildsTab);
   }),
 );
+$('shared-body').addEventListener('click', event => {
+  if (event.target.closest('[data-share-home]')) return goToRanking({ top: true });
+  if (event.target.closest('[data-share-retry]') && state.share)
+    openShare(state.share.id, { navigate: false });
+});
 $('builds-sync').addEventListener('click', async event => {
   const action = event.target.closest('[data-sync]')?.dataset.sync;
   if (!action) return;
@@ -2183,6 +2258,10 @@ document.addEventListener(
 );
 window.addEventListener('popstate', () => {
   const params = new URLSearchParams(location.hash.slice(1));
+  if (params.has('share')) {
+    openShare(params.get('share'), { navigate: false });
+    return;
+  }
   if (params.has('speed')) {
     openSpeed(params.get('speed'), { navigate: false });
     return;
@@ -2279,6 +2358,8 @@ if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });
 if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ navigate: false });
 const startupSpeed = new URLSearchParams(location.hash.slice(1)).get('speed');
 if (startupSpeed !== null) openSpeed(startupSpeed, { navigate: false });
+const startupShare = new URLSearchParams(location.hash.slice(1)).get('share');
+if (startupShare) openShare(startupShare, { navigate: false });
 const startupBuilds = new URLSearchParams(location.hash.slice(1)).get('builds');
 if (startupBuilds !== null) {
   const startupEdit = new URLSearchParams(location.hash.slice(1)).get('edit');

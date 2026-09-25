@@ -12,7 +12,7 @@
 ```
 sample {
   id, name, note,
-  pokemon, form,
+  pokemon,
   item, ability, nature, points[6],
   moves[4], altMoves[],
   updatedAt
@@ -159,6 +159,18 @@ doc  { samples[], parties[], version }
 공유 링크는 원본을 참조하지 않고 그 시점의 스냅샷을 복사해 둔다. 파티의 샘플
 참조도 이때 펼친다. 원본을 나중에 고쳐도 이미 보낸 링크는 그대로 남는다.
 
+- 보기 전용이다. 받은 사람이 자기 목록으로 가져오는 기능은 두지 않는다. 앱이
+  개인용으로 설계된 부분이 많아서다.
+- 동기화를 켠 기기에서, 저장한 샘플·파티의 편집 화면에 있는 ‘공유 링크’로 만든다.
+  고치던 초안이 아니라 저장된 내용이 나간다. 서버는 그 코드의 문서가 있을 때만
+  만든다(403 `not synced`). 동기화 코드 말고 다른 코드는 없다.
+- 링크는 `<앱 주소>/#share=<id>`다. id는 Crockford base32 12자다. 열면 메뉴에 없는
+  공유 전용 화면(`#shared`)이 뜬다. 안드로이드 앱에서도 같은 주소로 앱 안에서 열린다.
+- 기한은 `SHARE_DAYS`(30일)다. KV의 `expirationTtl`로 저절로 지워지고, 서버는
+  값에 적힌 `expiresAt`으로도 막는다(KV가 늦게 지울 수 있다). 기간은 저장 공간만
+  좌우하고 요청 한도와는 상관없다. 한 달 시즌 하나를 넘기되 레귤레이션(약 3개월)
+  전체를 붙잡지는 않는 길이로 잡았다.
+
 ## API
 
 Cloudflare Pages Functions로 정적 파일과 같은 프로젝트에서 `/api/*`를 처리한다.
@@ -167,8 +179,8 @@ Worker를 따로 배포하면 도메인과 CORS 설정이 늘어난다.
 ```
 GET  /api/doc               x-sync-code: <코드>   → { doc, version }
 PUT  /api/doc               x-sync-code: <코드>   → { version } / 409 { version } / 429
-POST /api/share             x-sync-code: <코드>   → { id }        (4단계)
-GET  /api/share/<id>                              → 스냅샷 (코드 불필요, 읽기 전용)
+POST /api/share             x-sync-code: <코드>   → { id, expiresAt } / 403 not synced
+GET  /api/share/<id>                              → 스냅샷 / 404 (코드 불필요, 읽기 전용)
 ```
 
 코드는 쿼리가 아니라 `x-sync-code` 헤더로 보낸다. 쿼리는 접속 기록에 남는다.
@@ -217,7 +229,7 @@ KV 키는 `doc:<코드>`와 `share:<id>` 둘뿐이다. 자료가 작아 스키�
 2. **배포와 APK** — Pages 배포, assetlinks, Bubblewrap. 이 시점에 안드로이드가
    단독으로 동작한다.
 3. **동기화** — Functions와 KV, 동기화 코드.
-4. **공유 링크**
+4. **공유 링크** — 보기 전용 스냅샷 링크, 30일.
 
 각 단계는 그 자체로 쓸 수 있다. 기기 사이 이동은 3단계의 동기화 코드로 한다.
 
