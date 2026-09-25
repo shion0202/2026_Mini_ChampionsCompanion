@@ -233,3 +233,20 @@ test('the summary gives range, percent of max HP, KO table, power and bulk', () 
   assert.equal(halfHp.reason, '효과가 없습니다.');
   assert.equal(halfHp.hpNow, Math.floor(halfHp.hpMax / 2));
 });
+
+test('hex, venoshock and facade double with the right status', () => {
+  const run = (id, attackerStatus, defenderStatus) =>
+    damageRolls({
+      reference,
+      attacker: side('gengar', {}, { status: attackerStatus }),
+      defender: side('garchomp', {}, { status: defenderStatus, hpPercent: 100 }),
+      field: { format: 'singles', weather: '', terrain: '' },
+      move: { ...reference.move[id], id },
+    }).basePower;
+  assert.equal(run('hex', '', ''), 65);
+  assert.equal(run('hex', '', 'par'), 130);
+  assert.equal(run('venoshock', '', 'par'), 65);
+  assert.equal(run('venoshock', '', 'psn'), 130);
+  assert.equal(run('facade', 'brn', ''), 140);
+  assert.equal(run('facade', 'slp', ''), 70, '잠듦이면 오르지 않는다');
+});

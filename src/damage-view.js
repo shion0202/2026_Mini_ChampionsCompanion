@@ -202,7 +202,9 @@ function defenderPanel(state, context) {
     abilitySelect(side, reference) +
     itemPick(side, reference) +
     `</div></fieldset>` +
-    `<fieldset class="calc-group"><legend>벽 · 부가효과</legend>` +
+    // 방어 측 상태이상은 병상첨병·베놈쇼크 같은 기술과 이상한비늘이 본다.
+    `<fieldset class="calc-group"><legend>상태 · 벽 · 부가효과</legend>` +
+    `<label class="calc-field">상태이상<select data-dmg-field="status">${options(Object.entries(STATUSES), side.status ?? '')}</select></label>` +
     check('reflect', side.reflect, '리플렉터') +
     check('lightScreen', side.lightScreen, '빛의장막') +
     check('auroraVeil', side.auroraVeil, '오로라베일') +

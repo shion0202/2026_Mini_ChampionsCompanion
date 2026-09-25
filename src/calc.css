@@ -380,11 +380,7 @@
   justify-self: end;
 }
 .dmg-rolls[open] {
-  display: grid;
   gap: 8px;
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--bg);
 }
 .dmg-rolls > small {
   color: var(--muted);

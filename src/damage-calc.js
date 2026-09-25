@@ -57,6 +57,8 @@ export const IGNORE_DEFENSE_STAGES = new Set(['sacredsword', 'darkestlariat', 'c
 export const CRASH_MOVES = new Set(['highjumpkick', 'jumpkick', 'supercellslam', 'axekick']);
 // 벽을 깨고 때리는 기술. 리플렉터·빛의장막·오로라베일을 받지 않는다.
 export const BREAKS_SCREENS = new Set(['brickbreak', 'psychicfangs', 'ragingbull']);
+// 상대가 상태이상이면 위력이 두 배인 기술
+export const STATUS_DOUBLES = new Set(['hex', 'infernalparade']);
 // 필드가 없으면 실패하는 기술
 export const NEEDS_TERRAIN = new Set(['steelroller']);
 // 타수가 정해진 연속기. 나머지 연속기(multihit)는 2~5회라 2회로 두고, 스킬링크면 5회다.
@@ -95,6 +97,10 @@ export function basePowerMods(ctx) {
     mods.push(MOD.x1_2);
   if (a === 'punkrock' && traits.includes('sound')) mods.push(MOD.x1_3);
   if (TYPE_BOOST_ITEMS[attacker.item] === move.type) mods.push(MOD.x1_2);
+  // 상태이상에 따라 위력이 두 배가 되는 기술(onBasePower). 객기는 잠듦이면 오르지 않는다.
+  const poisoned = ['psn', 'tox'].includes(ctx.defender.status);
+  if (move.id === 'facade' && attacker.status && attacker.status !== 'slp') mods.push(MOD.x2);
+  if (['venoshock', 'barbbarrage'].includes(move.id) && poisoned) mods.push(MOD.x2);
   if (attacker.charge && move.type === 'Electric') mods.push(MOD.x2);
   if (field.format === 'doubles' && attacker.helpingHand) mods.push(MOD.x1_5);
   // 필드. 땅에 붙어 있는지는 1단계에서 묻지 않고 붙어 있다고 본다.
@@ -277,8 +283,9 @@ export function damageRolls(input) {
   if (NEEDS_TERRAIN.has(move.id) && !field.terrain) return { blocked: true, effectiveness };
   const crit = !!input.crit || ALWAYS_CRIT.has(move.id);
 
-  // 위력
+  // 위력. 병상첨병·백귀야행은 상대가 상태이상이면 위력 자체가 두 배다(basePowerCallback).
   let basePower = attacker.power > 0 ? attacker.power : move.power;
+  if (!(attacker.power > 0) && STATUS_DOUBLES.has(move.id) && defender.status) basePower *= 2;
   if (!basePower) return { noPower: true };
   const ctx = {
     move,
@@ -493,6 +500,7 @@ export const emptyDefender = () => ({
   stages: {},
   ability: '',
   item: '',
+  status: '',
   hpPercent: 100,
   reflect: false,
   lightScreen: false,

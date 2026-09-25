@@ -223,7 +223,7 @@ const state = {
   trends: { scope: 'current', format: null, focus: null },
   // 계산기. 스피드 계산기의 양쪽 칸과 둘이 함께 쓰는 날씨·필드.
   calc: {
-    tab: 'speed',
+    tab: 'damage',
     mine: emptySide(),
     theirs: emptySide(),
     field: { weather: '', terrain: '' },
@@ -2298,8 +2298,8 @@ $('trends-chart').addEventListener('click', event => {
 // 계산기. 스피드 계산기는 계산을 speed-calc.js에, 마크업을 calc-view.js에 둔다.
 const CALC_TABS = ['speed', 'damage'];
 
-function openCalc(tab = 'speed', { navigate = true } = {}) {
-  state.calc.tab = CALC_TABS.includes(tab) ? tab : 'speed';
+function openCalc(tab = 'damage', { navigate = true } = {}) {
+  state.calc.tab = CALC_TABS.includes(tab) ? tab : 'damage';
   showPage('calc');
   if (navigate) history.pushState({ calc: state.calc.tab }, '', `#calc=${state.calc.tab}`);
   renderCalc();
