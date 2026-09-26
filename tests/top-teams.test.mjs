@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildNames, convertFile } from '../scripts/update-top-teams.mjs';
+import { buildNames, convertFile, dueSeasons } from '../scripts/update-top-teams.mjs';
 import {
   memberBase,
   pickTopTeamSeason,
@@ -154,5 +154,31 @@ test('the tab shows the fallback note, hidden members, item states and the sourc
       '채용한 기록이 없습니다',
     ),
     true,
+  );
+});
+
+test('a finished season is fetched at 3, 10 and 30 days after it ends, once per window', () => {
+  // 가장 최근 시즌(M6)은 진행 중이라 받지 않는다. 끝난 시즌은 마지막 날짜 하나만 남는다.
+  const seasons = [
+    { season: 'M6', dates: ['01_11_2026', '31_10_2026'] },
+    { season: 'M5', dates: ['10_10_2026'] },
+    { season: 'M4', dates: ['05_08_2026'] },
+  ];
+  const at = date => Date.parse(date);
+  const done = { M4: { at: ['2026-09-26'] } };
+  assert.deepEqual(dueSeasons(seasons, done, at('2026-10-12')), [], '3일이 안 됐다');
+  assert.deepEqual(dueSeasons(seasons, done, at('2026-10-13')), ['M5'], '3일째 첫 받기');
+  const first = { ...done, M5: { at: ['2026-10-13'] } };
+  assert.deepEqual(dueSeasons(seasons, first, at('2026-10-19')), [], '같은 창에서는 한 번만');
+  assert.deepEqual(dueSeasons(seasons, first, at('2026-10-20')), ['M5'], '10일째');
+  const second = { ...done, M5: { at: ['2026-10-13', '2026-10-20'] } };
+  assert.deepEqual(dueSeasons(seasons, second, at('2026-11-08')), []);
+  assert.deepEqual(dueSeasons(seasons, second, at('2026-11-09')), ['M5'], '30일째');
+  const third = { ...done, M5: { at: ['2026-10-13', '2026-10-20', '2026-11-09'] } };
+  assert.deepEqual(dueSeasons(seasons, third, at('2027-03-01')), [], '30일 뒤로는 더 받지 않는다');
+  assert.deepEqual(
+    dueSeasons(seasons, {}, at('2026-11-09')),
+    ['M5'],
+    '늦게 켜져도 지난 창을 한 번에 받는다(M4는 60일이 지나 포기)',
   );
 });
