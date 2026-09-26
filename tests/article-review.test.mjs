@@ -2,8 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { articleKey } from '../scripts/article-parse.mjs';
 import {
   articleId,
+  blogKey,
   authorFromUrl,
   buildRecord,
   formatArticles,
@@ -234,4 +236,40 @@ test('pickers offer Champions Pokemon and items by Korean name, without clashes'
   assert.ok(items.some(row => row.key === 'choicescarf' && row.label === '구애스카프'));
   assert.equal(new Set(species.map(row => row.label)).size, species.length);
   assert.equal(new Set(items.map(row => row.label)).size, items.length);
+});
+
+test('the same article under http and https, www or a trailing slash is one article', () => {
+  const key = articleKey('http://blog.livedoor.jp/someone/archives/123.html');
+  assert.equal(articleKey('https://blog.livedoor.jp/someone/archives/123.html'), key);
+  assert.equal(articleKey('https://www.blog.livedoor.jp/someone/archives/123.html/'), key);
+  assert.notEqual(articleKey('https://blog.livedoor.jp/someone/archives/124.html'), key);
+
+  const http = { ...entry, url: 'http://someone.hatenablog.com/entry/2026/09/12/1' };
+  const list = reviewList({ entries: [entry, http] }, data, { skipped: [] }, reference);
+  assert.equal(list.filter(row => row.kind === 'queue').length, 1, '큐에 두 번 있어도 한 번만');
+  const recorded = {
+    ...data,
+    articles: [...data.articles, { ...data.articles[0], url: http.url }],
+  };
+  assert.equal(
+    reviewList({ entries: [entry] }, recorded, { skipped: [] }, reference).length,
+    0,
+    '스킴만 다른 주소로 이미 기록했으면 다시 나오지 않는다',
+  );
+});
+
+test('another article from an already recorded blog is flagged, not hidden', () => {
+  assert.equal(blogKey('https://note.com/a/n/n1'), blogKey('https://note.com/a/n/n2'));
+  assert.notEqual(blogKey('https://note.com/a/n/n1'), blogKey('https://note.com/b/n/n1'));
+  assert.equal(
+    blogKey('http://blog.livedoor.jp/someone/archives/1.html'),
+    'blog.livedoor.jp/someone',
+  );
+  const rebo = data.articles.find(article => article.id === 'm5-singles-rebo');
+  const next = { ...entry, url: 'https://reboiona.hatenablog.com/entry/2026/10/01/1' };
+  const [row] = reviewList({ entries: [next] }, data, { skipped: [] }, reference);
+  assert.deepEqual(
+    row.sameBlog.map(article => article.id),
+    [rebo.id],
+  );
 });

@@ -35,11 +35,12 @@ const readJson = (path, fallback) =>
       if (fallback !== undefined && error.code === 'ENOENT') return fallback;
       throw error;
     });
-const [reference, ko, page] = await Promise.all([
+const [reference, ko] = await Promise.all([
   readJson('public/data/reference.json'),
   readJson('public/data/ko.json'),
-  readFile(new URL('scripts/review-page.html', root), 'utf8'),
 ]);
+// 화면 파일은 열 때마다 읽는다. 서버를 켠 채 git pull 해도 새 화면이 보인다.
+const page = () => readFile(new URL('scripts/review-page.html', root), 'utf8');
 const locale = createLocale(ko);
 const options = {
   season: season.toUpperCase(),
@@ -112,7 +113,7 @@ const server = createServer(async (request, response) => {
   try {
     const { pathname } = new URL(request.url, 'http://localhost');
     if (request.method === 'GET' && pathname === '/')
-      return send(response, 200, page, 'text/html; charset=utf-8');
+      return send(response, 200, await page(), 'text/html; charset=utf-8');
     if (request.method === 'GET' && pathname === '/api/options')
       return send(response, 200, options);
     if (request.method === 'GET' && pathname === '/api/list') {

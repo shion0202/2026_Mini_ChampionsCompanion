@@ -8,6 +8,7 @@ import {
   buildIndex,
   readPage,
   digest,
+  articleKey,
   decodeHtml,
   looksGarbled,
   gameCheck,
@@ -176,17 +177,22 @@ const [reference, ko, existing, feedList, skipList, queues] = await Promise.all(
 const previous = queues[queueNames.indexOf(queueName)] ?? { entries: [] };
 const index = buildIndex(reference, ko);
 // 등록한 기사와 판정에서 파티 기사가 아니라고 본 주소는 다시 큐에 올리지 않는다.
-const known = new Set([
-  ...existing.articles.map(article => article.url),
-  ...skipList.skipped.map(entry => entry.url),
-]);
+// 주소는 articleKey로 비교한다(http/https, www., 끝의 /가 달라도 같은 글).
+const known = new Set(
+  [
+    ...existing.articles.map(article => article.url),
+    ...skipList.skipped.map(entry => entry.url),
+  ].map(articleKey),
+);
 
 // 리드: 아직 받지 않은 기사 주소. source는 어디서 왔는지, manual은 사람이 고른
 // 주소라 제목 검사를 건너뛴다는 뜻이다.
 const found = new Map();
 const counts = {};
 const take = (link, source, manual = false) => {
-  if (!link.url || known.has(link.url) || found.has(link.url) || isNonArticle(link.url)) return;
+  if (!link.url || isNonArticle(link.url)) return;
+  const key = articleKey(link.url);
+  if (known.has(key) || found.has(key)) return;
   const hint = `${link.title ?? ''} ${link.context ?? ''}`;
   if (!manual) {
     if (!looksRelevant(hint)) return;
@@ -195,7 +201,7 @@ const take = (link, source, manual = false) => {
     const titled = parseTitle(hint).season;
     if (titled && titled !== season.toUpperCase()) return;
   }
-  found.set(link.url, { ...link, source });
+  found.set(key, { ...link, source });
   counts[source] = (counts[source] ?? 0) + 1;
 };
 const channels = [];
@@ -295,8 +301,9 @@ if (useSearch) {
 // 거의 없고, 규칙을 고친 뒤 돌리면 이미 쌓인 오탐도 빠진다.
 let requeued = 0;
 for (const entry of previous.entries) {
-  if (known.has(entry.url) || found.has(entry.url)) continue;
-  found.set(entry.url, {
+  const key = articleKey(entry.url);
+  if (known.has(key) || found.has(key)) continue;
+  found.set(key, {
     url: entry.url,
     title: entry.title,
     date: entry.publishedAt,
@@ -356,7 +363,8 @@ const skipped = {
   season: 0,
   format: 0,
 };
-for (const [url, link] of found) {
+for (const link of found.values()) {
+  const url = link.url;
   if (!looksLikeArticle(url)) {
     skipped['not-an-article']++;
     continue;

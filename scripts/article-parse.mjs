@@ -349,6 +349,18 @@ export function searchQueries({ season }) {
   return [...new Set(queries)];
 }
 
+// 같은 기사를 가리키는 주소를 하나로 본다. 포케DB 목록은 http, 작성자 피드는 https처럼
+// 같은 글이 스킴이나 www., 끝의 / 만 다르게 들어온다. 비교에만 쓰고 기록은 원래 주소로 한다.
+export function articleKey(value) {
+  try {
+    const url = new URL(value);
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+    return `${url.host.replace(/^www\./, '').toLowerCase()}${path}${url.search}`;
+  } catch {
+    return String(value);
+  }
+}
+
 // 블로그 첫 페이지는 기사가 아니다. 포켓몬 이름이 잔뜩 있어 후보 수 검사를
 // 통과해 버리므로 주소로 먼저 거른다.
 export const looksLikeArticle = url => {

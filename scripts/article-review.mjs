@@ -1,6 +1,7 @@
 // 검토 화면(scripts/review-articles.mjs)의 판단 부분. 네트워크와 파일을 쓰지 않는
 // 순수 함수만 두어 테스트로 고정한다.
 import { reviewedArticles } from '../src/articles.js';
+import { articleKey } from './article-parse.mjs';
 
 // 챔피언스에 나오는 포켓몬(기술 목록이 있는 것)만 고를 수 있게 한다. 이름이 겹치면
 // 키를 붙여 구분한다. 입력 칸은 한국어 이름을 받고 키로 바꾼다.
@@ -123,7 +124,7 @@ export function articleId(form, ids) {
 // 양식을 articles.json 기록으로 바꾸고 앱과 같은 검사를 돌린다. 오류가 있으면
 // { error }를 돌려주고 파일에 쓰지 않는다.
 export function buildRecord(form, data, reference, today, status = 'reviewed') {
-  const existing = data.articles.find(article => article.url === form.url);
+  const existing = data.articles.find(article => articleKey(article.url) === articleKey(form.url));
   const ids = new Set(data.articles.filter(a => a !== existing).map(a => a.id));
   const record = {
     id: existing?.id ?? articleId(form, ids),
@@ -189,7 +190,7 @@ export function problems(record, reference) {
 }
 
 export function putArticle(data, record, today) {
-  const rest = data.articles.filter(article => article.url !== record.url);
+  const rest = data.articles.filter(article => articleKey(article.url) !== articleKey(record.url));
   return { ...data, updatedAt: today, articles: [...rest, record] };
 }
 
@@ -205,9 +206,46 @@ export function reviewList(queue, data, skip, reference, defaults = {}) {
   const pending = data.articles
     .filter(article => article.review?.status === 'pending')
     .map(article => ({ kind: 'pending', entry: null, form: fromRecord(article) }));
-  const done = new Set([...data.articles.map(a => a.url), ...skip.skipped.map(s => s.url)]);
-  const queued = queue.entries
-    .filter(entry => !done.has(entry.url))
-    .map(entry => ({ kind: 'queue', entry, form: prefill(entry, reference, defaults) }));
-  return [...pending, ...queued];
+  // 같은 글이 주소만 달리 두 번 들어와도 한 번만 보인다.
+  const done = new Set(
+    [...data.articles.map(a => a.url), ...skip.skipped.map(s => s.url)].map(articleKey),
+  );
+  const queued = [];
+  for (const entry of queue.entries) {
+    const key = articleKey(entry.url);
+    if (done.has(key)) continue;
+    done.add(key);
+    queued.push({ kind: 'queue', entry, form: prefill(entry, reference, defaults) });
+  }
+  return [...pending, ...queued].map(row => ({ ...row, sameBlog: sameBlog(row.form.url, data) }));
 }
+
+// 한 블로그를 가리키는 열쇠. note·아메바·pokesol·livedoor는 경로의 작성자까지, 하테나 등은
+// 호스트다. 같은 블로그의 기사가 이미 기록되어 있으면 검토 화면이 알린다(다른 시즌이나
+// 더블일 수 있어 막지는 않는다).
+export function blogKey(value) {
+  try {
+    const url = new URL(value);
+    const host = url.host.replace(/^www\./, '');
+    const first = url.pathname.split('/').filter(Boolean);
+    if (['note.com', 'ameblo.jp', 'blog.livedoor.jp'].includes(host))
+      return `${host}/${first[0] ?? ''}`;
+    if (host === 'pokesol.app' && first[0] === 'u') return `${host}/u/${first[1] ?? ''}`;
+    return host;
+  } catch {
+    return String(value);
+  }
+}
+
+const sameBlog = (url, data) =>
+  data.articles
+    .filter(a => blogKey(a.url) === blogKey(url) && articleKey(a.url) !== articleKey(url))
+    .map(a => ({
+      id: a.id,
+      season: a.season,
+      format: a.format,
+      rank: a.rank,
+      title: a.title,
+      url: a.url,
+      status: a.review?.status,
+    }));
