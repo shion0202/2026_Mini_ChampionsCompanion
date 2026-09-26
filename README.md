@@ -69,11 +69,35 @@ node scripts/verify-browser.mjs
 
 검증 스크린샷은 Git에 포함하지 않는 `test-results/`에 생성됩니다. 한국어 사전을 갱신하려면 네트워크가 연결된 상태에서 `node scripts/update-locales.mjs`를 실행합니다.
 
-포켓몬 상세의 ‘상위 파티’ 탭은 [포켓몬 배틀 데이터베이스 챔피언스](https://champs.pokedb.tokyo/)의 공개 데이터(최종 순위 상위 구축)를 씁니다. 시즌이 끝나면 `https://champs.pokedb.tokyo/opendata/s{시즌}_{single|double}_ranked_teams.json`을 `.cache/pokedb/`에 받아 두고 `npm run top-teams`로 `public/data/top-teams.json`을 다시 만듭니다. 포케DB는 앱 사용자의 기기에서 직접 받지 말고 한 번 받아 두고 쓰라고 안내하므로, 앱은 이 사본만 읽습니다. 키로 바꾸지 못한 이름이 있으면 스크립트가 목록을 보이고 파일을 쓰지 않습니다. 폼 이름 표는 `scripts/update-top-teams.mjs`에 있습니다.
+포켓몬 상세의 ‘상위 파티’ 탭은 [포켓몬 배틀 데이터베이스 챔피언스](https://champs.pokedb.tokyo/)의 공개 데이터(최종 순위 상위 구축)를 씁니다. 포케DB는 앱 사용자의 기기에서 직접 받지 말고 한 번 받아 두고 쓰라고 안내하므로, 앱은 저장소의 사본 `public/data/top-teams.json`만 읽습니다.
+
+- 자동 갱신: GitHub Actions(`.github/workflows/daily.yml`, ‘매일 자료 점검’)가 매일 05:00(한국 시간)에 `node scripts/update-top-teams.mjs --fetch`를 돌립니다. championsbattledata의 시즌 목록으로 끝난 시즌을 알아내고, 시즌이 끝난 뒤 **3일째(빠른 첫 반영), 10일째(포케DB의 X 수집 7일이 끝난 뒤), 30일째(늦게 더해진 기사)**에 한 번씩만 싱글·더블 파일을 받습니다. 받을 차례가 아니면 포케DB에 요청하지 않고, 받을 때도 ETag로 바뀌지 않은 파일은 다시 받지 않습니다. 자료가 바뀌면 main에 커밋되어 배포됩니다. 받은 날짜는 파일의 `fetched`에 남습니다.
+- 수동 갱신: `https://champs.pokedb.tokyo/opendata/s{시즌}_{single|double}_ranked_teams.json`을 `.cache/pokedb/`에 받아 두고 `npm run top-teams`를 돌립니다. 받은 시즌만 바뀝니다. GitHub 저장소의 Actions 탭에서 ‘매일 자료 점검’을 직접 실행할 수도 있습니다.
+- 키로 바꾸지 못한 이름이 있으면 스크립트가 목록을 보이고 파일을 쓰지 않습니다. 자동 갱신이면 작업이 실패로 끝나고 디스코드로 알림이 갑니다. 폼 이름 표는 `scripts/update-top-teams.mjs`에 있습니다.
 
 새 기능의 브라우저 검증은 같은 환경 변수로 `node scripts/verify-reference-browser.mjs`를 실행합니다. 도감 데이터 재생성은 Node.js 24 이상에서 `node scripts/update-reference.mjs`로 실행합니다. 원본 리비전은 스크립트 안에 고정되어 있어 반복 실행만으로 새로운 원본으로 바뀌지는 않습니다. 갱신 시 버전 변경과 검증이 필요합니다.
 
 도감 실수치는 챔피언스 Lv.50 기준의 최대/무보정 +32/무보정 +0/최소 범위입니다. 방어상성은 타입 배율과 타입별 특성에 의해 달라지는 배율을 함께 표시합니다. 멀티스케일 같은 전 타입 보정과 접촉 조건, 날씨, 도구, 상대의 특성 무시 및 개별 기술 예외는 제외합니다. 실제 데미지가 아닌 참고 배율입니다. 포인트 합산은 제공된 상위 행만 합치며 전체 분포를 추정하지 않습니다. 세대 필터는 원종의 첫 등장 세대이며, 지역 폼이 추가된 세대와 구분합니다.
+
+## 레귤레이션이 바뀌면
+
+랭킹·사용률 추이·상위 파티는 저절로 새 시즌을 따라갑니다. 도감의 챔피언스 수록 목록, 계산기·내 샘플의 선택 항목(포켓몬, 배우는 기술, 도구), 스피드 랭킹의 포켓몬 목록은 `public/data/reference.json`과 두 목록 파일을 씁니다. 이 파일들은 원본(Showdown, champout)의 버전을 고정해 만들기 때문에 **새 레귤레이션을 저절로 따라가지 않습니다.** 대전 규칙 변경이 섞여 들어오므로 자동으로 바꾸지 않고 알림만 보냅니다.
+
+**알림:** ‘매일 자료 점검’이 `scripts/watch-upstream.mjs`로 다음을 살펴 새로 알아낸 것만 디스코드로 보냅니다. 보낸 알림은 `scripts/watch-state.json`에 남아 되풀이되지 않습니다.
+
+- 최신 랭킹에 도감에 없는 포켓몬, 배울 수 없다고 되어 있는 기술, 챔피언스에 없다고 되어 있는 도구가 있음(앱 자료가 낡았다는 가장 직접적인 신호)
+- Showdown의 챔피언스 라인업·배우는 기술·도구 파일이나 champout(게임 데이터)이 고정 버전 이후 바뀜
+- 새 시즌의 레귤레이션이 `src/data.js`의 `SEASON_REGULATIONS`에 없음
+- 매일 자료 점검 자체가 실패함
+
+알림을 받으려면 디스코드 채널 설정 → 연동 → 웹후크에서 주소를 만들고, GitHub 저장소 Settings → Secrets and variables → Actions에 `DISCORD_WEBHOOK_URL`이라는 이름으로 넣습니다. 로컬에서 `DISCORD_WEBHOOK_URL=… node scripts/watch-upstream.mjs`로 시험할 수 있습니다.
+
+**갱신 순서** (Node.js 24 이상, 네트워크 필요)
+
+1. `scripts/update-reference.mjs`의 `SHOWDOWN`, `CHAMPOUT`을 각 저장소의 최신 커밋으로 바꿉니다.
+2. `node scripts/update-reference.mjs` → `node scripts/update-speed-catalog.mjs` → `node scripts/update-damage-catalog.mjs` (두 목록은 1의 Showdown 버전을 따라갑니다)
+3. 새 시즌이면 `src/data.js`의 `SEASON_REGULATIONS`에 한 줄을 더합니다.
+4. `npm test`로 확인하고(바뀐 목록 때문에 스냅숏 갱신이 필요하면 `npm run test:snapshots` 후 차이를 확인), 커밋해 main에 올립니다.
 
 ## 데이터 및 제한
 
