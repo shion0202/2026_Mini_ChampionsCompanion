@@ -55,6 +55,8 @@ import {
   bulkBox,
 } from './damage-view.js';
 import { NFE_SPECIES } from './damage-catalog.js';
+import { pickTopTeamSeason, topTeamSeasons } from './top-teams.js';
+import { renderTopTeams, TOP_TEAMS_PAGE } from './top-teams-view.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
 import { speedRows, battleSpeedRows } from './speed.js';
@@ -191,14 +193,19 @@ const DETAIL_ORDER = [
   'stat_alignment',
   'stat_points',
   'teammate',
+  'topteams',
   'learnset',
   'trend',
 ];
 const DETAIL_LABELS = Object.fromEntries(
   DETAIL_ORDER.map(key => [
     key,
-    { overview: '기본 정보', learnset: '배우는 기술', trend: '사용률 추이' }[key] ??
-      CATEGORY_LABELS[key],
+    {
+      overview: '기본 정보',
+      topteams: '상위 파티',
+      learnset: '배우는 기술',
+      trend: '사용률 추이',
+    }[key] ?? CATEGORY_LABELS[key],
   ]),
 );
 
@@ -254,6 +261,15 @@ const state = {
   buildsCombo: null,
   speed: { mode: 'base', query: '', type: '', includeMega: true, ascending: false },
   speedLimit: 80,
+  // 포케DB 공개 상위 파티. 탭을 처음 열 때 받는다. season은 탭에서 고른 시즌(null이면 앱의 시즌).
+  topTeams: {
+    data: null,
+    error: false,
+    loading: false,
+    season: null,
+    limit: TOP_TEAMS_PAGE,
+    for: null,
+  },
   typeChartMode: 'defense',
   defenseTypes: [],
   format: saved.format,
@@ -447,6 +463,7 @@ function renderCategory() {
   });
   $('category-content').setAttribute('aria-labelledby', `tab-${category}`);
   if (category === 'trend') return renderPokemonTrend(p);
+  if (category === 'topteams') return renderPokemonTopTeams(p);
   if (category === 'overview' || category === 'learnset') {
     if (!state.reference) {
       $('category-content').innerHTML = referenceStatus(state.refError);
@@ -2245,6 +2262,59 @@ function focusTrend(name) {
   });
 }
 
+// 랭킹 상세의 ‘상위 파티’ 탭. 자료는 우리 사이트에 받아 둔 사본이다(포케DB에 직접 요청하지 않는다).
+function renderPokemonTopTeams(p) {
+  const top = state.topTeams;
+  if (top.for !== p.id) Object.assign(top, { for: p.id, limit: TOP_TEAMS_PAGE });
+  if (top.error) {
+    $('category-content').innerHTML =
+      '<div class="empty-state"><p>상위 파티 자료를 불러오지 못했습니다.</p><button class="text-button" data-retry-top-teams>다시 시도</button></div>';
+    return;
+  }
+  if (!top.data) {
+    $('category-content').innerHTML = loadingState('상위 파티를 불러오는 중');
+    loadTopTeams();
+    return;
+  }
+  if (!state.reference || !state.locale) {
+    $('category-content').innerHTML = referenceStatus(state.refError);
+    return;
+  }
+  const wanted = top.season ?? state.season;
+  const { season, substituted } = pickTopTeamSeason(top.data, state.format, wanted);
+  $('category-content').innerHTML = renderTopTeams(
+    {
+      data: top.data,
+      season,
+      substituted,
+      wanted,
+      seasons: topTeamSeasons(top.data, state.format),
+      format: state.format,
+      limit: top.limit,
+    },
+    p.id,
+    state.reference,
+    state.locale,
+  );
+}
+
+async function loadTopTeams() {
+  const top = state.topTeams;
+  if (top.loading) return;
+  Object.assign(top, { loading: true, error: false });
+  try {
+    const response = await fetch('./public/data/top-teams.json');
+    if (!response.ok) throw Error('Top teams unavailable');
+    const data = await response.json();
+    if (!data?.seasons) throw Error('Invalid top teams');
+    top.data = data;
+  } catch {
+    top.error = true;
+  }
+  top.loading = false;
+  if (state.category === 'topteams' && selectedEntry()) renderCategory();
+}
+
 // 랭킹 상세의 ‘추이’ 탭. 세 기간을 차례로 받아 채운다.
 async function renderPokemonTrend(p) {
   const format = state.format;
@@ -2888,6 +2958,21 @@ $('reverse-sort').onclick = () => {
   state.reverse = !state.reverse;
   if (!state.loading) renderList();
 };
+document.addEventListener('change', event => {
+  if (event.target.id !== 'top-team-season') return;
+  Object.assign(state.topTeams, { season: event.target.value, limit: TOP_TEAMS_PAGE });
+  renderCategory();
+});
+document.addEventListener('click', event => {
+  if (event.target.closest('[data-top-teams-more]')) {
+    state.topTeams.limit += TOP_TEAMS_PAGE;
+    renderCategory();
+  }
+  if (event.target.closest('[data-retry-top-teams]')) {
+    state.topTeams.error = false;
+    renderCategory();
+  }
+});
 document.addEventListener('input', event => {
   if (event.target.id === 'learnset-search') {
     state.learnQuery = event.target.value;
@@ -3067,6 +3152,10 @@ document.addEventListener(
   event => {
     const img = event.target;
     if (!(img instanceof HTMLImageElement)) return;
+    if (img.classList.contains('top-team-image')) {
+      img.hidden = true;
+      img.parentElement.querySelector('.top-team-fallback').hidden = false;
+    }
     if (img.classList.contains('portrait')) {
       img.classList.add('image-missing');
       const fallback = img.parentElement.querySelector('.hero-image-fallback');

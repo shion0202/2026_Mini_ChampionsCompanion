@@ -69,6 +69,8 @@ node scripts/verify-browser.mjs
 
 검증 스크린샷은 Git에 포함하지 않는 `test-results/`에 생성됩니다. 한국어 사전을 갱신하려면 네트워크가 연결된 상태에서 `node scripts/update-locales.mjs`를 실행합니다.
 
+포켓몬 상세의 ‘상위 파티’ 탭은 [포켓몬 배틀 데이터베이스 챔피언스](https://champs.pokedb.tokyo/)의 공개 데이터(최종 순위 상위 구축)를 씁니다. 시즌이 끝나면 `https://champs.pokedb.tokyo/opendata/s{시즌}_{single|double}_ranked_teams.json`을 `.cache/pokedb/`에 받아 두고 `npm run top-teams`로 `public/data/top-teams.json`을 다시 만듭니다. 포케DB는 앱 사용자의 기기에서 직접 받지 말고 한 번 받아 두고 쓰라고 안내하므로, 앱은 이 사본만 읽습니다. 키로 바꾸지 못한 이름이 있으면 스크립트가 목록을 보이고 파일을 쓰지 않습니다. 폼 이름 표는 `scripts/update-top-teams.mjs`에 있습니다.
+
 새 기능의 브라우저 검증은 같은 환경 변수로 `node scripts/verify-reference-browser.mjs`를 실행합니다. 도감 데이터 재생성은 Node.js 24 이상에서 `node scripts/update-reference.mjs`로 실행합니다. 원본 리비전은 스크립트 안에 고정되어 있어 반복 실행만으로 새로운 원본으로 바뀌지는 않습니다. 갱신 시 버전 변경과 검증이 필요합니다.
 
 도감 실수치는 챔피언스 Lv.50 기준의 최대/무보정 +32/무보정 +0/최소 범위입니다. 방어상성은 타입 배율과 타입별 특성에 의해 달라지는 배율을 함께 표시합니다. 멀티스케일 같은 전 타입 보정과 접촉 조건, 날씨, 도구, 상대의 특성 무시 및 개별 기술 예외는 제외합니다. 실제 데미지가 아닌 참고 배율입니다. 포인트 합산은 제공된 상위 행만 합치며 전체 분포를 추정하지 않습니다. 세대 필터는 원종의 첫 등장 세대이며, 지역 폼이 추가된 세대와 구분합니다.
