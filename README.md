@@ -90,7 +90,7 @@ node scripts/verify-browser.mjs
 - 새 시즌의 레귤레이션이 `src/data.js`의 `SEASON_REGULATIONS`에 없음
 - 매일 자료 점검 자체가 실패함
 
-알림을 받으려면 디스코드 채널 설정 → 연동 → 웹후크에서 주소를 만들고, GitHub 저장소 Settings → Secrets and variables → Actions에 `DISCORD_WEBHOOK_URL`이라는 이름으로 넣습니다. 로컬에서 `DISCORD_WEBHOOK_URL=… node scripts/watch-upstream.mjs`로 시험할 수 있습니다.
+알림을 받으려면 디스코드 채널 설정 → 연동 → 웹후크에서 주소를 만들고, GitHub 저장소 Settings → Secrets and variables → Actions에 `DISCORD_WEBHOOK_URL`이라는 이름으로 넣습니다. 연결 확인은 Actions 탭 → ‘매일 자료 점검’ → Run workflow에서 ‘디스코드 시험 메시지 보내기’를 체크하고 실행합니다. 비밀값이 없거나 주소가 틀리면 작업이 실패로 끝납니다. 로컬에서는 `DISCORD_WEBHOOK_URL=… node scripts/watch-upstream.mjs --message "시험"`으로 보낼 수 있습니다.
 
 **갱신 순서** (Node.js 24 이상, 네트워크 필요)
 
