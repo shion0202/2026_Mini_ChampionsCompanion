@@ -186,15 +186,31 @@ test('오류가 없으면 오류 자리를 숨긴다', () => {
   assert.ok(sampleEditor(sample, { reference, locale }).includes('data-builds-errors hidden'));
 });
 
-test('초안을 이어서 고칠 때만 안내한다', () => {
+test('초안을 이어서 고칠 때만 안내하고 되돌리기 단추를 둔다', () => {
+  const resumed = sampleEditor(sample, { reference, locale, resumed: true, existing: true });
+  assert.ok(resumed.includes('임시 저장된 내용을 이어서 작성합니다'));
+  assert.ok(resumed.includes('저장된 상태로 되돌리기'));
   assert.ok(
-    sampleEditor(sample, { reference, locale, resumed: true }).includes(
-      '작성 중인 항목을 이어서 작성합니다',
-    ),
+    sampleEditor(sample, { reference, locale, resumed: true }).includes('임시 저장 지우기'),
+    '새로 만드는 중이면 지우기',
   );
   assert.equal(
-    sampleEditor(sample, { reference, locale }).includes('작성 중인 항목을 이어서 작성합니다'),
+    sampleEditor(sample, { reference, locale }).includes('임시 저장된 내용을 이어서 작성합니다'),
     false,
+  );
+});
+
+test('저장된 것을 고쳤을 때만 변경 취소 단추가 있다', () => {
+  const html = extra => sampleEditor(sample, { reference, locale, ...extra });
+  assert.ok(html({ existing: true, dirty: true }).includes('변경 취소'));
+  assert.ok(
+    html({ existing: true }).includes('data-builds-revert hidden'),
+    '바뀐 것이 없으면 숨긴다',
+  );
+  assert.equal(
+    html({ dirty: true }).includes('변경 취소'),
+    false,
+    '새로 만드는 중이면 초기화와 같다',
   );
 });
 

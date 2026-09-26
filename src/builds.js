@@ -566,6 +566,13 @@ export function searchParties(parties, query) {
 // 고치다 말아도 서로 덮어쓰지 않는다.
 export const draftKey = (kind, id) => id ?? `new-${kind}`;
 
+// 초안이 저장된 것(새로 만드는 중이면 빈 것)과 같은가. 수정일은 저장할 때만 바뀌므로 뺀다.
+// 같으면 고친 것이 없으므로 임시 저장도 나갈 때 묻는 것도 하지 않는다.
+export function sameBuild(a, b) {
+  const plain = x => JSON.stringify({ ...x, updatedAt: null });
+  return plain(a) === plain(b);
+}
+
 export function readDrafts(storage) {
   try {
     const raw = JSON.parse(storage?.getItem(DRAFT_KEY));

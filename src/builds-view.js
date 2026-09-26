@@ -78,10 +78,20 @@ const errorList = errors =>
 // 경고는 저장 단추 바로 위에 붙인다. 화면 맨 위에 두면 긴 편집기에서는 저장을
 // 누른 자리에서 보이지 않는다.
 // 공유는 저장한 것만, 동기화를 켠 기기에서만 한다(shareable).
-const editorActions = (existing, errors, shareable = false, shareLabel = '샘플 공유') =>
+// 변경 취소는 저장된 것을 고치던 중이고 바뀐 것이 있을 때만 보인다. 새로 만드는 중이면
+// 초기화와 같으므로 두지 않는다.
+const editorActions = (
+  existing,
+  errors,
+  shareable = false,
+  shareLabel = '샘플 공유',
+  dirty = false,
+) =>
   errorList(errors) +
   `<div class="builds-actions">` +
   `<button type="submit" class="primary-button" data-builds-save>저장</button>` +
+  // 이름·설명을 칠 때는 다시 그리지 않으므로 숨겨 두고 app.js가 켠다.
+  `${existing ? `<button type="button" class="text-button" data-builds-revert${dirty ? '' : ' hidden'}>변경 취소</button>` : ''}` +
   `<button type="button" class="text-button" data-builds-reset>초기화</button>` +
   `${existing ? '<button type="button" class="text-button builds-delete" data-builds-delete>삭제</button>' : ''}` +
   `${shareable ? `<button type="button" class="text-button" data-builds-share>${shareLabel}</button>` : ''}` +
@@ -94,9 +104,11 @@ const backToList =
   `<div class="builds-nav">` +
   `<button type="button" class="text-button" data-builds-cancel>← 목록으로</button></div>`;
 
-const resumeNote = resumed =>
+// 임시 저장된 내용을 이어서 열었을 때. 원래대로 돌아갈 단추를 함께 둔다.
+const resumeNote = (resumed, existing) =>
   resumed
-    ? '<p class="builds-resume">작성 중인 항목을 이어서 작성합니다. 저장하지 않은 내용이 남아 있었습니다.</p>'
+    ? `<div class="builds-resume"><p>임시 저장된 내용을 이어서 작성합니다. 아직 저장하지 않은 내용입니다.</p>` +
+      `<button type="button" class="text-button" data-builds-revert>${existing ? '저장된 상태로 되돌리기' : '임시 저장 지우기'}</button></div>`
     : '';
 
 // reference가 null이면 포켓몬 이름 자리에 저장된 id가 나온다. 도감을 아직
@@ -330,6 +342,7 @@ export function sampleEditor(
     resumed = false,
     errors = [],
     shareable = false,
+    dirty = false,
   },
 ) {
   const total = sample.points.reduce((a, b) => a + b, 0);
@@ -339,7 +352,7 @@ export function sampleEditor(
   return (
     `<form class="builds-editor" data-builds-form="sample">` +
     backToList +
-    `${resumeNote(resumed)}` +
+    `${resumeNote(resumed, existing)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(sample.name)}" data-builds-field="name" placeholder="샘플명 (예: 스카프 한카리아스)"></label>` +
     `<p class="builds-day-line">수정일 ${fmtDay(sample.updatedAt)}</p>` +
     `<div class="builds-hero">` +
@@ -398,7 +411,7 @@ export function sampleEditor(
     `<ul>${sample.altMoves.map(altRow(reference, locale)).join('')}</ul>` +
     `<button type="button" class="text-button" data-builds-alt-add>후보 기술 추가</button></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="보정과 포인트의 의도, 기술의 의도, 후보 기술인 이유 등">${esc(sample.note)}</textarea></label>` +
-    `${editorActions(existing, errors, shareable, '샘플 공유')}` +
+    `${editorActions(existing, errors, shareable, '샘플 공유', dirty)}` +
     `</form>`
   );
 }
@@ -414,19 +427,20 @@ export function partyEditor(
     resumed = false,
     errors = [],
     shareable = false,
+    dirty = false,
   },
 ) {
   const byId = new Map(samples.map(s => [s.id, s]));
   return (
     `<form class="builds-editor" data-builds-form="party">` +
     backToList +
-    `${resumeNote(resumed)}` +
+    `${resumeNote(resumed, existing)}` +
     `<label class="builds-field">이름<input type="text" value="${esc(party.name)}" data-builds-field="name" placeholder="파티명"></label>` +
     `<fieldset class="builds-members"><legend>구성</legend><ul>${party.members
       .map(memberRow(byId, reference, locale, index))
       .join('')}</ul></fieldset>` +
     `<label class="builds-field">설명<textarea rows="5" data-builds-field="note" placeholder="특정 포켓몬을 파티에 채용한 이유 등">${esc(party.note)}</textarea></label>` +
-    `${editorActions(existing, errors, shareable, '파티 공유')}` +
+    `${editorActions(existing, errors, shareable, '파티 공유', dirty)}` +
     `</form>`
   );
 }

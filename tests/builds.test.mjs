@@ -44,6 +44,7 @@ import {
   actualStats,
   searchSamples,
   searchParties,
+  sameBuild,
 } from '../src/builds.js';
 
 const ko = JSON.parse(await readFile(new URL('../public/data/ko.json', import.meta.url)));
@@ -1117,4 +1118,10 @@ test('key order does not make two equal items differ', () => {
   const reordered = Object.fromEntries(Object.entries(a).reverse());
   assert.equal(sameItems(docOf([a]), docOf([reordered], [], 9)), true);
   assert.deepEqual(mergeThreeWay(docOf([a]), docOf([reordered]), docOf([a])).conflicts, []);
+});
+
+test('sameBuild ignores the updated time', () => {
+  const a = { ...emptySample(), name: 'A', updatedAt: 1 };
+  assert.equal(sameBuild(a, { ...a, updatedAt: 99 }), true);
+  assert.equal(sameBuild(a, { ...a, name: 'B' }), false);
 });

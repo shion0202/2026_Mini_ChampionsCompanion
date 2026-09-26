@@ -3253,7 +3253,13 @@ select optgroup {
 .builds-grip:empty {
   cursor: default;
 }
-/* 끄는 중인 줄은 흐리게, 놓을 자리는 테두리로 보인다. */
+/* 끄는 중인 줄은 흐리게, 놓을 자리는 테두리로 보인다. 테두리는 칸 밖 4px까지 나가는데
+   후보 기술은 줄 간격이 2px이라, 뒤에 그려지는 다음 줄이 테두리 아래쪽을 덮었다.
+   놓을 자리의 줄을 이웃보다 위에 그린다. */
+.builds-editor li.is-drop-target {
+  position: relative;
+  z-index: 1;
+}
 .builds-editor li.is-dragging {
   opacity: 0.45;
 }
@@ -3566,6 +3572,17 @@ body.is-dragging-move {
 .builds-resume {
   margin: 0;
   color: var(--muted);
+}
+/* 임시 저장 안내. 글 옆(좁으면 아래)에 되돌리기 단추를 둔다. */
+div.builds-resume {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+div.builds-resume p {
+  margin: 0;
 }
 .picker-list {
   list-style: none;
