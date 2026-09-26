@@ -277,12 +277,10 @@ test('another article from an already recorded blog is flagged, not hidden', () 
 });
 
 test('a record saved under a blog front page can be moved to the real article address', () => {
-  const top = {
-    ...data.articles[0],
-    id: 'm5-singles-forpoke',
-    url: 'http://blog.livedoor.jp/forpoke/',
-  };
-  const withTop = { ...data, articles: [...data.articles, top] };
+  // 실제 파일에는 이 기사가 이미 옮겨져 있으니, 처음 두 기록만 두고 시험한다.
+  const base = data.articles.filter(a => ['m5-singles-sigma', 'm5-singles-rebo'].includes(a.id));
+  const top = { ...base[0], id: 'm5-singles-forpoke', url: 'http://blog.livedoor.jp/forpoke/' };
+  const withTop = { ...data, articles: [...base, top] };
   const article = { ...entry, url: 'http://blog.livedoor.jp/forpoke/archives/97752131.html' };
   const [row] = reviewList({ entries: [article] }, withTop, { skipped: [] }, reference);
   assert.deepEqual(

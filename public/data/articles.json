@@ -146,6 +146,246 @@
         "teamEvidence": "검토 화면에서 작성자의 팀 이미지와 본문 후보를 대조해 여섯 마리와 도구를 확인.",
         "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
       }
+    },
+    {
+      "id": "m5-singles-miga-channel",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 99,
+      "author": "Miga channel 池溝みぃ",
+      "title": "【M-Bシーズン5シングル:レート2467:最終99位】盤面掌握アシレハッサム",
+      "url": "https://pokesol.app/u/migachannel0423/articles/03e7a36d2cc499a7",
+      "team": [
+        { "pokemon": "scizormega", "item": "scizorite" },
+        { "pokemon": "primarina", "item": "sitrusberry" },
+        { "pokemon": "dragonite", "item": "lifeorb" },
+        { "pokemon": "gengarmega", "item": "gengarite" },
+        { "pokemon": "garchomp", "item": "lumberry" },
+        { "pokemon": "archaludon", "item": "choicescarf" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/a6d2852e-9cef-417a-a591-6a334ae44ae6.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-mahiru04",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 108,
+      "author": "迷央マヒル",
+      "title": "【M-5 / 最終108位】裏マヒル式対面",
+      "url": "https://pokesol.app/u/mahiru04/articles/140b9088df6ba130",
+      "team": [
+        { "pokemon": "blastoisemega", "item": "blastoisinite" },
+        { "pokemon": "victreebelmega", "item": "victreebelite" },
+        { "pokemon": "mimikyu", "item": "lifeorb" },
+        { "pokemon": "basculegion", "item": "spelltag" },
+        { "pokemon": "vanilluxe", "item": "nevermeltice" },
+        { "pokemon": "aegislash", "item": "focussash" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/92b726e4-32b2-4cb5-8220-ad880d94eb1e.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-ciderman",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 133,
+      "author": "ciderman",
+      "title": "【M-5シングル R2428/最終133位】3メガじゃんけんステロあくび",
+      "url": "https://pokesol.app/u/ciderman/articles/b73900527dceeadd",
+      "team": [
+        { "pokemon": "lucariomega", "item": "lucarionite" },
+        { "pokemon": "gyaradosmega", "item": "gyaradosite" },
+        { "pokemon": "delphoxmega", "item": "delphoxite" },
+        { "pokemon": "garchomp", "item": "sitrusberry" },
+        { "pokemon": "sylveon", "item": "leftovers" },
+        { "pokemon": "meowscarada", "item": "focussash" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/ec23c7e9-f0db-4d48-aad2-c57cd8257a79.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-pancho-dgz",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 142,
+      "author": "pancho_dgz",
+      "title": "【M-5最終142位】一鮫・二鷹・三土下座【レート2423】",
+      "url": "https://pokesol.app/u/pancho_dgz/articles/fc28f10365a4761e",
+      "team": [
+        { "pokemon": "kingambit", "item": "blackglasses" },
+        { "pokemon": "staraptormega", "item": "staraptite" },
+        { "pokemon": "delphoxmega", "item": "delphoxite" },
+        { "pokemon": "garchomp", "item": "sitrusberry" },
+        { "pokemon": "primarina", "item": "chestoberry" },
+        { "pokemon": "meowscarada", "item": "focussash" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/e466064b-214b-4dac-a71b-92de55833ecf.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-nature",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 177,
+      "author": "nature",
+      "title": "【シングルM-5 最終177位 】グロス軸対面構築",
+      "url": "https://pokesol.app/u/nature/articles/1647f9f3d9611bc3",
+      "team": [
+        { "pokemon": "metagrossmega", "item": "metagrossite" },
+        { "pokemon": "primarina", "item": "focussash" },
+        { "pokemon": "garchomp", "item": "habanberry" },
+        { "pokemon": "basculegion", "item": "choicescarf" },
+        { "pokemon": "hydreigon", "item": "leftovers" },
+        { "pokemon": "venusaurmega", "item": "venusaurite" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/4a07b6d5-b6d3-478d-a1bd-d2269455233a.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-sui-pokemon",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 186,
+      "author": "sui_pokemon",
+      "title": "【シングルM-5 最終186位　 不撓不屈フロルアマガイダイトウ～シャンデリアを添えて～】",
+      "url": "https://pokesol.app/u/sui_pokemon/articles/9f7d4f3382462f09",
+      "team": [
+        { "pokemon": "corviknight", "item": "leftovers" },
+        { "pokemon": "glimmora", "item": "focussash" },
+        { "pokemon": "basculegion", "item": "choicescarf" },
+        { "pokemon": "lopunnymega", "item": "lopunnite" },
+        { "pokemon": "garchomp", "item": "habanberry" },
+        { "pokemon": "chandeluremega", "item": "chandelurite" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/pokenote_600.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-k-poke3511",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 218,
+      "author": "けー",
+      "title": "【M-5最終218位】臥薪嘗胆マフォブラドヒド【最高/最終2414】",
+      "url": "https://pokesol.app/u/k_poke3511/articles/fa4ed3acc787d21a",
+      "team": [
+        { "pokemon": "toxapex", "item": "shedshell" },
+        { "pokemon": "umbreon", "item": "leftovers" },
+        { "pokemon": "meganiummega", "item": "meganiumite" },
+        { "pokemon": "delphoxmega", "item": "delphoxite" },
+        { "pokemon": "glimmora", "item": "focussash" },
+        { "pokemon": "gholdengo", "item": "choicescarf" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/aa439c5f-6993-4c74-b62b-361ae8d8a92c.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-mahina-poke",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 238,
+      "author": "マヒナポケ",
+      "title": "【SM-5 最終R2412 最終238位】襷アシレーヌ始動 ブラゲンサイクル",
+      "url": "https://pokesol.app/u/mahina_poke/articles/011d6da5267e0670",
+      "team": [
+        { "pokemon": "gengarmega", "item": "gengarite" },
+        { "pokemon": "corviknight", "item": "leftovers" },
+        { "pokemon": "umbreon", "item": "sitrusberry" },
+        { "pokemon": "garchomp", "item": "lifeorb" },
+        { "pokemon": "primarina", "item": "focussash" },
+        { "pokemon": "lopunnymega", "item": "lopunnite" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/24167e7a-2579-453c-8614-c32c5ba37620.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-kultlily",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 248,
+      "author": "kultlily",
+      "title": "【M-5 最終2411】アマガガブエッテ【最終248位】",
+      "url": "https://pokesol.app/u/kultlily/articles/1f07f123e6843547",
+      "team": [
+        { "pokemon": "floettemega", "item": "floettite" },
+        { "pokemon": "garchomp", "item": "sitrusberry" },
+        { "pokemon": "corviknight", "item": "leftovers" },
+        { "pokemon": "basculegion", "item": "choicescarf" },
+        { "pokemon": "lopunnymega", "item": "lopunnite" },
+        { "pokemon": "archaludon", "item": "scopelens" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/f9006ea0-4580-44fc-9ed1-9fbd39574453.png",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-c-trl-lab",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 275,
+      "author": "ギン",
+      "title": "【M-5 最終275位】爆風ミッドレンジ【R2409】",
+      "url": "https://pokesol.app/u/c_trl_lab/articles/a8aba143e21f4c75",
+      "team": [
+        { "pokemon": "typhlosion", "item": "focussash" },
+        { "pokemon": "mimikyu", "item": "lifeorb" },
+        { "pokemon": "garchomp", "item": "sitrusberry" },
+        { "pokemon": "greninjamega", "item": "greninjite" },
+        { "pokemon": "venusaurmega", "item": "venusaurite" },
+        { "pokemon": "corviknight", "item": "leftovers" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/8d5abad5-0c4f-440f-90c5-056acb0987d0.jpg",
+        "teamEvidence": "원문 본문에 작성자가 넣은 포켓몬 카드(포켓몬·도구 데이터)에서 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
     }
   ]
 }

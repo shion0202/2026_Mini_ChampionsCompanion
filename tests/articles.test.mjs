@@ -9,6 +9,11 @@ const read = name =>
   readFile(new URL(`../public/data/${name}.json`, import.meta.url)).then(JSON.parse);
 const [data, reference, ko] = await Promise.all(['articles', 'reference', 'ko'].map(read));
 const locale = createLocale(ko);
+// 조회 규칙 테스트는 처음 두 기록(シグマ 1위, rebo® 2위)으로만 센다. 기록이 늘어도
+// 기대값이 흔들리지 않게 한다. 형식 검사는 파일 전체를 본다.
+const sample = {
+  articles: data.articles.filter(a => ['m5-singles-sigma', 'm5-singles-rebo'].includes(a.id)),
+};
 
 // pending 기록이 파일에 있어도 된다. 형식은 공개 기록과 같아야 하고 다른 것은
 // status 하나뿐이어야 한다. 수집 자동화가 넣는 기록이 이 모양이다.
@@ -61,7 +66,7 @@ test('drafts, ambiguous, incomplete and unsafe records are never published', () 
 });
 
 test('filters preserve season/format, rank order and exact forms except Mega base matching', () => {
-  const rows = reviewedArticles(data, reference).reverse();
+  const rows = reviewedArticles(sample, reference).reverse();
   assert.deepEqual(
     selectArticles(rows, { season: 'M5', format: 'Singles' }, reference, locale).map(a => a.rank),
     [1, 2],
@@ -91,7 +96,7 @@ test('cards escape external text, retain item details and mark original links', 
 });
 
 test('several picked Pokemon keep only the parties that use all of them', () => {
-  const rows = reviewedArticles(data, reference);
+  const rows = reviewedArticles(sample, reference);
   const pick = pokemons => selectArticles(rows, { pokemons }, reference, locale).map(a => a.author);
   assert.deepEqual(pick(['garchomp', 'primarina']), ['シグマ', 'rebo®']);
   assert.deepEqual(pick(['garchomp', 'lucario']), ['rebo®'], '메가루카리오도 루카리오로 찾는다');
@@ -106,7 +111,7 @@ test('several picked Pokemon keep only the parties that use all of them', () => 
 });
 
 test('search words must all match, and the rank limit and sort apply', () => {
-  const rows = reviewedArticles(data, reference);
+  const rows = reviewedArticles(sample, reference);
   const authors = filters => selectArticles(rows, filters, reference, locale).map(a => a.author);
   assert.deepEqual(authors({ query: '한카리아스 팬텀' }), ['シグマ']);
   assert.deepEqual(authors({ query: '  한카리아스   누리레느 ' }), ['シグマ', 'rebo®']);
@@ -121,7 +126,7 @@ test('search words must all match, and the rank limit and sort apply', () => {
 });
 
 test('usage counts megas under their base and leaves out what is already picked', () => {
-  const rows = reviewedArticles(data, reference);
+  const rows = reviewedArticles(sample, reference);
   const usage = articleUsage(rows, reference);
   assert.deepEqual(usage.slice(0, 2), [
     { pokemon: 'garchomp', count: 2 },
