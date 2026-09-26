@@ -291,7 +291,8 @@ for (const entry of previous.entries) {
     url: entry.url,
     title: entry.title,
     date: entry.publishedAt,
-    context: '',
+    context: entry.leadText ?? '',
+    lead: entry.leadText ?? '',
     rankHint: entry.rankHint ?? null,
     source: entry.source ?? 'manual',
   });
@@ -418,6 +419,8 @@ for (const [url, link] of found) {
     publishedAt: page.publishedAt ?? link.date ?? null,
     rank,
     rankHint: link.rankHint ?? null,
+    // 목록 페이지에서 링크 옆에 있던 글(순위, 작성자). 검토 화면에 보인다.
+    leadText: (link.lead || link.context || '').slice(0, 160),
     season: titledSeason,
     format: titledFormat,
     monthly: title.monthly || hint.monthly,

@@ -197,6 +197,7 @@ export function digest(page, index) {
   const items = scan(text, [...index.item.keys()]).map(hit => ({
     key: index.item.get(hit.name),
     at: hit.at,
+    length: hit.name.length,
   }));
   const mons = scan(text, [...index.pokemon.keys()]);
 
@@ -208,6 +209,7 @@ export function digest(page, index) {
       base,
       forms: [],
       items: [],
+      nearest: [],
       hits: 0,
       firstIndex: text.length,
       negative: 0,
@@ -227,6 +229,32 @@ export function digest(page, index) {
     }
     merged.set(base, entry);
   }
+
+  // items는 근처(±40자)의 도구를 모두 담아 점수에 쓴다. 본문이 촘촘하면 한 도구가
+  // 여러 포켓몬에 붙으므로, 검토 화면이 미리 채울 도구는 따로 고른다. 도구 표기마다
+  // 가장 가까운 포켓몬 하나에만 붙인다. 'ガブリアス@スカーフ'처럼 도구는 보통 이름 뒤에
+  // 오므로 앞에 있는 도구는 조금 멀게 본다.
+  const places = mons.flatMap(hit => {
+    const key = index.pokemon.get(hit.name);
+    const base = index.baseOf.get(key) ?? key;
+    return hit.at.map(at => ({ base, at, end: at + hit.name.length }));
+  });
+  for (const item of items)
+    for (const at of item.at) {
+      let best = null;
+      let bestDistance = NEAR;
+      for (const place of places) {
+        const distance =
+          at >= place.end ? at - place.end : (place.at - (at + item.length)) * 1.5 + 1;
+        if (distance >= 0 && distance <= bestDistance) {
+          if (distance === bestDistance && best) continue;
+          best = place;
+          bestDistance = distance;
+        }
+      }
+      const entry = best && merged.get(best.base);
+      if (entry && !entry.nearest.includes(item.key)) entry.nearest.push(item.key);
+    }
 
   for (const entry of merged.values()) {
     // 점수는 본문에서 실제로 찾은 도구로만 매긴다. 아래에서 채우는 메가스톤은
@@ -455,10 +483,17 @@ const lastRank = text => {
 
 export function extractLinks(body, base = pageUrlOf(body)) {
   const found = new Map();
-  const add = (href, title, context, rankHint = null) => {
+  // lead는 링크 앞(직전 기사 링크 뒤부터)의 글이다. 카드의 순위·작성자가 여기 있다.
+  const add = (href, title, context, rankHint = null, lead = '') => {
     const url = cleanUrl(href, base);
     if (!url || found.has(url)) return;
-    found.set(url, { url, title: flatten(title), context: flatten(context), rankHint });
+    found.set(url, {
+      url,
+      title: flatten(title),
+      context: flatten(context),
+      rankHint,
+      lead: flatten(lead).slice(-160),
+    });
   };
   const anchors = [...body.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([^]*?)<\/a>/gi)];
   if (anchors.length) {
@@ -476,8 +511,14 @@ export function extractLinks(body, base = pageUrlOf(body)) {
       const head = starts.length ? before.slice(starts.at(-1).index) : before;
       const after = body.slice(match.index + match[0].length, match.index + match[0].length + 300);
       const end = after.search(BLOCK_END);
-      const rankHint = lastRank(flatten(body.slice(segment, match.index).replace(SCRIPTS, ' ')));
-      add(match[1], match[2], `${head} ${end < 0 ? after : after.slice(0, end)}`, rankHint);
+      const lead = flatten(body.slice(segment, match.index).replace(SCRIPTS, ' '));
+      add(
+        match[1],
+        match[2],
+        `${head} ${end < 0 ? after : after.slice(0, end)}`,
+        lastRank(lead),
+        lead,
+      );
       const url = cleanUrl(match[1], base);
       if (url && isBlogPost(url)) segment = match.index + match[0].length;
     }
@@ -485,7 +526,13 @@ export function extractLinks(body, base = pageUrlOf(body)) {
   }
   for (const line of body.split(/\r?\n/))
     for (const match of line.matchAll(/https?:\/\/[^\s"'<>]+/g))
-      add(match[0], '', line.replace(match[0], ' '), lastRank(line.replace(match[0], ' ')));
+      add(
+        match[0],
+        '',
+        line.replace(match[0], ' '),
+        lastRank(line.replace(match[0], ' ')),
+        line.replace(match[0], ' '),
+      );
   return [...found.values()];
 }
 
