@@ -43,6 +43,27 @@ test('normalize folds the full-width forms that item names use', () => {
   assert.equal(normalize('ガブリアス'), 'ガブリアス');
 });
 
+test('regional and gender names in brackets map to their forms, and @ headers pick the form', () => {
+  assert.equal(index.pokemon.get('ゾロアーク(ヒスイ)'), 'zoroarkhisui');
+  assert.equal(index.pokemon.get(normalize('ヌメルゴン（ヒスイ）')), 'goodrahisui');
+  assert.equal(index.pokemon.get('イダイトウ♀'), 'basculegionf');
+  assert.equal(index.pokemon.get('イダイトウ(♂)'), 'basculegion');
+  // 해설 제목은 폼을 밝히고 본문은 줄여 쓴다. ♀는 설명에만 나온다.
+  const { candidates } = digest(
+    {
+      text:
+        'イダイトウ♂♀は別カウント。イダイトウ♀も候補。◯ゾロアーク(ヒスイ)@きあいのタスキ ' +
+        'ゾロアークは強い。ゾロアークで化かす。◯イダイトウ♂@オボンのみ イダイトウは強い。',
+      images: [],
+    },
+    index,
+  );
+  const zoroark = candidates.find(c => c.base === 'zoroark');
+  assert.deepEqual(zoroark.keyHits, { zoroarkhisui: [1, 1], zoroark: [2, 0] });
+  const basculegion = candidates.find(c => c.base === 'basculegion');
+  assert.equal(basculegion.keyHits.basculegion[1], 1, 'イダイトウ♂@ 는 수컷 해설 제목');
+});
+
 test('the index reads base, mega and regional names', () => {
   assert.equal(index.pokemon.get('ガブリアス'), 'garchomp');
   assert.equal(index.pokemon.get('リザードン'), 'charizard');
@@ -324,6 +345,13 @@ test('real M-5 titles all yield a rank and the season', () => {
     ['シーズン5 最終19位 構築記事', 19],
     ['M-5:2538/2515 【最終32位&46位】お願いサザングロス', 32],
     ['【M-5:36位】超越ロップアマガ', 36],
+    // 最終 없이 N位만 쓴 제목. 검토에서 사람이 제목을 보고 순위를 넣던 것들이다.
+    ['【チャンピオンズM-5 53位 おさかな一本釣りスタン】 - 灯台の女神様', 53],
+    ['【M-5/74位】フラガブカバガルド【まどマギネタバレ注意】 - 小林の小話', 74],
+    ['【S5最終レート2414&219位】メガスコヴィランサイクル構築', 219],
+    ['M-5 雨パ（チャンピオン級223位 レート2414.116達成）', 223],
+    ['M-5最終2313(494位) ペリラグブリII', 494],
+    ['【MB M-5 2306 568位】受けない受けサイクル', 568],
   ];
   for (const [title, rank] of titles) {
     const parsed = parseTitle(title);
@@ -346,6 +374,9 @@ test('a rating is never mistaken for a rank', () => {
   // レート나 점수는 네 자리다. 最終 없이 숫자만 있을 때는 세 자리까지만 받는다.
   assert.equal(parseTitle('M-5:2538/2515 お願いサザングロス').rank, null);
   assert.equal(parseTitle('【M-5】レート2579 力戦奮闘').rank, null);
+  assert.equal(parseTitle('最高順位8000位→2桁順位まで行けた環境読み').rank, null, '최고 순위');
+  assert.equal(parseTitle('シーズンM-5最終R2307.557位').rank, null, '레이팅 소수점과 구분 못 함');
+  assert.equal(parseTitle('【MCS 2026.08 12位】月間').rank, null, '월간 챌린지 순위');
 });
 
 test('hosts that forbid AI fetching are never queued', () => {

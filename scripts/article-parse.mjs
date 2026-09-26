@@ -52,7 +52,18 @@ export function buildIndex(reference, ko) {
     if (/Mega/.test(species.forme))
       put(`メガ${baseName}${/^Mega-(.)$/.exec(species.forme)?.[1] ?? ''}`, key);
     const region = REGION_PREFIX[species.forme];
-    if (region) put(`${region}${baseName}`, key);
+    // ヒスイゾロアーク와 ゾロアーク(ヒスイ) 둘 다 쓴다. 괄호 쪽을 모르면 기본 폼으로 읽혀
+    // 히스이 통일 파티가 통째로 틀렸다(M-5 499위).
+    if (region) {
+      put(`${region}${baseName}`, key);
+      put(`${baseName}(${region})`, key);
+    }
+  }
+  // 성별·폼 괄호 표기(イダイトウ(♀) 등). 괄호 없이 イダイトウ♀로도 쓴다.
+  for (const [name, key] of Object.entries(POKESOL_FORMS)) {
+    if (!reference.species[key]) continue;
+    put(name, key);
+    put(name.replace(/\(([♂♀])\)$/, '$1'), key);
   }
 
   const item = new Map();
@@ -94,11 +105,15 @@ export function parseTitle(title) {
   // 最終이 붙은 순위를 가장 믿는다. 그게 없으면 시즌 표기 바로 뒤의 N位만 받되
   // 세 자리까지로 제한한다. レート2579나 2538/2515 같은 네 자리는 순위가 아니라
   // 레이팅이다. 순위 인증은 일본어 커뮤니티 밖에도 있어 한국어 표기도 읽는다.
+  // 最終 없이 N位만 쓴 제목도 많다(【M-5 53位】, (494位), 世界207位). 숫자 앞이 숫자나
+  // 점이면 레이팅의 일부(2307.557位)라 받지 않고, 最高N位는 최고 순위라 뺀다. 월간 챌린지
+  // 제목에서는 이 규칙을 쓰지 않는다. 월간 순위일 수 있다.
   const rank =
     seasonal.match(/最終\s*(\d+)\s*位/) ??
     text.match(/最終\s*(\d+)\s*位/) ??
     text.match(/최종\s*(\d+)\s*위/) ??
-    seasonal.match(/[MS]\s*-?\s*\d+\s*[:：]\s*(\d{1,3})\s*位/);
+    seasonal.match(/[MS]\s*-?\s*\d+\s*[:：]\s*(\d{1,3})\s*位/) ??
+    (monthly ? null : seasonal.match(/(?<!最高\s*(?:順位)?\s*)(?<![\d.])(\d{1,4})\s*位/));
   // シーズン 뒤, 하이픈이 붙은 M-숫자, 구분자 뒤의 S숫자 순으로 본다. 하이픈이
   // 있으면 어디에 있든 시즌이지만(チャンピオンズM-3처럼 붙여 쓴다), 없으면
   // 구분자 뒤에서만 받는다. レギュM-B는 숫자가 없어 걸리지 않고 MCS의 연월은
@@ -248,6 +263,11 @@ export function digest(page, index) {
       excerpts: [],
     };
     if (key !== base && !entry.forms.includes(key)) entry.forms.push(key);
+    // 폼마다 [나온 횟수, 바로 뒤에 @가 붙은 횟수]. 개별 해설 제목(ゾロアーク(ヒスイ)@タスキ)은
+    // 폼을 밝히고 본문은 줄여 쓰므로, 검토 화면은 @ 붙은 쪽을 먼저 보고 폼을 고른다.
+    const heads = hit.at.filter(at => /^\s*@/.test(text.slice(at + hit.name.length))).length;
+    const [count = 0, headCount = 0] = entry.keyHits?.[key] ?? [];
+    entry.keyHits = { ...entry.keyHits, [key]: [count + hit.at.length, headCount + heads] };
     entry.hits += hit.at.length;
     entry.firstIndex = Math.min(entry.firstIndex, hit.at[0]);
     for (const at of hit.at) {

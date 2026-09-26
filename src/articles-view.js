@@ -72,7 +72,7 @@ export function renderArticleCards(articles, reference, locale, pokemon = []) {
   return `<div class="article-list">${articles
     .map(
       a => `<article class="team-article">
-    <header class="article-meta"><strong class="article-rank">최종 ${a.rank}위</strong><strong>${esc(a.author)}</strong><span>${esc(articleSeasonLabel(a.season))} / ${a.format === 'Singles' ? '싱글배틀' : '더블배틀'}${a.publishedAt ? ` / <time datetime="${esc(a.publishedAt)}">${esc(a.publishedAt)}</time>` : ''}</span></header>
+    <header class="article-meta"><strong class="article-rank">${a.rank === null ? '순위 미공개' : `최종 ${a.rank}위`}</strong><strong>${esc(a.author)}</strong><span>${esc(articleSeasonLabel(a.season))} / ${a.format === 'Singles' ? '싱글배틀' : '더블배틀'}${a.publishedAt ? ` / <time datetime="${esc(a.publishedAt)}">${esc(a.publishedAt)}</time>` : ''}</span></header>
     <ul class="article-party">${a.team
       .map(member => {
         const species = reference.species[member.pokemon];

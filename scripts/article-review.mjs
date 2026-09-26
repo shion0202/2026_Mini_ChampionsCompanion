@@ -1,7 +1,7 @@
 // 검토 화면(scripts/review-articles.mjs)의 판단 부분. 네트워크와 파일을 쓰지 않는
 // 순수 함수만 두어 테스트로 고정한다.
 import { reviewedArticles } from '../src/articles.js';
-import { articleKey, isBlogTop } from './article-parse.mjs';
+import { articleKey, isBlogTop, parseTitle } from './article-parse.mjs';
 
 // 챔피언스에 나오는 포켓몬(기술 목록이 있는 것)만 고를 수 있게 한다. 이름이 겹치면
 // 키를 붙여 구분한다. 입력 칸은 한국어 이름을 받고 키로 바꾼다.
@@ -58,7 +58,13 @@ export function prefill(entry, reference, defaults = {}) {
     .sort((a, b) => (a.firstIndex ?? 0) - (b.firstIndex ?? 0))
     .map(candidate => {
       const mega = candidate.forms.find(form => /Mega/.test(reference.species[form]?.forme ?? ''));
-      const pokemon = mega ?? candidate.base;
+      // 메가가 아니면 '이름@도구'로 쓴 폼, 그다음 많이 나온 폼을 쓴다(같으면 기본 폼 아닌 쪽).
+      // 예전 큐에는 keyHits가 없어 기본 폼이 된다.
+      const form = Object.entries(candidate.keyHits ?? {}).sort(
+        ([keyA, [hitsA, headsA]], [keyB, [hitsB, headsB]]) =>
+          headsB - headsA || hitsB - hitsA || (keyA === candidate.base) - (keyB === candidate.base),
+      )[0]?.[0];
+      const pokemon = mega ?? form ?? candidate.base;
       const stone = mega
         ? Object.entries(reference.held_item).find(([, item]) => item.megaStone === mega)?.[0]
         : null;
@@ -77,7 +83,8 @@ export function prefill(entry, reference, defaults = {}) {
     url: entry.url,
     title: entry.title ?? '',
     author: authorFromUrl(entry.url) ?? entry.siteName ?? '',
-    rank: entry.rank ?? '',
+    // 큐를 만든 뒤 제목 규칙이 나아졌을 수 있어, 큐에 순위가 없으면 제목을 다시 읽는다.
+    rank: entry.rank ?? parseTitle(entry.title ?? '').rank ?? '',
     season: entry.season ?? defaults.season ?? '',
     format: entry.format ?? defaults.format ?? 'Singles',
     publishedAt: entry.publishedAt ?? '',
@@ -130,7 +137,8 @@ export function buildRecord(form, data, reference, today, status = 'reviewed') {
     id: existing?.id ?? articleId(form, ids),
     season: form.season,
     format: form.format,
-    rank: Number(form.rank),
+    // null은 순위 없음(원문에 표기 없음)이다. 빈칸('')은 모름이라 아래 검사가 막는다.
+    rank: form.rank === null ? null : Number(form.rank || NaN),
     author: String(form.author ?? '').trim(),
     title: String(form.title ?? '').trim(),
     url: form.url,
@@ -173,8 +181,8 @@ export function problems(record, reference) {
   if (!['https:', 'http:'].includes(url?.protocol)) list.push('원문 주소가 올바르지 않습니다.');
   if (!/^M\d+$/.test(record.season)) list.push('시즌은 M5처럼 적어 주세요.');
   if (!['Singles', 'Doubles'].includes(record.format)) list.push('형식을 골라 주세요.');
-  if (!Number.isInteger(record.rank) || record.rank < 1)
-    list.push('최종 순위를 숫자로 적어 주세요.');
+  if (record.rank !== null && (!Number.isInteger(record.rank) || record.rank < 1))
+    list.push('최종 순위를 숫자로 적어 주세요. 원문에 순위가 없으면 [순위 없음]을 고르세요.');
   if (!record.author) list.push('작성자를 적어 주세요.');
   if (!record.title) list.push('제목을 적어 주세요.');
   if (!record.review.teamEvidence || !record.review.rankEvidence)
@@ -228,6 +236,33 @@ export function applyProposal(form, proposal) {
   return next;
 }
 
+// 기록과 제안의 여섯 칸을 칸 순서대로 견준다. 제안이 비운 칸('')은 모름이라 세지 않는다.
+export function compareProposal(form, proposal) {
+  const verdict = proposal.verdict ?? 'party';
+  const team = Array.isArray(proposal.team) ? proposal.team : [];
+  const diffs = [];
+  team.slice(0, 6).forEach((member, i) => {
+    const mine = form.team[i] ?? {};
+    if (member?.pokemon && member.pokemon !== mine.pokemon)
+      diffs.push(`${i + 1}번 포켓몬 ${mine.pokemon || '빈칸'} → 제안 ${member.pokemon}`);
+    if (member?.item !== undefined && member.item !== '' && member.item !== (mine.item ?? null))
+      diffs.push(`${i + 1}번 도구 ${mine.item ?? '없음'} → 제안 ${member.item ?? '없음'}`);
+  });
+  const summary = !team.length
+    ? '기록과 견줄 제안 파티가 없다.'
+    : diffs.length
+      ? `기록과 다른 칸: ${diffs.join(', ')}.`
+      : '기록과 제안의 여섯 칸이 같다.';
+  const other = ['author', 'rank']
+    .filter(field => proposal[field] != null && proposal[field] !== '')
+    .filter(field => String(proposal[field]) !== String(form[field] ?? ''))
+    .map(
+      field =>
+        `${field === 'author' ? '작성자' : '순위'} ${form[field] ?? ''} → 제안 ${proposal[field]}.`,
+    );
+  return { verdict, note: [summary, ...other, proposal.note].filter(Boolean).join(' ') };
+}
+
 export function reviewList(
   queue,
   data,
@@ -239,9 +274,18 @@ export function reviewList(
   const proposed = new Map(
     (proposals.proposals ?? []).filter(p => p?.url).map(p => [articleKey(p.url), p]),
   );
+  // pending 기록(다시 볼 기록 포함)은 기록 값을 그대로 연다. 제안이 있으면 덮지 않고 다른 칸만
+  // AI 메모로 알린다. 큐에 같은 글이 있으면 받아 둔 이미지와 사본도 보인다.
+  const entries = new Map(queue.entries.map(entry => [articleKey(entry.url), entry]));
   const pending = data.articles
     .filter(article => article.review?.status === 'pending')
-    .map(article => ({ kind: 'pending', entry: null, form: fromRecord(article) }));
+    .map(article => {
+      const key = articleKey(article.url);
+      const form = fromRecord(article);
+      const proposal = proposed.get(key);
+      if (proposal) form.proposal = compareProposal(form, proposal);
+      return { kind: 'pending', entry: entries.get(key) ?? null, form };
+    });
   // 같은 글이 주소만 달리 두 번 들어와도 한 번만 보인다.
   const done = new Set(
     [...data.articles.map(a => a.url), ...skip.skipped.map(s => s.url)].map(articleKey),
@@ -292,22 +336,26 @@ const sameBlog = (url, data) =>
       top: isBlogTop(a.url),
     }));
 
-// 기록의 주소만 바꾼다. 첫 페이지 주소로 잘못 기록한 기사를 실제 기사 주소로 옮길 때 쓴다.
-export function moveArticle(data, from, to, today) {
+// 첫 페이지 주소로 잘못 기록한 기사를 실제 기사 주소로 옮긴다. 검토 화면의 양식(form)을
+// 함께 받으면 그 값으로 저장한다. 주소만 바꾸면 화면에서 고친 여섯 칸이 사라지고 첫
+// 페이지로 기록한 예전 파티가 남는다(M-5 88위가 그렇게 되돌아갔다). id와 상태는 기록 것을 둔다.
+export function moveArticle(data, from, to, today, { form, reference } = {}) {
   const record = data.articles.find(article => article.url === from);
   if (!record) return { error: '옮길 기록을 찾지 못했습니다.' };
   if (
     data.articles.some(article => article !== record && articleKey(article.url) === articleKey(to))
   )
     return { error: '옮길 주소로 이미 기록이 있습니다.' };
-  return {
-    data: {
-      ...data,
-      updatedAt: today,
-      articles: data.articles.map(article =>
-        article === record ? { ...article, url: to } : article,
-      ),
-    },
-    id: record.id,
+  const moved = {
+    ...data,
+    updatedAt: today,
+    articles: data.articles.map(article =>
+      article === record ? { ...article, url: to } : article,
+    ),
   };
+  if (!form) return { data: moved, id: record.id };
+  const built = buildRecord({ ...form, url: to }, moved, reference, today, record.review?.status);
+  if (built.error)
+    return { error: `화면의 값으로 저장할 수 없어 옮기지 않았습니다: ${built.error}` };
+  return { data: putArticle(moved, built.record, today), id: built.record.id };
 }

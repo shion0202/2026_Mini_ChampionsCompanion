@@ -32,8 +32,10 @@ const [queue, data, skip, reference, ko] = await Promise.all([
 const outPath = `.cache/article-proposals-${season.toLowerCase()}.json`;
 const out = await readJson(outPath, { proposals: [] });
 const index = buildIndex(reference, ko);
+// pending 기록은 다시 볼 기록이라 제안을 쓴다. 검토 화면이 기록과 제안의 다른 칸을 알린다.
+const reviewed = data.articles.filter(article => article.review?.status !== 'pending');
 const done = new Set(
-  [...data.articles, ...skip.skipped, ...out.proposals].map(record => articleKey(record.url)),
+  [...reviewed, ...skip.skipped, ...out.proposals].map(record => articleKey(record.url)),
 );
 
 // 포케솔의 시즌은 'm-5', 형식은 'single'/'double'이다.

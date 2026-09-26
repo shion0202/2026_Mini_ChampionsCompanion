@@ -25,8 +25,8 @@ export function reviewedArticles(data, reference) {
       publicUrl(a.url) &&
       /^M\d+$/.test(a.season) &&
       ['Singles', 'Doubles'].includes(a.format) &&
-      Number.isInteger(a.rank) &&
-      a.rank > 0 &&
+      // 원문이 최종 순위를 밝히지 않은 기사는 rank: null이다. 빠진 값(undefined)은 받지 않는다.
+      (a.rank === null || (Number.isInteger(a.rank) && a.rank > 0)) &&
       a.review?.status === 'reviewed' &&
       text(a.review.checkedAt) &&
       text(a.review.teamEvidence) &&
@@ -54,9 +54,11 @@ export const selectedPokemon = filters => [
   ...new Set([...(filters.pokemons ?? []), filters.pokemon].filter(Boolean)),
 ];
 
+// 순위 없는 기사는 같은 시즌의 맨 뒤에 두고, 순위 범위로 좁히면 빠진다.
+const rankOf = article => article.rank ?? Number.MAX_SAFE_INTEGER;
 const bySeasonThenRank = (a, b) =>
   Number(b.season.slice(1)) - Number(a.season.slice(1)) ||
-  a.rank - b.rank ||
+  rankOf(a) - rankOf(b) ||
   a.id.localeCompare(b.id);
 const SORTS = {
   rank: bySeasonThenRank,
@@ -73,7 +75,7 @@ export function selectArticles(articles, filters, reference, locale) {
     .filter(a => {
       if (filters.season && a.season !== filters.season) return false;
       if (filters.format && a.format !== filters.format) return false;
-      if (a.rank > maxRank) return false;
+      if (rankOf(a) > maxRank) return false;
       if (!pokemon.every(id => usesPokemon(a, id, reference))) return false;
       if (!words.length) return true;
       const names = a.team.flatMap(m => {

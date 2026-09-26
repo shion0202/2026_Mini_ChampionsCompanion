@@ -284,7 +284,7 @@
 
       const FLAG_TEXT = {
         'rank-from-hint': '순위: 목록 페이지에서 읽음',
-        'rank-missing': '순위 없음',
+        'rank-missing': '순위 표기 못 찾음',
         'season-missing': '시즌 표기 없음',
         'format-missing': '싱글/더블 표기 없음',
         'monthly-challenge': '월간 챌린지 순위 섞임',
@@ -395,11 +395,12 @@
       ${form.proposal?.note ? `<p class="muted" style="margin:0 0 8px">AI 메모: ${esc(form.proposal.note)}</p>` : ''}
       <p style="margin:4px 0 8px"><a href="${esc(form.url)}" target="_blank" rel="noopener noreferrer">${esc(form.title || form.url)} ↗</a>
         · <a href="/cached?url=${encodeURIComponent(form.url)}" target="_blank" title="원문이 열리지 않을 때 수집기가 받아 둔 사본을 연다">사본 보기</a></p>
-      ${row.sameBlog?.length ? `<div class="flag warn" style="display:block;border-radius:8px;padding:6px 10px;margin:0 0 8px">같은 블로그에 이미 기록된 기사가 있습니다. 같은 글이면 [제외]에서 '이미 등록한 기사와 같은 글'을 고르세요.${row.sameBlog.map(a => `<br>· <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.season)} ${a.format === 'Doubles' ? '더블' : '싱글'} 최종 ${esc(a.rank)}위 — ${esc(a.title)}</a>${a.status === 'pending' ? ' (pending)' : ''}${a.top ? ` <b>— 블로그 첫 페이지 주소로 기록됨</b> <button data-move-from="${esc(a.url)}">이 기록을 지금 기사 주소로 옮기기</button>` : ''}`).join('')}</div>` : ''}
+      ${row.sameBlog?.length ? `<div class="flag warn" style="display:block;border-radius:8px;padding:6px 10px;margin:0 0 8px">같은 블로그에 이미 기록된 기사가 있습니다. 같은 글이면 [제외]에서 '이미 등록한 기사와 같은 글'을 고르세요.${row.sameBlog.map(a => `<br>· <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.season)} ${a.format === 'Doubles' ? '더블' : '싱글'} ${a.rank === null ? '순위 없음' : `최종 ${esc(a.rank)}위`} —${esc(a.title)}</a>${a.status === 'pending' ? ' (pending)' : ''}${a.top ? ` <b>— 블로그 첫 페이지 주소로 기록됨</b> <button data-move-from="${esc(a.url)}">이 기록을 지금 기사 주소로 옮기기</button>` : ''}`).join('')}</div>` : ''}
       ${entry?.leadText ? `<p class="muted" style="margin:0 0 8px">목록: ${esc(entry.leadText)}</p>` : ''}
       <div class="meta">
         <label>작성자<input id="author" value="${esc(form.author)}"></label>
-        <label>최종 순위<input id="rank" type="number" min="1" value="${esc(form.rank)}"></label>
+        <label>최종 순위<input id="rank" type="number" min="1" value="${esc(form.rank ?? '')}"${form.rank === null ? ' disabled' : ''}></label>
+        <label title="원문에 최종 순위가 없을 때. 모르는 것과 다르다">순위 없음<input id="rank-none" type="checkbox"${form.rank === null ? ' checked' : ''}></label>
         <label>시즌<input id="seasonField" value="${esc(form.season || options.season)}"></label>
         <label>형식<select id="format"><option value="Singles"${form.format !== 'Doubles' ? ' selected' : ''}>싱글</option><option value="Doubles"${form.format === 'Doubles' ? ' selected' : ''}>더블</option></select></label>
         <label>게시일<input id="publishedAt" type="date" value="${esc(form.publishedAt)}"></label>
@@ -439,7 +440,8 @@
       function readForm() {
         const value = id => $(id)?.value.trim() ?? '';
         form.author = value('author');
-        form.rank = value('rank');
+        // 순위 없음(null)과 모름('')을 나눈다. 모름이면 저장 전 검사가 막는다.
+        form.rank = $('rank-none')?.checked ? null : value('rank');
         form.season = value('seasonField')
           .toUpperCase()
           .replace(/[^M0-9]/g, '');
@@ -510,17 +512,24 @@
           const response = await fetch('/api/move', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ from: moveFrom.dataset.moveFrom, to: form.url }),
+            body: JSON.stringify({ from: moveFrom.dataset.moveFrom, to: form.url, form: readForm() }),
           });
           const result = await response.json();
           if (!response.ok) return setMessage(result.error, 'error');
           await reload();
-          return show(`기록 ${result.id}의 주소를 옮겼습니다. 같은 글이라 이 기사는 목록에서 빠졌습니다.`, 'ok');
+          return show(`기록 ${result.id}를 이 기사 주소로 옮기고 화면의 값으로 저장했습니다.`, 'ok');
         }
         if (event.target.id === 'later') move(1);
       });
       // 입력 칸을 바꾸면 그 칸만 고친다. 전체를 다시 그리면 바로 이어서 누른 단추가 사라진다.
       $('app').addEventListener('change', event => {
+        if (event.target.id === 'rank-none') {
+          $('rank').disabled = event.target.checked;
+          const evidence = $('rankEvidence');
+          if (event.target.checked && (!evidence.value.trim() || evidence.value.includes('순위 표기')))
+            evidence.value = '원문의 제목·본문·이미지에 최종 순위 표기가 없음을 확인.';
+          return;
+        }
         if (!event.target.dataset.field) return;
         readForm();
         const i = Number(event.target.dataset.i);

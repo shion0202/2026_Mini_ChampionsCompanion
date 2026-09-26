@@ -178,9 +178,9 @@ const server = createServer(async (request, response) => {
       return send(response, 200, { id: result.record.id });
     }
     if (request.method === 'POST' && pathname === '/api/move') {
-      const { from, to } = await body(request);
+      const { from, to, form } = await body(request);
       const [, data] = await load();
-      const result = moveArticle(data, from, to, today());
+      const result = moveArticle(data, from, to, today(), { form, reference });
       if (result.error) return send(response, 400, result);
       await writeFile(new URL('public/data/articles.json', root), formatArticles(result.data));
       console.log(`주소 옮김: ${result.id} ${from} → ${to}`);

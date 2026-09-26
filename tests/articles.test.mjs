@@ -7,7 +7,13 @@ import { createLocale } from '../src/locale.js';
 
 const read = name =>
   readFile(new URL(`../public/data/${name}.json`, import.meta.url)).then(JSON.parse);
-const [data, reference, ko] = await Promise.all(['articles', 'reference', 'ko'].map(read));
+const [file, reference, ko] = await Promise.all(['articles', 'reference', 'ko'].map(read));
+// 파일의 기록을 모두 공개 기록으로 보고 검사한다. 다시 검토하느라 pending인 기록도 형식은
+// 공개 기록과 같아야 한다.
+const data = {
+  ...file,
+  articles: file.articles.map(a => ({ ...a, review: { ...a.review, status: 'reviewed' } })),
+};
 const locale = createLocale(ko);
 // 조회 규칙 테스트는 처음 두 기록(シグマ 1위, rebo® 2위)으로만 센다. 기록이 늘어도
 // 기대값이 흔들리지 않게 한다. 형식 검사는 파일 전체를 본다.
@@ -83,7 +89,7 @@ test('filters preserve season/format, rank order and exact forms except Mega bas
 
 test('cards escape external text, retain item details and mark original links', () => {
   const markup = renderArticleCards(
-    [{ ...data.articles[0], author: '<img onerror=x>' }],
+    [{ ...sample.articles[0], author: '<img onerror=x>' }],
     reference,
     locale,
   );
@@ -145,5 +151,23 @@ test('usage counts megas under their base and leaves out what is already picked'
     renderArticleUsage(usage, 1, reference, locale),
     '',
     '파티 하나로는 집계하지 않는다',
+  );
+});
+
+test('an article with no rank is published, sorted last in its season and left out of rank limits', () => {
+  const unranked = { ...sample.articles[1], id: 'm5-singles-unranked', author: 'なし', rank: null };
+  const rows = reviewedArticles({ articles: [...sample.articles, unranked] }, reference);
+  assert.equal(rows.length, 3);
+  assert.deepEqual(
+    selectArticles(rows, {}, reference, locale).map(a => a.rank),
+    [1, 2, null],
+  );
+  assert.equal(selectArticles(rows, { maxRank: '1000' }, reference, locale).length, 2);
+  assert.ok(renderArticleCards([unranked], reference, locale).includes('순위 미공개'));
+  const { rank, ...missing } = unranked;
+  assert.equal(
+    reviewedArticles({ articles: [missing] }, reference).length,
+    0,
+    '빠진 순위는 받지 않는다',
   );
 });
