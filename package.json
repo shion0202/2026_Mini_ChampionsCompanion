@@ -14,10 +14,6 @@
     "test:snapshots": "node --test --test-update-snapshots tests/*.test.mjs",
     "locales": "node scripts/update-locales.mjs",
     "reference": "node scripts/update-reference.mjs",
-    "articles": "node scripts/collect-articles.mjs",
-    "leads": "node scripts/list-leads.mjs",
-    "review": "node scripts/review-articles.mjs",
-    "propose": "node scripts/propose-articles.mjs",
     "format": "prettier --write \"src/**/*.{js,css}\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" \"functions/**/*.js\" sw.js",
     "format:check": "prettier --check \"src/**/*.{js,css}\" \"tests/**/*.mjs\" \"scripts/**/*.mjs\" \"functions/**/*.js\" sw.js"
   },

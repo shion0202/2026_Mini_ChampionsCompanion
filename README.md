@@ -51,8 +51,6 @@ node scripts/build.mjs
 node scripts/serve.mjs --dist --port 4174
 ```
 
-`npm run articles -- --season M3 --format singles`는 구축 기사 후보를 모아 시즌별 큐 `.cache/article-queue-<시즌>.json`(예: `article-queue-m5.json`)에 쌓습니다. 기사 주소는 직접 붙여 넣은 주소 목록(`--urls`), 기사 모음 페이지의 링크(`--from`), 이미 등록한 작성자의 블로그 피드, 하테나 북마크 검색에서 얻습니다. 구글 검색 채널은 기존 키(`GOOGLE_API_KEY`, `GOOGLE_CSE_ID`)가 있을 때만 돌며 2027년에 끝납니다. 호스트마다 `robots.txt`를 확인해 AI 목적 수집을 금지한 사이트(네이버 블로그·카페, 포케DB 등)는 받아오지 않습니다. 원문과 이미지는 `.cache/`에만 남고 커밋되지 않으며, 수집 결과는 `pending` 상태로만 등록되어 사람이 확인해야 공개됩니다. 자세한 동작은 [docs/article-collection.md](docs/article-collection.md)에 있습니다.
-
 `dist/`에 정적 배포 파일을 생성합니다. HTTPS 정적 호스팅에 올릴 수 있지만 이 작업에서는 외부 공개/배포를 하지 않았습니다. 사용자 데이터 서버는 없습니다.
 
 렌더 결과는 스냅샷으로 비교합니다. 상세 화면의 도감·기술·효과는 `tests/reference-view.test.mjs`가, 랭킹 목록과 상세 화면 틀·필터는 `tests/app-view.test.mjs`가 담당합니다. 마크업을 의도적으로 바꾼 뒤에는 `node --test --test-update-snapshots tests/*.test.mjs`로 갱신하고 함께 저장된 `.snapshot` 파일의 차이를 확인합니다.

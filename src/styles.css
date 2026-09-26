@@ -2641,8 +2641,7 @@ select optgroup {
 /* The ranking sits under the toolbar's rule; these views hide the toolbar, so they
    draw the same line to keep the separation from the intro. */
 .dex-panel,
-.type-chart-panel,
-.articles-panel {
+.type-chart-panel {
   border-top: 1px solid var(--line);
   padding-top: 17px;
 }
@@ -2789,192 +2788,6 @@ select optgroup {
   margin-top: 24px;
 }
 
-/* The same article cards fit both the full catalog and the narrow detail panel. */
-.articles-panel {
-  padding-bottom: 24px;
-  min-width: 0;
-}
-.article-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 22px 0 12px;
-}
-.article-controls label {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  flex: 1 1 145px;
-  min-width: 0;
-}
-.article-controls .article-search-label {
-  flex: 2 1 240px;
-}
-.article-controls select,
-.article-controls input {
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-  min-height: 46px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--white);
-  color: var(--ink);
-  padding: 10px 12px;
-  font-size: 14px;
-}
-.article-count {
-  color: var(--muted);
-  font-size: 12px;
-  margin: 18px 0 12px;
-}
-.article-pokemon-filter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.article-pokemon-filter > span {
-  color: var(--muted);
-  font-size: 12px;
-}
-.article-chip {
-  min-height: 36px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--white);
-  color: var(--ink);
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.article-chip:hover {
-  border-color: var(--teal);
-}
-.article-chip-selected {
-  color: var(--teal);
-  background: var(--teal-soft);
-  border-color: var(--teal);
-}
-.article-usage {
-  margin: 0 0 18px;
-}
-.article-usage h3 {
-  font-size: 13px;
-  margin: 0 0 8px;
-}
-.article-usage-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.article-list {
-  display: grid;
-  gap: 18px;
-}
-.team-article {
-  min-width: 0;
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  overflow: hidden;
-}
-.article-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
-}
-.article-rank {
-  color: var(--teal);
-  background: var(--teal-soft);
-  border-radius: 7px;
-  padding: 3px 9px;
-}
-.article-meta > span {
-  color: var(--muted);
-  font-size: 12px;
-  margin-left: auto;
-}
-.article-party {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
-  list-style: none;
-  margin: 0;
-  padding: 14px;
-  gap: 8px;
-}
-.article-party li {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: start;
-  gap: 5px;
-  min-width: 0;
-  padding: 8px 4px;
-  border-radius: 10px;
-  text-align: center;
-}
-.article-member-selected {
-  background: var(--teal-soft);
-  box-shadow: inset 0 0 0 1px var(--teal);
-}
-.article-party strong {
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-.article-pokemon-art {
-  display: grid;
-  place-items: center;
-  width: 76px;
-  height: 72px;
-}
-.article-pokemon-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.article-image-fallback {
-  color: var(--muted);
-  font-size: 30px;
-}
-.article-party .article-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 5px;
-  gap: 3px;
-  font-size: 11px;
-  max-width: 100%;
-  min-height: 36px;
-}
-.article-item .item-art {
-  flex-shrink: 0;
-}
-.article-footer {
-  padding: 14px 16px;
-  border-top: 1px solid var(--line);
-}
-.article-footer a {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  text-decoration: none;
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-.article-footer a:hover {
-  text-decoration: underline;
-}
-.article-open-label {
-  margin-left: auto;
-  white-space: nowrap;
-  font-size: 12px;
-}
 .type-picker-heading + .type-picker-help {
   margin-top: 2px;
 }
@@ -3205,7 +3018,7 @@ select optgroup {
 .builds-field select {
   min-height: 44px;
   width: 100%;
-  /* 전역 select가 max-width를 180px로 묶는다. 스피드·구축 기사 화면과 같이 푼다. */
+  /* 전역 select가 max-width를 180px로 묶는다. 스피드 화면과 같이 푼다. */
   max-width: none;
   border: 1px solid var(--line);
   border-radius: 10px;

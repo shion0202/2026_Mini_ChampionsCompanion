@@ -56,14 +56,6 @@ import {
 } from './damage-view.js';
 import { NFE_SPECIES } from './damage-catalog.js';
 import { filterValues, filterSummary, matchesFilter } from './filters.js';
-import { articleUsage, reviewedArticles, selectArticles, selectedPokemon } from './articles.js';
-import {
-  articleControls,
-  articleSeasonLabel,
-  renderArticleCards,
-  renderArticleUsage,
-  renderSelectedPokemon,
-} from './articles-view.js';
 import { renderTypeDefense, renderTypeMatrix, toggleDefenseType } from './type-chart-view.js';
 import { speedRows, battleSpeedRows } from './speed.js';
 import { renderSpeedRows, renderSpeedLines } from './speed-view.js';
@@ -199,15 +191,13 @@ const DETAIL_ORDER = [
   'stat_points',
   'teammate',
   'learnset',
-  'articles',
   'trend',
 ];
 const DETAIL_LABELS = Object.fromEntries(
   DETAIL_ORDER.map(key => [
     key,
-    { overview: '기본 정보', learnset: '배우는 기술', articles: '구축 기사', trend: '사용률 추이' }[
-      key
-    ] ?? CATEGORY_LABELS[key],
+    { overview: '기본 정보', learnset: '배우는 기술', trend: '사용률 추이' }[key] ??
+      CATEGORY_LABELS[key],
   ]),
 );
 
@@ -263,17 +253,6 @@ const state = {
   buildsCombo: null,
   speed: { mode: 'base', query: '', type: '', includeMega: true, ascending: false },
   speedLimit: 80,
-  articleData: null,
-  articleError: false,
-  articleFilters: {
-    season: null,
-    format: 'Singles',
-    query: '',
-    pokemon: '',
-    pokemons: [],
-    maxRank: '',
-    sort: 'rank',
-  },
   typeChartMode: 'defense',
   defenseTypes: [],
   format: saved.format,
@@ -467,15 +446,6 @@ function renderCategory() {
   });
   $('category-content').setAttribute('aria-labelledby', `tab-${category}`);
   if (category === 'trend') return renderPokemonTrend(p);
-  if (category === 'articles') {
-    const filters = { season: state.season, format: state.format, pokemon: p.id };
-    $('category-content').innerHTML =
-      `<div class="category-heading"><h3>구축 기사</h3></div>
-      <p class="category-tip">${esc(articleSeasonLabel(state.season))} / ${state.format === 'Singles' ? '싱글배틀' : '더블배틀'} 기준입니다.</p>` +
-      articleContent(filters) +
-      `<button class="load-more" data-article-pokemon="${esc(p.id)}">이 포켓몬의 다른 시즌 기사 보기</button>`;
-    return;
-  }
   if (category === 'overview' || category === 'learnset') {
     if (!state.reference) {
       $('category-content').innerHTML = referenceStatus(state.refError);
@@ -605,7 +575,6 @@ function showPage(page) {
     ranking: 'workspace',
     dex: 'dex',
     types: 'type-chart',
-    articles: 'articles',
     calc: 'calc',
     trends: 'trends',
     speed: 'speed',
@@ -618,93 +587,6 @@ function showPage(page) {
   }
   $('toolbar').hidden = page !== 'ranking';
   $('notice').hidden = page !== 'ranking' || !$('notice').textContent;
-}
-
-function articleContent(filters, { usage = false } = {}) {
-  if (state.articleError)
-    return '<div class="empty-state"><p>구축 기사를 불러오지 못했습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
-  if (!state.articleData) return loadingState('구축 기사를 불러오는 중');
-  if (!state.reference) return referenceStatus(state.refError);
-  if (!state.locale)
-    return '<div class="empty-state"><p>한국어 명칭을 준비하고 있습니다.</p><button class="text-button" data-retry-articles>다시 시도</button></div>';
-  const rows = selectArticles(
-    reviewedArticles(state.articleData, state.reference),
-    filters,
-    state.reference,
-    state.locale,
-  );
-  const picked = selectedPokemon(filters);
-  const order =
-    filters.sort === 'recent'
-      ? '최근 게시순'
-      : filters.season
-        ? '최종 순위순'
-        : '최근 시즌부터, 최종 순위순';
-  return (
-    `<p class="article-count" role="status">${rows.length}건 (${order})</p>` +
-    (usage
-      ? renderArticleUsage(
-          articleUsage(rows, state.reference, picked),
-          rows.length,
-          state.reference,
-          state.locale,
-          picked,
-        )
-      : '') +
-    renderArticleCards(rows, state.reference, state.locale, picked)
-  );
-}
-
-function renderArticles() {
-  if (state.page !== 'articles') return;
-  const filters = state.articleFilters;
-  $('article-controls').innerHTML = articleControls(state.articleData?.articles ?? [], filters);
-  renderArticleRows();
-}
-
-// 목록과 고른 포켓몬 칩만 다시 그린다. 조절 칸을 다시 그리면 검색 입력의 커서가 튄다.
-function renderArticleRows() {
-  const filters = state.articleFilters;
-  const picked =
-    state.reference && state.locale
-      ? selectedPokemon(filters).filter(id => state.reference.species[id])
-      : [];
-  $('article-pokemon-filter').innerHTML = renderSelectedPokemon(
-    picked,
-    state.reference,
-    state.locale,
-  );
-  $('article-pokemon-filter').hidden = !picked.length;
-  $('article-rows').innerHTML = articleContent(filters, { usage: true });
-}
-
-function openArticles({ navigate = true } = {}) {
-  showPage('articles');
-  if (navigate) history.pushState({ articles: true }, '', '#articles');
-  renderArticles();
-  window.scrollTo(0, 0);
-}
-
-async function loadArticles() {
-  state.articleError = false;
-  try {
-    const response = await fetch('./public/data/articles.json');
-    if (!response.ok) throw Error('Articles unavailable');
-    const data = await response.json();
-    if (!Array.isArray(data.articles)) throw Error('Invalid articles');
-    state.articleData = data;
-    if (state.articleFilters.season === null) {
-      state.articleFilters.season =
-        data.articles
-          .filter(a => a.review?.status === 'reviewed')
-          .map(a => a.season)
-          .sort((a, b) => Number(b.slice(1)) - Number(a.slice(1)))[0] ?? '';
-    }
-  } catch {
-    state.articleError = true;
-  }
-  renderArticles();
-  if (state.category === 'articles' && selectedEntry()) renderCategory();
 }
 
 function renderSpeed() {
@@ -1551,7 +1433,6 @@ async function loadReference() {
     updateGroupSummary($('gimmick-filter'));
   }
   if (state.dex) renderDex();
-  renderArticles();
   renderTypeChart();
   if (selectedEntry()) renderCategory();
   renderSpeed();
@@ -1610,7 +1491,6 @@ async function load(force = false) {
       if (!response.ok) throw Error('한국어 명칭을 불러오지 못했습니다.');
       state.locale = createLocale(await response.json());
       if (state.dex) renderDex();
-      renderArticles();
       renderSpeed();
       renderBuilds();
       renderShare();
@@ -2811,65 +2691,6 @@ $('calc-body').addEventListener('change', event => {
   else return;
   renderCalc();
 });
-$('articles-link').onclick = () => {
-  if (state.page !== 'articles') openArticles();
-};
-$('articles').addEventListener('change', event => {
-  if (event.target.id === 'article-season') state.articleFilters.season = event.target.value;
-  if (event.target.id === 'article-format') state.articleFilters.format = event.target.value;
-  if (event.target.id === 'article-rank') state.articleFilters.maxRank = event.target.value;
-  if (event.target.id === 'article-sort') state.articleFilters.sort = event.target.value;
-  renderArticleRows();
-});
-$('articles').addEventListener('input', event => {
-  if (event.target.id !== 'article-search') return;
-  state.articleFilters.query = event.target.value;
-  renderArticleRows();
-});
-document.addEventListener('click', event => {
-  if (event.target.closest('[data-retry-articles]')) {
-    loadArticles();
-    if (!state.locale) load();
-    return;
-  }
-  const button = event.target.closest('[data-article-pokemon]');
-  if (button) {
-    state.articleFilters = {
-      ...state.articleFilters,
-      season: '',
-      format: state.format,
-      query: '',
-      maxRank: '',
-      pokemon: '',
-      pokemons: [button.dataset.articlePokemon],
-    };
-    openArticles();
-  }
-  const add = event.target.closest('[data-article-add-pokemon]');
-  if (add) {
-    const filters = state.articleFilters;
-    filters.pokemons = selectedPokemon({
-      ...filters,
-      pokemons: [...filters.pokemons, add.dataset.articleAddPokemon],
-    });
-    filters.pokemon = '';
-    renderArticleRows();
-  }
-  const remove = event.target.closest('[data-article-remove-pokemon]');
-  if (remove) {
-    const filters = state.articleFilters;
-    filters.pokemons = selectedPokemon(filters).filter(
-      id => id !== remove.dataset.articleRemovePokemon,
-    );
-    filters.pokemon = '';
-    renderArticleRows();
-  }
-  if (event.target.closest('#clear-article-pokemon')) {
-    state.articleFilters.pokemon = '';
-    state.articleFilters.pokemons = [];
-    renderArticleRows();
-  }
-});
 $('types-link').onclick = () => {
   if (state.page !== 'types') openTypeChart();
 };
@@ -3165,10 +2986,6 @@ document.addEventListener(
   event => {
     const img = event.target;
     if (!(img instanceof HTMLImageElement)) return;
-    if (img.classList.contains('article-pokemon-image')) {
-      img.hidden = true;
-      img.parentElement.querySelector('.article-image-fallback').hidden = false;
-    }
     if (img.classList.contains('portrait')) {
       img.classList.add('image-missing');
       const fallback = img.parentElement.querySelector('.hero-image-fallback');
@@ -3197,10 +3014,6 @@ window.addEventListener('popstate', () => {
   }
   if (params.has('calc')) {
     openCalc(params.get('calc'), { navigate: false });
-    return;
-  }
-  if (params.has('articles')) {
-    openArticles({ navigate: false });
     return;
   }
   if (params.has('types')) {
@@ -3281,14 +3094,12 @@ state.buildsDrafts = pruneDrafts(readDrafts(storage), state.builds);
 writeDrafts(storage, state.buildsDrafts);
 load();
 loadReference();
-loadArticles();
 syncOnOpen();
 // Opening a shared #dex link lands on the index rather than the ranking.
 const startupDex = new URLSearchParams(location.hash.slice(1)).get('dex');
 if (startupDex) openDex(startupDex, { navigate: false });
 const startupTypes = new URLSearchParams(location.hash.slice(1)).get('types');
 if (startupTypes !== null) openTypeChart(startupTypes, { navigate: false });
-if (new URLSearchParams(location.hash.slice(1)).has('articles')) openArticles({ navigate: false });
 const startupTrends = new URLSearchParams(location.hash.slice(1)).get('trends');
 if (startupTrends !== null) openTrends(startupTrends, { navigate: false });
 const startupCalc = new URLSearchParams(location.hash.slice(1)).get('calc');
