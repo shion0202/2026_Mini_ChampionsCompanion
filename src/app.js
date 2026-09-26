@@ -76,6 +76,7 @@ import {
   readDrafts,
   writeDrafts,
   draftKey,
+  sameBuild,
   pruneDrafts,
   speciesOptions,
   speciesSprite,
@@ -974,9 +975,15 @@ function openBuilds(tab = 'sample', { navigate = true } = {}) {
   window.scrollTo(0, 0);
 }
 
+// 고친 것이 있는가. 저장된 것(새로 만드는 중이면 빈 것)과 견준다.
+const buildsDirty = () =>
+  !!state.buildsEditing && !sameBuild(state.buildsEditing.draft, state.buildsEditing.base);
+
+// 고칠 때마다 초안을 임시 저장한다(앱을 그냥 닫아도 잃지 않는다). 원래와 같아졌으면 지운다.
 function saveDraft() {
   const editing = state.buildsEditing;
   if (!editing) return;
+  if (!buildsDirty()) return dropDraft(editing.kind, editing.id);
   state.buildsDrafts = {
     ...state.buildsDrafts,
     [draftKey(editing.kind, editing.id)]: editing.draft,
@@ -1004,6 +1011,7 @@ function renderBuildsEditor() {
     shareable: editing.id !== null && !!state.sync,
     resumed: state.buildsResumed,
     errors: state.buildsErrors,
+    dirty: buildsDirty(),
   };
   $('builds-rows').innerHTML =
     editing.kind === 'sample'
@@ -1026,7 +1034,7 @@ function openBuildsEditor(kind, id, { navigate = true, from = null } = {}) {
   const base = saved ?? (kind === 'sample' ? emptySample() : emptyParty());
   state.buildsResumed = !!kept;
   state.buildsErrors = [];
-  state.buildsEditing = { kind, id, draft: kept ?? base };
+  state.buildsEditing = { kind, id, draft: kept ?? base, base };
   state.buildsReturn = from;
   state.buildsTab = kind;
   showPage('builds');
@@ -1335,6 +1343,51 @@ function resetBuild() {
     },
     '초기화',
   );
+}
+
+// 임시 저장한 것과 고친 것을 버리고 저장된 상태(새로 만드는 중이면 빈 상태)로 돌아간다.
+function revertBuild() {
+  const editing = state.buildsEditing;
+  if (!editing) return;
+  askConfirm(
+    editing.id === null
+      ? '임시 저장된 내용을 지우고 처음 상태로 되돌립니다.'
+      : '저장하지 않은 변경 사항을 버리고 저장된 상태로 되돌립니다.',
+    () => {
+      editing.draft = editing.base;
+      state.buildsErrors = [];
+      state.buildsCombo = null;
+      state.buildsResumed = false;
+      dropDraft(editing.kind, editing.id);
+      renderBuildsEditor();
+    },
+    '되돌리기',
+  );
+}
+
+// 고친 것이 있으면 나가기 전에 묻는다: 임시 저장 / 저장하지 않음 / 계속 편집.
+// 앱을 닫을 때는 브라우저가 이런 창을 허락하지 않으므로 고칠 때마다 임시 저장해 둔다.
+let leaveAction = null;
+function guardLeave(proceed) {
+  if (!buildsDirty()) return proceed();
+  leaveAction = proceed;
+  $('leave-dialog').showModal();
+}
+function finishLeave(keep) {
+  const proceed = leaveAction;
+  leaveAction = null;
+  $('leave-dialog').close();
+  const editing = state.buildsEditing;
+  if (!proceed || !editing) return;
+  if (keep) saveDraft();
+  else {
+    // 버렸으면 편집기도 닫는다. 메뉴로 나갔다 돌아와도 목록에서 시작한다.
+    dropDraft(editing.kind, editing.id);
+    state.buildsEditing = null;
+    state.buildsResumed = false;
+    state.buildsErrors = [];
+  }
+  proceed();
 }
 
 function removeBuild() {
@@ -1832,8 +1885,9 @@ $('builds-rows').addEventListener('click', event => {
     const field = comboOpen.dataset.buildsComboOpen;
     // 같은 것을 다시 누르면 접는다. 다른 것을 누르면 그쪽만 펼친다.
     state.buildsCombo = state.buildsCombo?.field === field ? null : { field, query: '' };
+    // 검색 칸에 바로 들어가지 않는다. 목록에서 고르는 것이 기본이고, 찾을 사람만 검색 칸을
+    // 누른다(폰에서 자판이 목록을 가리지 않는다).
     renderBuildsEditor();
-    $('builds-rows').querySelector('[data-builds-combo-search]')?.focus();
     return;
   }
   const picked = event.target.closest('[data-builds-combo-value]');
@@ -1848,7 +1902,8 @@ $('builds-rows').addEventListener('click', event => {
     renderBuildsEditor();
     return;
   }
-  if (event.target.closest('[data-builds-cancel]')) closeBuildsEditor();
+  if (event.target.closest('[data-builds-cancel]')) guardLeave(() => closeBuildsEditor());
+  if (event.target.closest('[data-builds-revert]')) revertBuild();
   if (event.target.closest('[data-builds-reset]')) return resetBuild();
   if (event.target.closest('[data-builds-delete]')) return removeBuild();
   if (event.target.closest('[data-builds-share]')) return shareBuild();
@@ -1958,6 +2013,8 @@ $('builds-rows').addEventListener('input', event => {
   if (name !== 'name' && name !== 'note') return;
   state.buildsEditing.draft = { ...state.buildsEditing.draft, [name]: field.value };
   saveDraft();
+  const revert = $('builds-rows').querySelector('.builds-actions [data-builds-revert]');
+  if (revert) revert.hidden = !buildsDirty();
 });
 
 // 포인트와 목록 선택은 값이 정해진 뒤에 다시 그린다.
@@ -2839,6 +2896,30 @@ document.addEventListener('input', event => {
 });
 $('close-effect').onclick = () => $('effect-dialog').close();
 $('close-confirm').onclick = () => $('confirm-dialog').close();
+$('close-leave').onclick = () => $('leave-dialog').close();
+$('keep-leave').onclick = () => finishLeave(true);
+$('discard-leave').onclick = () => finishLeave(false);
+$('leave-dialog').addEventListener('close', () => {
+  leaveAction = null;
+});
+// 편집기에서 다른 메뉴로 갈 때도 묻는다. 메뉴 단추의 onclick보다 먼저 가로챈다.
+let navApproved = false;
+document.querySelector('.category-nav').addEventListener(
+  'click',
+  event => {
+    const button = event.target.closest('button[id$="-link"]');
+    if (!button || navApproved || button.id === 'builds-link') return;
+    if (state.page !== 'builds' || !buildsDirty()) return;
+    event.stopImmediatePropagation();
+    event.preventDefault();
+    guardLeave(() => {
+      navApproved = true;
+      button.click();
+      navApproved = false;
+    });
+  },
+  true,
+);
 $('cancel-confirm').onclick = () => $('confirm-dialog').close();
 $('accept-confirm').onclick = () => {
   const action = confirmAction;
@@ -2998,7 +3079,24 @@ document.addEventListener(
   },
   true,
 );
-window.addEventListener('popstate', () => {
+// 뒤로 가기로 편집기를 떠날 때도 묻는다. 주소는 이미 바뀌었으므로 편집기 주소를 다시 넣어
+// 두고 묻는다. 나가기로 하면 다시 뒤로 가고, 그때는 묻지 않는다.
+let leaveApproved = false;
+window.addEventListener('popstate', event => {
+  const editing = state.buildsEditing;
+  if (state.page === 'builds' && editing && buildsDirty() && !leaveApproved) {
+    const hash = `#builds=${editing.kind}&edit=${editing.id ?? 'new'}`;
+    if (location.hash !== hash) {
+      event.stopImmediatePropagation();
+      history.pushState({ builds: editing.kind, edit: editing.id ?? 'new' }, '', hash);
+      guardLeave(() => {
+        leaveApproved = true;
+        history.back();
+      });
+      return;
+    }
+  }
+  leaveApproved = false;
   const params = new URLSearchParams(location.hash.slice(1));
   if (params.has('share')) {
     openShare(params.get('share'), { navigate: false });
