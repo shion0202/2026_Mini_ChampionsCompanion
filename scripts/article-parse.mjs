@@ -238,6 +238,25 @@ export function digest(page, index) {
   return { candidates, flags };
 }
 
+// 챔피언스 랭크배틀 M-1이 시작한 날. 이보다 먼저 쓴 글은 챔피언스 기사일 수 없다.
+export const CHAMPIONS_START = '2026-04-08';
+
+// 작성자 피드와 검색에는 같은 블로그의 지난 게임 기사가 섞인다. 소드실드의 'S5'나
+// SV의 '시즌 20'도 제목 파싱으로는 시즌처럼 읽히므로 게임을 따로 가린다.
+const CHAMPIONS_TERMS =
+  /チャンピオンズ|ポケチャン|Champions|챔피언스|レギュ(?:レーション)?\s*M|M-[A-Z](?![a-z])|シーズン\s*M|M-\d/i;
+const OTHER_GAME_TERMS =
+  /剣盾|ソードシールド|ソード・シールド|SWSH|スカーレット|バイオレット|スカバイ|(?<![A-Za-z])SV(?![A-Za-z])|テラスタル|テラスタイプ|ダイマックス|竜王戦|JCS|WCS\s*20(?:1\d|2[0-5])|シリーズ\s*\d+/i;
+
+export function gameCheck(text, publishedAt) {
+  const folded = normalize(text ?? '');
+  const flags = [];
+  if (publishedAt && publishedAt < CHAMPIONS_START) flags.push('before-champions');
+  const champions = CHAMPIONS_TERMS.test(folded);
+  if (!champions) flags.push(OTHER_GAME_TERMS.test(folded) ? 'other-game' : 'no-champions-mention');
+  return flags;
+}
+
 // チャンピオンズ만으로는 포켓몬 외 결과가 섞이지만 종족 필터와 순위 파싱이
 // 걸러낸다. 앞의 두 개는 공백만 다르다. 하테나가 복합어를 어떻게 쪼개는지
 // 확인하는 비용보다 둘 다 던지는 비용이 싸다.

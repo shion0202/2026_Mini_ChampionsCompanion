@@ -8,6 +8,7 @@ import {
   buildIndex,
   readPage,
   digest,
+  gameCheck,
   parseTitle,
   looksRelevant,
   searchQueries,
@@ -281,6 +282,23 @@ if (useSearch) {
   channels.push(`하테나 ${feeds}쿼리`);
 }
 
+// 이전 큐도 이번 규칙으로 다시 판단한다. 원문과 이미지는 캐시에서 읽으므로 요청이
+// 거의 없고, 규칙을 고친 뒤 돌리면 이미 쌓인 오탐도 빠진다.
+let requeued = 0;
+for (const entry of previous.entries) {
+  if (known.has(entry.url) || found.has(entry.url)) continue;
+  found.set(entry.url, {
+    url: entry.url,
+    title: entry.title,
+    date: entry.publishedAt,
+    context: '',
+    rankHint: entry.rankHint ?? null,
+    source: entry.source ?? 'manual',
+  });
+  requeued++;
+}
+if (requeued) channels.push(`이전 큐 ${requeued}건 다시 판단`);
+
 console.log(channels.join(' | '));
 console.log(
   `후보 ${found.size}건 (` +
@@ -324,6 +342,7 @@ const skipped = {
   'robots.txt': 0,
   fetch: 0,
   'not-an-article': 0,
+  'other-game': 0,
   season: 0,
   format: 0,
 };
@@ -358,6 +377,15 @@ for (const [url, link] of found) {
   const titledSeason = title.season ?? hint.season;
   const titledFormat = title.format ?? hint.format;
   const { candidates, flags } = digest(page, index);
+  // 작성자 피드와 검색은 같은 블로그의 지난 게임 기사(소드실드 S5, SV 시즌 20, 대회
+  // 후기)를 섞어 온다. 챔피언스 이전에 쓴 글이나 다른 게임 기사는 버린다. 사람이 고른
+  // 주소(포케DB 목록 등)는 챔피언스 목록에서 왔으므로 버리지 않고 플래그만 단다.
+  const game = gameCheck(`${page.title} ${page.text}`, page.publishedAt ?? link.date);
+  const picked = link.source === 'manual' || link.source === 'index';
+  if (!picked && (game.includes('before-champions') || game.includes('other-game'))) {
+    skipped['other-game']++;
+    continue;
+  }
   // 제목에 최종 순위가 없으면 구축 기사가 아닐 확률이 높다. 챔피언스 후보가 여섯
   // 미만인 글까지 큐에 넣으면 판정 비용만 늘어난다.
   if (rank === null && candidates.filter(c => c.champions).length < 6) {
@@ -389,6 +417,7 @@ for (const [url, link] of found) {
     siteName: page.siteName,
     publishedAt: page.publishedAt ?? link.date ?? null,
     rank,
+    rankHint: link.rankHint ?? null,
     season: titledSeason,
     format: titledFormat,
     monthly: title.monthly || hint.monthly,
@@ -399,6 +428,7 @@ for (const [url, link] of found) {
     candidates,
     flags: [
       ...flags,
+      ...game,
       ...(page.images.length && !imageFiles.some(Boolean) ? ['image-not-cached'] : []),
       ...(rank === null ? ['rank-missing'] : []),
       ...(title.rank === null && rank !== null ? ['rank-from-hint'] : []),
@@ -409,20 +439,14 @@ for (const [url, link] of found) {
   });
 }
 
-// 큐는 여러 번에 나눠 채운다(검색 한 번, 주소 목록 한 번). 이번에 다시 본 주소는
-// 새 결과로 바꾸고, 그사이 articles.json에 등록된 주소는 뺀다.
-const fresh = new Set(entries.map(entry => entry.url));
-const kept = previous.entries.filter(entry => !fresh.has(entry.url) && !known.has(entry.url));
+// 큐는 여러 번에 나눠 채운다(검색 한 번, 주소 목록 한 번). 이전 큐는 위에서 다시
+// 판단했으므로 이번 결과가 곧 큐다. articles.json과 제외 목록에 든 주소는 빠진다.
+// 판정은 사람이 고른 주소(포케DB 목록 등)부터, 그 안에서 순위순으로 한다.
+const trust = entry => (entry.source === 'manual' || entry.source === 'index' ? 0 : 1);
+entries.sort((a, b) => trust(a) - trust(b) || (a.rank ?? Infinity) - (b.rank ?? Infinity));
 const out = new URL(`.cache/${queueName}`, root);
-await writeFile(
-  out,
-  JSON.stringify(
-    { generatedAt: new Date().toISOString(), entries: [...kept, ...entries] },
-    null,
-    2,
-  ),
-);
-console.log(`${queueName}: 새로 ${entries.length}건, 이전 ${kept.length}건 유지`);
+await writeFile(out, JSON.stringify({ generatedAt: new Date().toISOString(), entries }, null, 2));
+console.log(`${queueName}: ${entries.length}건 (이전 ${previous.entries.length}건)`);
 console.log(
   '거른 것: ' +
     (Object.entries(skipped)

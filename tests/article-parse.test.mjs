@@ -7,6 +7,7 @@ import {
   digest,
   extractLinks,
   feedLinks,
+  gameCheck,
   feedUrlFor,
   googleLinks,
   humanOnly,
@@ -550,4 +551,31 @@ test('YouTube videos are leads for people; channels and playlists are not', () =
   assert.ok(!isNonArticle('https://note.com/a/n/n1'));
   const [link] = extractLinks('https://youtu.be/abc123?si=track&t=30 最終5位');
   assert.equal(link.url, 'https://youtu.be/abc123?t=30', '공유 추적 값만 뗀다');
+});
+
+test('older games that share the season words are told apart from Champions', () => {
+  // 실제 오탐: 소드실드 S5, SV 시즌 20, 2022 竜王戦. 셋 다 제목으로는 시즌·순위가 읽힌다.
+  assert.deepEqual(gameCheck('【剣盾S5最終1位】ドラパルト入りサイクル', '2020-05-02'), [
+    'before-champions',
+    'other-game',
+  ]);
+  assert.deepEqual(gameCheck('SVシーズン20 最終5位 テラスタル', '2024-08-01'), [
+    'before-champions',
+    'other-game',
+  ]);
+  assert.ok(gameCheck('ポケモン竜王戦2022 優勝構築', '2022-12-01').includes('before-champions'));
+  // 날짜가 없어도 본문의 다른 게임 표기로 가린다.
+  assert.deepEqual(gameCheck('ソードシールド S5 最終3位', null), ['other-game']);
+
+  assert.deepEqual(
+    gameCheck('【S5最終1位】臥薪嘗胆アーマーガア ポケモンチャンピオンズ', '2026-09-13'),
+    [],
+  );
+  assert.deepEqual(gameCheck('【M-5】神速ルカリザスタン【最終2位】', '2026-09-10'), []);
+  assert.deepEqual(
+    gameCheck('レギュM-B 最終84位 SVから復帰', '2026-09-12'),
+    [],
+    '챔피언스 표기가 있으면 통과',
+  );
+  assert.deepEqual(gameCheck('最終84位 メガバシャーモ軸', '2026-09-12'), ['no-champions-mention']);
 });
