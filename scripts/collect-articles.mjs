@@ -8,6 +8,8 @@ import {
   buildIndex,
   readPage,
   digest,
+  decodeHtml,
+  looksGarbled,
   gameCheck,
   parseTitle,
   looksRelevant,
@@ -132,14 +134,21 @@ async function cacheImage(url) {
 
 async function fetchArticle(url) {
   const path = cachePath(url);
-  try {
-    return await readFile(path, 'utf8');
-  } catch {
-    const html = await fetchText(url);
-    await writeFile(path, html);
-    await wait(PAUSE);
-    return html;
-  }
+  const cached = await readFile(path, 'utf8').catch(() => null);
+  if (cached !== null && !looksGarbled(cached)) return cached;
+  const response = await fetch(url, {
+    headers: { 'user-agent': AGENT },
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok) throw Error(`${response.status}: ${url}`);
+  // 캐시는 UTF-8로 풀어 둔다. 검토 화면과 파서가 인코딩을 다시 따지지 않게 한다.
+  const html = decodeHtml(
+    new Uint8Array(await response.arrayBuffer()),
+    response.headers.get('content-type') ?? '',
+  );
+  await writeFile(path, html);
+  await wait(PAUSE);
+  return html;
 }
 
 const readJson = (path, fallback) =>

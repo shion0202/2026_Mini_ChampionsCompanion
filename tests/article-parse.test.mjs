@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   buildIndex,
+  decodeHtml,
   digest,
   extractLinks,
+  looksGarbled,
   feedLinks,
   gameCheck,
   feedUrlFor,
@@ -592,4 +594,34 @@ test('readPage finds lazily loaded images and the og:image', () => {
     'https://cdn.example/party-640.jpg',
     'https://cdn.example/og.png',
   ]);
+});
+
+test('old Japanese blogs in EUC-JP or Shift_JIS are decoded, not garbled', () => {
+  const eucjp = Uint8Array.from([
+    ...Buffer.from(
+      '<html><head><meta http-equiv="Content-Type" content="text/html; charset=EUC-JP"></head><body>',
+    ),
+    0xa5,
+    0xac,
+    0xa5,
+    0xd6,
+    0xa5,
+    0xea,
+    0xa5,
+    0xa2,
+    0xa5,
+    0xb9,
+    ...Buffer.from('</body></html>'),
+  ]);
+  assert.match(decodeHtml(eucjp), /ガブリアス/);
+  const sjis = Uint8Array.from([0x83, 0x4b, 0x83, 0x75]);
+  assert.equal(decodeHtml(sjis, 'text/html; charset=Shift_JIS'), 'ガブ');
+  assert.equal(decodeHtml(Buffer.from('ガブリアス')), 'ガブリアス', '표기가 없으면 UTF-8');
+  assert.equal(
+    decodeHtml(Buffer.from('x'), 'text/html; charset=nonsense'),
+    'x',
+    '모르는 표기도 던지지 않는다',
+  );
+  assert.ok(looksGarbled(new TextDecoder().decode(eucjp).repeat(10)));
+  assert.ok(!looksGarbled('ガブリアス'.repeat(100)));
 });

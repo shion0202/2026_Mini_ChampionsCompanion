@@ -132,6 +132,14 @@ test('an unknown item is never turned into none, and mistakes are named', () => 
   unknown.author = 'x';
   assert.match(buildRecord(unknown, data, reference, 'd').error, /도구를 모르는 칸/);
 
+  const old = confirmed();
+  old.url = 'http://blog.livedoor.jp/someone/archives/1.html';
+  assert.equal(
+    buildRecord(old, data, reference, 'd').error,
+    undefined,
+    '오래된 블로그의 http 주소',
+  );
+
   const none = confirmed();
   none.team[5].item = null;
   assert.equal(
@@ -141,7 +149,7 @@ test('an unknown item is never turned into none, and mistakes are named', () => 
   );
 
   const cases = [
-    [form => (form.url = 'http://a.example/x'), /https/],
+    [form => (form.url = 'javascript:alert(1)'), /원문 주소/],
     [form => (form.team[1].pokemon = 'blazikenmega'), /두 번/],
     [form => (form.team[2].pokemon = '한카리아스'), /3번 포켓몬/],
     [form => (form.team[2].item = '구애스카프'), /3번 도구/],

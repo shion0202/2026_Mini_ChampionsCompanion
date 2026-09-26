@@ -392,7 +392,8 @@
     </section>
     <section>
       <div class="flags"><span class="flag">${row.kind === 'pending' ? '이미 기록된 pending' : esc(entry?.source ?? '')}</span>${flags}</div>
-      <p style="margin:4px 0 8px"><a href="${esc(form.url)}" target="_blank" rel="noopener noreferrer">${esc(form.title || form.url)} ↗</a></p>
+      <p style="margin:4px 0 8px"><a href="${esc(form.url)}" target="_blank" rel="noopener noreferrer">${esc(form.title || form.url)} ↗</a>
+        · <a href="/cached?url=${encodeURIComponent(form.url)}" target="_blank" title="원문이 열리지 않을 때 수집기가 받아 둔 사본을 연다">사본 보기</a></p>
       ${entry?.leadText ? `<p class="muted" style="margin:0 0 8px">목록: ${esc(entry.leadText)}</p>` : ''}
       <div class="meta">
         <label>작성자<input id="author" value="${esc(form.author)}"></label>

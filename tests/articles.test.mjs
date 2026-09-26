@@ -34,7 +34,7 @@ test('a pending record stays out of the list but does not break the file', () =>
 test('published teams have six valid members, item records and review evidence', () => {
   assert.equal(new Set(data.articles.map(a => a.id)).size, data.articles.length);
   for (const article of data.articles) {
-    assert.ok(article.review.teamImage.startsWith('https://'));
+    assert.match(article.review.teamImage, /^https?:\/\//);
     assert.ok(article.review.teamEvidence);
     assert.ok(article.review.rankEvidence);
   }

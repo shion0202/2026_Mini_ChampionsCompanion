@@ -4,6 +4,7 @@
 // 사용: node scripts/review-articles.mjs --season M5 [--port 4180]
 import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { createLocale } from '../src/locale.js';
 import {
   buildRecord,
@@ -123,6 +124,27 @@ const server = createServer(async (request, response) => {
         }),
       );
       return send(response, 200, { list, queueFile: queuePath });
+    }
+    // 수집기가 받아 둔 원문 사본. 원문 사이트가 열리지 않을 때(인증서 오류, 삭제) 본다.
+    // 스크립트는 막고(sandbox) 상대 주소 이미지는 원문 기준으로 풀리게 base를 넣는다.
+    if (request.method === 'GET' && pathname === '/cached') {
+      const url = new URL(request.url, 'http://localhost').searchParams.get('url') ?? '';
+      const name = createHash('sha1').update(url).digest('hex');
+      const html = await readFile(new URL(`.cache/articles/${name}.html`, root), 'utf8').catch(
+        () => null,
+      );
+      if (html === null)
+        return send(response, 404, '<p>받아 둔 사본이 없습니다.</p>', 'text/html; charset=utf-8');
+      const base = `<base href="${url.replace(/[&"<>]/g, c => `&#${c.charCodeAt(0)};`)}">`;
+      const body = /<head[^>]*>/i.test(html)
+        ? html.replace(/<head[^>]*>/i, match => `${match}<meta charset="utf-8">${base}`)
+        : `<meta charset="utf-8">${base}${html}`;
+      response.writeHead(200, {
+        'content-type': 'text/html; charset=utf-8',
+        'content-security-policy': "sandbox allow-popups; script-src 'none'; object-src 'none'",
+        'cache-control': 'no-store',
+      });
+      return response.end(body);
     }
     const image = pathname.match(IMAGE);
     if (request.method === 'GET' && image) {

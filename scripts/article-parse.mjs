@@ -127,6 +127,37 @@ const flatten = value =>
     .replace(/\s+/g, ' ')
     .trim();
 
+// 오래된 일본 블로그(livedoor, FC2 등)는 EUC-JP나 Shift_JIS로 쓴다. 모두 UTF-8로 읽으면
+// 글자가 깨져 포켓몬 이름을 하나도 찾지 못한다. 응답 헤더, 없으면 문서 앞부분의
+// meta charset을 보고 푼다.
+const CHARSETS = {
+  'x-sjis': 'shift_jis',
+  sjis: 'shift_jis',
+  'shift-jis': 'shift_jis',
+  'windows-31j': 'shift_jis',
+  cp932: 'shift_jis',
+  'x-euc-jp': 'euc-jp',
+  eucjp: 'euc-jp',
+};
+export function charsetOf(bytes, contentType = '') {
+  const head = Buffer.from(bytes.slice(0, 4096)).toString('latin1');
+  const label = (
+    contentType.match(/charset=["']?([\w-]+)/i)?.[1] ??
+    head.match(/<meta[^>]+charset=["']?([\w-]+)/i)?.[1] ??
+    'utf-8'
+  ).toLowerCase();
+  return CHARSETS[label] ?? label;
+}
+export function decodeHtml(bytes, contentType = '') {
+  try {
+    return new TextDecoder(charsetOf(bytes, contentType)).decode(bytes);
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+}
+// 예전에 UTF-8로 잘못 읽어 캐시한 문서를 알아본다. 깨진 글자(U+FFFD)가 많으면 다시 받는다.
+export const looksGarbled = text => (text.match(/\uFFFD/g)?.length ?? 0) > 20;
+
 export function readPage(html) {
   const meta = name =>
     html.match(

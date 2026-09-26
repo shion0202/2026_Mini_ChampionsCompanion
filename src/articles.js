@@ -4,7 +4,9 @@ const text = value => typeof value === 'string' && value.trim().length > 0;
 function publicUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password;
+    // 오래된 블로그(livedoor 등)는 http 주소만 있다. 원문 링크로만 쓰므로 http도 받되
+    // javascript: 같은 다른 스킴과 계정이 박힌 주소는 막는다.
+    return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password;
   } catch {
     return false;
   }

@@ -149,8 +149,8 @@ export function buildRecord(form, data, reference, today, status = 'reviewed') {
   // 도구 칸을 비운 것은 '모름'이다. 없음(null)으로 바꾸지 않는다(articles.md 4번).
   if (record.team.some(member => member.item === undefined))
     return { error: '도구를 모르는 칸이 있습니다. 모르면 추가하지 말고 건너뛰세요.' };
-  if (!record.review.teamImage?.startsWith('https://'))
-    return { error: '팀 이미지를 하나 골라 주세요(https 주소).' };
+  if (!/^https?:\/\//.test(record.review.teamImage ?? ''))
+    return { error: '팀 이미지를 하나 골라 주세요.' };
   const problem = problems(record, reference)[0];
   if (problem) return { error: problem };
   // 앱이 공개할 때 쓰는 검사와 같다. 위 목록이 놓친 것이 있어도 여기서 막는다.
@@ -169,7 +169,7 @@ export function problems(record, reference) {
   } catch {
     // 아래에서 알린다.
   }
-  if (url?.protocol !== 'https:') list.push('원문 주소가 https가 아닙니다.');
+  if (!['https:', 'http:'].includes(url?.protocol)) list.push('원문 주소가 올바르지 않습니다.');
   if (!/^M\d+$/.test(record.season)) list.push('시즌은 M5처럼 적어 주세요.');
   if (!['Singles', 'Doubles'].includes(record.format)) list.push('형식을 골라 주세요.');
   if (!Number.isInteger(record.rank) || record.rank < 1)
