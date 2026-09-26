@@ -732,3 +732,124 @@ export function googleLinks(body) {
     date: null,
   }));
 }
+
+// 포케솔(pokesol.app) 기사는 본문과 포켓몬·도구 표를 페이지 안의 React Router 데이터
+// (turbo-stream)로 싣는다. 작성자가 본문에 넣은 포켓몬 카드에 포켓몬·도구 번호가 있어서
+// 팀 이미지를 보지 않고 여섯 칸을 읽는다. 측정: M-5 10건이 사람이 확정한 기록과 120칸 일치.
+// turbo-stream은 값을 평평한 배열에 두고, 객체의 키 "_n"과 값 n이 그 배열의 번호다.
+// 음수는 null·undefined 같은 상수이고, ["D", 값] 같은 배열은 날짜 등 특수 값이다.
+export function pokesolData(html) {
+  const chunks = [...String(html).matchAll(/enqueue\(("(?:[^"\\]|\\.)*")\)/g)];
+  if (!chunks.length) return null;
+  let values;
+  try {
+    values = JSON.parse(
+      chunks
+        .map(([, chunk]) => JSON.parse(chunk))
+        .join('')
+        .split('\n')[0],
+    );
+  } catch {
+    return null;
+  }
+  const memo = new Map();
+  const hydrate = index => {
+    if (typeof index !== 'number' || index < 0) return null;
+    if (memo.has(index)) return memo.get(index);
+    const value = values[index];
+    if (Array.isArray(value)) {
+      if (typeof value[0] === 'string') return value[1] ?? null;
+      const out = [];
+      memo.set(index, out);
+      for (const item of value) out.push(hydrate(item));
+      return out;
+    }
+    if (value && typeof value === 'object') {
+      const out = {};
+      memo.set(index, out);
+      for (const [key, item] of Object.entries(value))
+        out[values[Number(key.slice(1))]] = hydrate(item);
+      return out;
+    }
+    return value;
+  };
+  const routes = Object.values(hydrate(0)?.loaderData ?? {});
+  return routes.find(route => route?.article && route?.masterData) ?? null;
+}
+
+// 포케솔은 폼을 괄호로 적는다. 지역 폼은 buildIndex의 ヒスイダイケンキ 꼴로 바꿔 찾고,
+// 나머지는 챔피언스에 나오는 것만 적는다. 없는 폼은 비워서 사람이 채운다.
+export const POKESOL_FORMS = {
+  'イダイトウ(♂)': 'basculegion',
+  'イダイトウ(♀)': 'basculegionf',
+  'ギルガルド(盾)': 'aegislash',
+  'ギルガルド(剣)': 'aegislashblade',
+  'ロトム(炎)': 'rotomheat',
+  'ロトム(水)': 'rotomwash',
+  'ロトム(氷)': 'rotomfrost',
+  'ロトム(飛)': 'rotomfan',
+  'ロトム(草)': 'rotommow',
+  'ニャオニクス(♂)': 'meowstic',
+  'ニャオニクス(♀)': 'meowsticf',
+  'メガニャオニクス♂': 'meowsticmmega',
+  'メガニャオニクス♀': 'meowsticfmega',
+  'イエッサン(♂)': 'indeedee',
+  'イエッサン(♀)': 'indeedeef',
+  'ルガルガン(真昼)': 'lycanroc',
+  'ルガルガン(真夜中)': 'lycanrocmidnight',
+  'ルガルガン(黄昏)': 'lycanrocdusk',
+  'ストリンダー(ハイ)': 'toxtricity',
+  'ストリンダー(ロー)': 'toxtricitylowkey',
+  'ケンタロス(パルデア闘)': 'taurospaldeacombat',
+  'ケンタロス(パルデア炎)': 'taurospaldeablaze',
+  'ケンタロス(パルデア水)': 'taurospaldeaaqua',
+  'ポワルン(炎)': 'castformsunny',
+  'ポワルン(水)': 'castformrainy',
+  'ポワルン(氷)': 'castformsnowy',
+  'パンプジン(中)': 'gourgeist',
+  'パンプジン(小)': 'gourgeistsmall',
+  'パンプジン(大)': 'gourgeistlarge',
+  'パンプジン(ギガ)': 'gourgeistsuper',
+  'イルカマン(変身)': 'palafinhero',
+  'フラエッテ(永遠)': 'floetteeternal',
+};
+
+export function pokesolPokemon(name, index) {
+  const folded = normalize(name);
+  const regional = /^(.+)\((アローラ|ガラル|ヒスイ|パルデア)\)$/.exec(folded);
+  return (
+    index.pokemon.get(folded) ??
+    POKESOL_FORMS[folded] ??
+    (regional && index.pokemon.get(`${regional[2]}${regional[1]}`)) ??
+    ''
+  );
+}
+
+// 카드 순서대로 돌려준다. 이름을 키로 못 바꾸면 ''다. 카드에 도구가 없으면 입력하지 않은
+// 것일 수 있어 없음(null)이 아니라 모름('')으로 둔다(articles.md 4번).
+export function pokesolTeam(route, index) {
+  const { article, masterData } = route;
+  const names = new Map(masterData.pokemons.map(pokemon => [pokemon.id, pokemon.name]));
+  const items = new Map(masterData.items.map(item => [item.id, item.name]));
+  const cards = [
+    ...String(article.body ?? '').matchAll(/<div data-type="pokemon-card"([^>]*)>/g),
+  ].map(([, attrs]) => {
+    const attr = key => new RegExp(`${key}="([^"]*)"`).exec(attrs)?.[1] ?? '';
+    const name = names.get(Number(attr('data-pokemon-id'))) ?? '';
+    const itemName = attr('data-item-id') ? (items.get(Number(attr('data-item-id'))) ?? '') : '';
+    const pokemon = name ? pokesolPokemon(name, index) : '';
+    const item = itemName ? (index.item.get(normalize(itemName)) ?? '') : '';
+    // 카드가 일반 폼이어도 메가스톤을 들었으면 메가 폼으로 기록한다(ゲッコウガ@ゲッコウガナイト).
+    const mega = [...index.formStone].find(
+      ([form, stone]) => item && stone === item && index.baseOf.get(form) === pokemon,
+    )?.[0];
+    return { name, itemName, pokemon: mega ?? pokemon, item };
+  });
+  return {
+    author: article.author?.displayName ?? '',
+    title: article.title ?? '',
+    battleFormat: article.battleFormat ?? '',
+    season: article.season ?? '',
+    cards,
+  };
+}

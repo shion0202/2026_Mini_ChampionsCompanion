@@ -27,6 +27,9 @@ import {
   looksRelevant,
   rssLinks,
   searchQueries,
+  pokesolData,
+  pokesolTeam,
+  POKESOL_FORMS,
 } from '../scripts/article-parse.mjs';
 
 const read = name =>
@@ -653,4 +656,79 @@ test('a blog front page is not an article even when its address has a path', () 
     'https://example.com/my-team-m5/',
   ])
     assert.ok(looksLikeArticle(url), url);
+});
+
+// 포케솔 페이지처럼 turbo-stream으로 편다: 값은 한 배열에, 객체 키는 "_번호", 값은 번호.
+function turboStream(value) {
+  const values = [];
+  const put = item => {
+    const at = values.length;
+    values.push(null);
+    if (Array.isArray(item)) values[at] = item.map(put);
+    else if (item && typeof item === 'object')
+      values[at] = Object.fromEntries(
+        Object.entries(item).map(([key, child]) => [`_${put(key)}`, put(child)]),
+      );
+    else values[at] = item;
+    return at;
+  };
+  put(value);
+  const payload = JSON.stringify(`${JSON.stringify(values)}\n`);
+  return `<script>window.__reactRouterContext.streamController.enqueue(${payload});</script>`;
+}
+
+test('pokesol pokemon cards become team keys without reading images', () => {
+  const card = (pokemon, item) =>
+    `<div data-type="pokemon-card" data-pokemon-id="${pokemon}"${item ? ` data-item-id="${item}"` : ''} data-move-ids="[1,2]"></div>`;
+  const html = turboStream({
+    loaderData: {
+      root: { user: null },
+      'routes/u.$username.articles.$id': {
+        article: {
+          title: '【M-5 最終99位】テスト',
+          battleFormat: 'single',
+          season: 'm-5',
+          author: { displayName: 'テスト' },
+          body: `<p>本文</p>${card(1, 10)}${card(2, 11)}${card(3, 12)}${card(4, 13)}${card(5, 14)}${card(6)}`,
+        },
+        masterData: {
+          pokemons: [
+            { id: 1, name: 'メガハッサム' },
+            { id: 2, name: 'ダイケンキ(ヒスイ)' },
+            { id: 3, name: 'イダイトウ(♂)' },
+            { id: 4, name: 'ゲッコウガ' },
+            { id: 5, name: 'ゲッコウガ(サトシ)' },
+            { id: 6, name: 'ガブリアス' },
+          ],
+          items: [
+            { id: 10, name: 'ハッサムナイト' },
+            { id: 11, name: 'くろいメガネ' },
+            { id: 12, name: 'こだわりスカーフ' },
+            { id: 13, name: 'ゲッコウガナイト' },
+            { id: 14, name: 'きのみジュース' },
+          ],
+        },
+      },
+    },
+  });
+  const team = pokesolTeam(pokesolData(html), index);
+  assert.deepEqual(
+    { author: team.author, battleFormat: team.battleFormat, season: team.season },
+    { author: 'テスト', battleFormat: 'single', season: 'm-5' },
+  );
+  assert.deepEqual(
+    team.cards.map(({ pokemon, item }) => [pokemon, item]),
+    [
+      ['scizormega', 'scizorite'],
+      ['samurotthisui', 'blackglasses'],
+      ['basculegion', 'choicescarf'],
+      ['greninjamega', 'greninjite'],
+      ['', ''],
+      ['garchomp', ''],
+    ],
+    '지역 폼은 괄호를 풀고, 메가스톤을 든 일반 카드는 메가로, 모르는 폼·도구와 빈 도구는 비운다',
+  );
+  assert.equal(pokesolData('<html><body>no data</body></html>'), null);
+  for (const [name, key] of Object.entries(POKESOL_FORMS))
+    assert.ok(reference.species[key], `${name} → ${key}`);
 });

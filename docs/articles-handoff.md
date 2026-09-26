@@ -18,19 +18,21 @@
   "채용이 많은/함께 채용된 포켓몬" 집계가 들어갔다. 원문 주소는 http도 받는다.
 - 수집: M-5 싱글은 포케DB 목록 `leads/pokedb-mb01~07.html`(사람이 저장, 커밋 안 함)과 작성자
   피드로 큐를 모았다. 큐는 `.cache/article-queue-m5.json`.
-- 검토: 검토 화면으로 몇 건을 공개했다. 이 기록은 **사용자 PC의 `public/data/articles.json`에만
-  있을 수 있다.** 이어서 작업하기 전에 `git status`로 확인하고 커밋한다.
-- 문제: 본문 글자로 여섯 마리를 추측하는 prefill이 거의 모든 파티에서 틀렸다. 그래서 **로컬
-  AI가 팀 이미지를 보고 제안을 쓰는 방식**으로 바꾸기로 했다. 검토 화면은 제안 파일을
-  읽도록 이미 고쳐 두었다(`.cache/article-proposals-<시즌>.json`). 제안을 쓰는 일은 아직
-  한 번도 돌리지 않았다.
+- 검토: 검토 화면으로 공개한 기록은 **사용자 PC의 `public/data/articles.json`에만 있을 수
+  있다.** 이어서 작업하기 전에 `git status`로 확인하고 커밋한다.
+- 제안: 포케솔 기사는 본문의 포켓몬 카드 데이터로 `npm run propose`가 제안을 쓴다(이미지 안 봄).
+  첫 10건은 사람이 확정했고 120칸 모두 일치했다. 나머지 포케솔 60건도 제안을 써 두었다:
+  `party` 55건(빈칸 0), 본문 글자를 읽고 고친 `party` 5건(빈칸 4칸, note에 이유),
+  카드가 없어 이미지가 필요한 `unsure` 5건. **이 60건은 아직 검토 화면에서 확인하지 않았다.**
+- 확인할 것: 확정 기록 fuuro_poke(91위) 3번 칸이 `basculegion`인데 포케솔 카드는
+  イダイトウ(♀)다. 이미지로 성별을 확인한다.
 
 ## 흐름
 
 | 단계 | 누가 | 명령 / 파일 | 결과 |
 | --- | --- | --- | --- |
 | 1 수집 | 수집기 | `npm run articles -- --season M5 --format singles --urls leads\\pokedb-mb01.html ... --no-search` | `.cache/article-queue-m5.json`, 원문·이미지 캐시 `.cache/articles/`, 사람 검토 목록 `leads/review-m5.txt` |
-| 2 제안 | 로컬 AI | [article-judging.md](article-judging.md) "AI 제안" | `.cache/article-proposals-m5.json` |
+| 2 제안 | 스크립트 → 로컬 AI | `npm run propose -- --season M5`(포케솔), 나머지는 [article-judging.md](article-judging.md) "AI 제안" | `.cache/article-proposals-m5.json` |
 | 3 검토 | 사람 | `npm run review -- --season M5` → <http://localhost:4180> | `public/data/articles.json`(추가), `scripts/article-skip.json`(제외) |
 | 4 공개 | 사람 | `node --test tests/articles.test.mjs` → 커밋 → main 병합 | 배포된 앱에 표시 |
 
@@ -49,6 +51,7 @@
 | `leads/` | X (gitignore) | 사람이 저장한 목록 페이지, `review-<시즌>.txt`(사람이 직접 볼 기사) |
 | `.cache/` | X (gitignore) | 큐, 제안, 원문·이미지 캐시 |
 | `scripts/collect-articles.mjs` | O | 수집기 CLI |
+| `scripts/propose-articles.mjs` | O | 포케솔 AI 제안 CLI(캐시만 읽음) |
 | `scripts/article-parse.mjs` | O | 수집 판단(순수 함수). 테스트 `tests/article-parse.test.mjs` |
 | `scripts/review-articles.mjs`, `scripts/review-page.html` | O | 검토 화면 서버·화면 |
 | `scripts/article-review.mjs` | O | 검토 판단(순수 함수). 테스트 `tests/article-review.test.mjs` |
@@ -67,15 +70,17 @@
 
 ## 다음 할 일 (순서대로)
 
-1. **M-5 싱글 큐에 AI 제안을 쓴다.** 10건으로 시작해 검토 화면에서 몇 칸을 고쳐야 했는지
-   본다. 괜찮으면 나머지를 한다. 제안 절차는 [article-judging.md](article-judging.md).
-2. 검토 화면에서 확정한다. 공개한 기록과 제외 목록을 커밋한다.
+1. **포케솔 제안 60건을 검토 화면에서 확정한다.** `unsure` 5건은 이미지를 보고 판단하거나
+   제외한다. 공개한 기록과 제외 목록을 커밋한다.
+2. **note(50건)·하테나 등 블로그(약 80건)에 AI 제안을 쓴다.** 먼저 10건으로 사본의
+   `포켓몬@도구` 줄만 읽어 되는지 보고, 모자란 것만 이미지를 본다.
+   절차는 [article-judging.md](article-judging.md).
 3. `leads/review-m5.txt`의 기사(네이버·야쿤·X·YouTube 등)는 사람이 원문을 보고 직접 넣는다.
    검토 화면에서 새 기사를 만드는 기능은 없으므로 `articles.json`에 손으로 쓰거나 AI에게
    사실(여섯 마리·도구·순위)을 불러 주고 기록을 만들게 한다.
 4. 이 브랜치를 main에 합친다(PR). 배포된 앱에서 기사 화면을 확인한다.
 5. (선택) 적중 측정: 제안과 확정 기록을 비교해 칸별 적중률을 출력하는 스크립트. 제안
-   절차를 고칠 때 근거가 된다.
+   절차를 고칠 때 근거가 된다. 지금은 대화에서 한 줄 명령으로 셌다.
 6. 다른 시즌(M-4 등)과 더블. 포케DB 목록 저장 → 1~4 반복.
 7. 남은 기능: [battle-tools-plan.md](battle-tools-plan.md). 추천 순서는 공통 대면 계산 →
    파티 상성 확인 → 배틀 어시스트 → 엔트리 픽 → 빈자리 추천.
@@ -89,12 +94,14 @@
 - `.prettierrc`가 `endOfLine: "crlf"`다. 저장소 파일은 LF라서 Linux에서 `npm run format`을
   돌리면 모든 파일이 바뀐다. Windows에서는 Git 줄바꿈 변환 때문에 문제가 없을 수 있다.
   클라우드 세션에서는 `npx prettier --write --end-of-line lf <파일>`로 고친 파일만 맞췄다.
-- 테스트: `npm test`(2026-09-26 기준 454개 통과).
+- 테스트: `npm test`(2026-09-26 기준 455개 통과). 조회 규칙 테스트는 `articles.json`의 처음
+  두 기록(シグマ, rebo®)만 쓴다. 기록이 늘어도 기대값이 바뀌지 않게 하려는 것이다.
 
 ## 새 대화 시작용 문장
 
 로컬 Claude Code에 붙여 넣는다.
 
 > docs/articles-handoff.md를 읽고 이어서 작업하자. 먼저 git status로 내 로컬 변경을 확인하고,
-> docs/article-judging.md의 "AI 제안" 절차대로 .cache/article-queue-m5.json 앞에서 10건의
-> 제안을 .cache/article-proposals-m5.json에 써 줘. 원문 사이트에는 접속하지 말고 .cache만 봐.
+> docs/article-judging.md의 "AI 제안" 절차대로 .cache/article-queue-m5.json의 포케솔이 아닌
+> 기사 앞에서 10건의 제안을 .cache/article-proposals-m5.json에 써 줘. 이미지보다 사본의
+> `포켓몬@도구` 줄을 먼저 봐. 원문 사이트에는 접속하지 말고 .cache만 봐.
