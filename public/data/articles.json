@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-20",
+  "updatedAt": "2026-09-26",
   "articles": [
     {
       "id": "m5-singles-sigma",
@@ -49,6 +49,102 @@
         "teamImage": "https://cdn-ak.f.st-hatena.com/images/fotolife/r/reboioNa/20260910/20260910143307.jpg",
         "teamEvidence": "rebo®의 MyHERO 팀 이미지와 여섯 개별 해설을 대조. 첫 트레이너 카드의 다른 포켓몬들은 제외. 아머까오는 핫삼으로 교체되었고, 한카리아스의 초기 기합의띠는 최종 구애스카프로 변경된 점을 확인. 이미지의 별명은 종 이름으로 정규화.",
         "rankEvidence": "제목의 M-5 최종 2위 및 마무리의 시즌 최종일 경쟁 서술. 싱글 선출과 환경을 설명하는 본문 기준. 순위는 작성자 공개 내용 기준."
+      }
+    },
+    {
+      "id": "m5-singles-z",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 88,
+      "author": "ウルトラメガZリーフストーム",
+      "title": "【シーズンM-5 最終88位】メガジュカインサイクルパ2.0 : ウルトラメガZリーフストーム",
+      "url": "http://blog.livedoor.jp/forpoke/archives/97752131.html",
+      "team": [
+        { "pokemon": "sceptilemega", "item": "sceptilite" },
+        { "pokemon": "archaludon", "item": "sitrusberry" },
+        { "pokemon": "meganium", "item": "leftovers" },
+        { "pokemon": "mimikyu", "item": "lifeorb" },
+        { "pokemon": "garchomp", "item": "lumberry" },
+        { "pokemon": "delphoxmega", "item": "delphoxite" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://livedoor.blogimg.jp/forpoke/imgs/a/b/ab870e3b-s.jpg",
+        "teamEvidence": "검토 화면에서 작성자의 팀 이미지와 본문 후보를 대조해 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-fuuro-poke",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 91,
+      "author": "fuuro_poke",
+      "title": "【M-5：最終91位】ミミガブイダイ♡",
+      "url": "https://pokesol.app/u/fuuro_poke/articles/e7566274da081231",
+      "team": [
+        { "pokemon": "lopunnymega", "item": "lopunnite" },
+        { "pokemon": "garchomp", "item": "choicescarf" },
+        { "pokemon": "basculegion", "item": "lifeorb" },
+        { "pokemon": "umbreon", "item": "leftovers" },
+        { "pokemon": "volcarona", "item": "lumberry" },
+        { "pokemon": "gengarmega", "item": "gengarite" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/9e1a6112-6d22-4af7-b1aa-bb221c49112c.jpg",
+        "teamEvidence": "검토 화면에서 작성자의 팀 이미지와 본문 후보를 대조해 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-cider-css",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 92,
+      "author": "cider_css",
+      "title": "【シーズンM-5最終92位】想定外ガブルカドドゲ",
+      "url": "https://pokesol.app/u/cider_css/articles/e5baeffaa5faf474",
+      "team": [
+        { "pokemon": "garchomp", "item": "choicescarf" },
+        { "pokemon": "gengar", "item": "focussash" },
+        { "pokemon": "greninjamega", "item": "greninjite" },
+        { "pokemon": "kingambit", "item": "sitrusberry" },
+        { "pokemon": "lucariomega", "item": "lucarionite" },
+        { "pokemon": "rotomwash", "item": "leftovers" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/e9b7f0b8-9ef3-4505-b4a1-f0ac891fafc7.png",
+        "teamEvidence": "검토 화면에서 작성자의 팀 이미지와 본문 후보를 대조해 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
+      }
+    },
+    {
+      "id": "m5-singles-siyu-poke",
+      "season": "M5",
+      "format": "Singles",
+      "rank": 95,
+      "author": "siyu_poke",
+      "title": "Champions M-5 最終95位(R2468)高火力フラエッテスタン",
+      "url": "https://pokesol.app/u/siyu_poke/articles/7c3b520f21355660",
+      "team": [
+        { "pokemon": "floettemega", "item": "floettite" },
+        { "pokemon": "starmiemega", "item": "starminite" },
+        { "pokemon": "garchomp", "item": "focussash" },
+        { "pokemon": "samurotthisui", "item": "blackglasses" },
+        { "pokemon": "archaludon", "item": "dragonfang" },
+        { "pokemon": "corviknight", "item": "leftovers" }
+      ],
+      "review": {
+        "status": "reviewed",
+        "checkedAt": "2026-09-26",
+        "teamImage": "https://pokesol.app/api/images/uploads/covers/a6e6c52f-6aaa-438a-bb9a-e220db42929a.png",
+        "teamEvidence": "검토 화면에서 작성자의 팀 이미지와 본문 후보를 대조해 여섯 마리와 도구를 확인.",
+        "rankEvidence": "제목의 최종 순위 표기와 원문의 시즌 서술을 대조."
       }
     }
   ]
