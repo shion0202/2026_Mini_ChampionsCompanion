@@ -55,4 +55,5 @@ jobs:
           fi
       - name: 실패 알림
         if: failure()
-        run: node scripts/watch-upstream.mjs --message "매일 자료 점검이 실패했습니다. 로그: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: |
+          node scripts/watch-upstream.mjs --message "매일 자료 점검이 실패했습니다. 로그: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
