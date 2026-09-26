@@ -2192,6 +2192,14 @@ select optgroup {
   min-width: 86px;
   min-height: 44px;
 }
+/* .primary-button은 margin-top이 15px이라 한 줄에 놓으면 혼자 내려앉는다. 창의 단추 줄에서는
+   여백을 지우고 세로 가운데로 맞춘다(삭제 확인·나가기 확인 창). */
+.filter-actions {
+  align-items: center;
+}
+.filter-actions .primary-button {
+  margin-top: 0;
+}
 .reference-block {
   padding: 22px 0;
 }
