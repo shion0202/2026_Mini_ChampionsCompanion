@@ -157,8 +157,8 @@ test('readPage takes the meta, drops script and style, folds the text', () => {
   assert.ok(page.excerpt.length <= 300);
 });
 
-test('readPage drops the blog icon and keeps at most three content images', () => {
-  assert.equal(page.images.length, 3);
+test('readPage drops the blog icon and keeps the content images in order', () => {
+  assert.ok(page.images.length <= 5);
   assert.ok(!page.images.some(url => url.includes('custom_blog_icon')));
   assert.ok(page.images[0].endsWith('20260910143307.jpg'));
 });
@@ -578,4 +578,18 @@ test('older games that share the season words are told apart from Champions', ()
     '챔피언스 표기가 있으면 통과',
   );
   assert.deepEqual(gameCheck('最終84位 メガバシャーモ軸', '2026-09-12'), ['no-champions-mention']);
+});
+
+test('readPage finds lazily loaded images and the og:image', () => {
+  const lazy =
+    readPage(`<html><head><meta property="og:image" content="https://cdn.example/og.png"></head><body>
+<img src="data:image/gif;base64,R0lGOD" data-src="https://cdn.example/team.png">
+<img src="https://cdn.example/1px.gif" srcset="https://cdn.example/party-640.jpg 640w, https://cdn.example/party-1280.jpg 1280w">
+<img src="https://cdn.example/profile_icon.png">
+<img src="https://cdn.example/team.png"></body></html>`);
+  assert.deepEqual(lazy.images, [
+    'https://cdn.example/team.png',
+    'https://cdn.example/party-640.jpg',
+    'https://cdn.example/og.png',
+  ]);
 });

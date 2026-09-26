@@ -134,10 +134,27 @@ export function readPage(html) {
     )?.[1] ?? null;
   const body = html.replace(/<(script|style)\b[^]*?<\/\1>/gi, ' ');
   const text = flatten(body);
-  const images = [...body.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)]
-    .map(match => match[1])
-    .filter(url => /^https?:/.test(url) && !DECORATION.test(url))
-    .slice(0, 3);
+  // 요즘 블로그는 이미지를 늦게 불러와 src에 빈 자리표시(data: URI, 1px gif)만 두고
+  // 실제 주소를 data-src나 srcset에 둔다. src만 보면 팀 이미지를 놓친다. og:image는
+  // 작성자가 고른 대표 이미지라 팀 이미지인 경우가 많아 끝에 더한다.
+  const images = [
+    ...[...body.matchAll(/<img\b[^>]*>/gi)].map(([tag]) => {
+      const attr = name => tag.match(new RegExp(`\\s${name}=["']([^"']+)["']`, 'i'))?.[1];
+      const srcset = attr('data-srcset') ?? attr('srcset');
+      return (
+        attr('data-src') ??
+        attr('data-original') ??
+        attr('data-lazy-src') ??
+        srcset?.trim().split(/\s+/)[0] ??
+        attr('src')
+      );
+    }),
+    meta('og:image'),
+  ]
+    .map(url => url && decode(url))
+    .filter(url => url && /^https?:/.test(url) && !DECORATION.test(url))
+    .filter((url, at, all) => all.indexOf(url) === at)
+    .slice(0, 5);
   return {
     title: meta('og:title') ?? flatten(html.match(/<title[^>]*>([^]*?)<\/title>/i)?.[1] ?? ''),
     siteName: meta('og:site_name'),
