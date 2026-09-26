@@ -14,6 +14,7 @@ import {
   googleLinks,
   humanOnly,
   isBlogPost,
+  isBlogTop,
   isNonArticle,
   pageUrlOf,
   isLeadLink,
@@ -412,6 +413,10 @@ test('feedUrlFor finds the author feed on services with a fixed feed address', (
     'https://rssblog.ameba.jp/marron9339/rss20.xml',
   );
   assert.equal(feedUrlFor('https://pokesol.app/u/sigma573/articles/bbe27ed18e7cccb3'), null);
+  assert.equal(
+    feedUrlFor('http://blog.livedoor.jp/forpoke/archives/97752131.html'),
+    'http://blog.livedoor.jp/forpoke/index.rdf',
+  );
   assert.equal(feedUrlFor('주소 아님'), null);
 });
 
@@ -624,4 +629,28 @@ test('old Japanese blogs in EUC-JP or Shift_JIS are decoded, not garbled', () =>
   );
   assert.ok(looksGarbled(new TextDecoder().decode(eucjp).repeat(10)));
   assert.ok(!looksGarbled('ガブリアス'.repeat(100)));
+});
+
+test('a blog front page is not an article even when its address has a path', () => {
+  // 실제 사례: livedoor 첫 페이지가 최신 글을 통째로 보여 줘 기사처럼 등록되었다.
+  for (const url of [
+    'http://blog.livedoor.jp/forpoke/',
+    'https://note.com/someone',
+    'https://ameblo.jp/someone/',
+    'https://pokesol.app/u/sigma573',
+    'https://reboiona.hatenablog.com/archive',
+    'https://example.com/',
+  ]) {
+    assert.ok(isBlogTop(url), url);
+    assert.ok(!looksLikeArticle(url), url);
+  }
+  for (const url of [
+    'http://blog.livedoor.jp/forpoke/archives/97752131.html',
+    'https://note.com/someone/n/n1',
+    'https://ameblo.jp/someone/entry-1.html',
+    'https://pokesol.app/u/sigma573/articles/bbe27',
+    'https://reboiona.hatenablog.com/entry/2026/09/10/174818',
+    'https://example.com/my-team-m5/',
+  ])
+    assert.ok(looksLikeArticle(url), url);
 });

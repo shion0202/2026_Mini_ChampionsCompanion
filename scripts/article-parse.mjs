@@ -363,12 +363,27 @@ export function articleKey(value) {
 
 // 블로그 첫 페이지는 기사가 아니다. 포켓몬 이름이 잔뜩 있어 후보 수 검사를
 // 통과해 버리므로 주소로 먼저 거른다.
-export const looksLikeArticle = url => {
+// 블로그 아이디가 경로에 들어가는 서비스는 첫 페이지도 경로가 있다(blog.livedoor.jp/forpoke/,
+// note.com/someone). 첫 페이지에는 최신 글이 통째로 떠 있어 후보가 완벽하게 잡히지만, 새 글이
+// 올라오면 다른 글이 된다. 이런 서비스는 기사 주소 형식일 때만 기사로 본다.
+const PATH_BLOG_HOSTS =
+  /^(blog\.livedoor\.jp|note\.com|ameblo\.jp|pokesol\.app)$|(^|\.)(hatenablog\.(com|jp)|hateblo\.jp|hatenadiary\.(com|jp|org))$/;
+export const isBlogTop = url => {
   try {
-    return new URL(url).pathname.replace(/\/+$/, '').length > 0;
+    const parsed = new URL(url);
+    if (!parsed.pathname.replace(/\/+$/, '')) return true;
+    return PATH_BLOG_HOSTS.test(parsed.host.replace(/^www\./, '')) && !isBlogPost(url);
   } catch {
     return false;
   }
+};
+export const looksLikeArticle = url => {
+  try {
+    new URL(url);
+  } catch {
+    return false;
+  }
+  return !isBlogTop(url);
 };
 
 const feedDate = value => {
@@ -425,6 +440,10 @@ export function feedUrlFor(value) {
     const user = url.pathname.match(/^\/([^/]+)\//)?.[1];
     return user ? `https://rssblog.ameba.jp/${user}/rss20.xml` : null;
   }
+  if (host === 'blog.livedoor.jp') {
+    const user = url.pathname.match(/^\/([^/]+)/)?.[1];
+    return user ? `${url.origin}/${user}/index.rdf` : null;
+  }
   if (/\.blog\.fc2\.com$/.test(host)) return `${url.origin}/?xml`;
   if (/\.(livedoor\.blog|blog\.jp|seesaa\.net)$/.test(host)) return `${url.origin}/index.rdf`;
   return null;
@@ -439,6 +458,7 @@ const BLOG_POST = [
   /^ameblo\.jp\/[^/]+\/entry-/,
   /\.blog\.fc2\.com\/blog-entry-/,
   /\.(livedoor\.blog|blog\.jp)\/archives\//,
+  /^blog\.livedoor\.jp\/[^/]+\/archives\//,
   /\.seesaa\.net\/article\//,
   // 아래는 기사로 알아보되 받지는 않는 곳이다. 검토 목록으로 간다(humanOnly, robots.txt).
   /^(m\.)?blog\.naver\.com\/[^/]+\/\d+/,

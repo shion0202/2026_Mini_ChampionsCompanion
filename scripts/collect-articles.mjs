@@ -22,6 +22,7 @@ import {
   humanOnly,
   isNonArticle,
   looksLikeArticle,
+  isBlogTop,
   pageUrlOf,
   robotsAllows,
   googleLinks,
@@ -366,6 +367,10 @@ const skipped = {
 for (const link of found.values()) {
   const url = link.url;
   if (!looksLikeArticle(url)) {
+    // 사람이 고른 주소가 블로그 첫 페이지면 그 카드의 기사가 어딘가 있다는 뜻이다. 사람이
+    // 기사 주소를 찾도록 검토 목록에 남긴다(작성자 피드가 따로 찾아오기도 한다).
+    if (isBlogTop(url) && (link.source === 'manual' || link.source === 'index'))
+      toReview(url, link, '블로그 첫 페이지');
     skipped['not-an-article']++;
     continue;
   }

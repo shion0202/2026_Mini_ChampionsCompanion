@@ -99,6 +99,14 @@ https://someone.hatenablog.com/entry/2026/09/10/000000
 수집기는 돌 때마다 **이전 큐 전체를 캐시로 다시 판단**한다. 규칙을 고친 뒤 한 번 돌리면
 이미 쌓인 오탐도 빠진다. 큐는 사람이 고른 주소를 앞에, 그 안에서 순위순으로 정렬한다.
 
+### 블로그 첫 페이지
+
+livedoor(`blog.livedoor.jp/아이디/`), note(`note.com/아이디`), 아메바, pokesol, 하테나는 첫
+페이지 주소에도 경로가 있다. 첫 페이지는 최신 글을 통째로 보여 줘 후보가 완벽하게 잡히므로
+기사처럼 등록된 일이 있었다. 이 서비스들은 기사 주소 형식(`/archives/`, `/n/`, `/entry-`,
+`/articles/`, `/entry/`)일 때만 기사로 본다(`isBlogTop`). 사람이 고른 주소가 첫 페이지면
+`블로그 첫 페이지` 이유로 사람 검토 목록에 남긴다.
+
 ### 사람 검토 목록
 
 수집기가 받지 않는 기사는 판정 큐 대신 `leads/review-<시즌>.txt`에 남는다. 한 줄에
@@ -130,7 +138,8 @@ X의 계정 프로필, 유튜브 채널·재생목록, 디스코드 링크는 �
 | note | `https://note.com/<작성자>/rss` |
 | 아메바 블로그 | `https://rssblog.ameba.jp/<작성자>/rss20.xml` |
 | FC2 | `<블로그>/?xml` |
-| 라이브도어, seesaa | `<블로그>/index.rdf` |
+| 라이브도어(`*.livedoor.blog`, `*.blog.jp`), seesaa | `<블로그>/index.rdf` |
+| 라이브도어(`blog.livedoor.jp/아이디`) | `blog.livedoor.jp/<아이디>/index.rdf` |
 
 pokesol은 공개된 작성자 피드를 찾지 못했다. 그 외에 따로 볼 피드나 기사 주소는
 `scripts/article-feeds.json`의 `feeds`에 적는다. 기사 주소를 적으면 피드로 바꿔 본다.

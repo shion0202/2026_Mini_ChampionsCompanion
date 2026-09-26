@@ -10,6 +10,7 @@ import {
   buildRecord,
   formatArticles,
   itemOptions,
+  moveArticle,
   prefill,
   putArticle,
   reviewList,
@@ -272,4 +273,29 @@ test('another article from an already recorded blog is flagged, not hidden', () 
     row.sameBlog.map(article => article.id),
     [rebo.id],
   );
+});
+
+test('a record saved under a blog front page can be moved to the real article address', () => {
+  const top = {
+    ...data.articles[0],
+    id: 'm5-singles-forpoke',
+    url: 'http://blog.livedoor.jp/forpoke/',
+  };
+  const withTop = { ...data, articles: [...data.articles, top] };
+  const article = { ...entry, url: 'http://blog.livedoor.jp/forpoke/archives/97752131.html' };
+  const [row] = reviewList({ entries: [article] }, withTop, { skipped: [] }, reference);
+  assert.deepEqual(
+    row.sameBlog.map(a => [a.id, a.top]),
+    [['m5-singles-forpoke', true]],
+  );
+  const moved = moveArticle(withTop, top.url, article.url, '2026-09-26');
+  assert.equal(moved.id, 'm5-singles-forpoke');
+  assert.equal(moved.data.articles.at(-1).url, article.url);
+  assert.equal(
+    reviewList({ entries: [article] }, moved.data, { skipped: [] }, reference).length,
+    0,
+    '옮긴 뒤에는 같은 글이 다시 나오지 않는다',
+  );
+  assert.match(moveArticle(withTop, 'https://none.example/', article.url, 'd').error, /찾지 못/);
+  assert.match(moveArticle(withTop, top.url, data.articles[0].url, 'd').error, /이미 기록/);
 });

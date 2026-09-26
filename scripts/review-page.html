@@ -394,7 +394,7 @@
       <div class="flags"><span class="flag">${row.kind === 'pending' ? '이미 기록된 pending' : esc(entry?.source ?? '')}</span>${flags}</div>
       <p style="margin:4px 0 8px"><a href="${esc(form.url)}" target="_blank" rel="noopener noreferrer">${esc(form.title || form.url)} ↗</a>
         · <a href="/cached?url=${encodeURIComponent(form.url)}" target="_blank" title="원문이 열리지 않을 때 수집기가 받아 둔 사본을 연다">사본 보기</a></p>
-      ${row.sameBlog?.length ? `<div class="flag warn" style="display:block;border-radius:8px;padding:6px 10px;margin:0 0 8px">같은 블로그에 이미 기록된 기사가 있습니다. 같은 글이면 [제외]에서 '이미 등록한 기사와 같은 글'을 고르세요.${row.sameBlog.map(a => `<br>· <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.season)} ${a.format === 'Doubles' ? '더블' : '싱글'} 최종 ${esc(a.rank)}위 — ${esc(a.title)}</a>${a.status === 'pending' ? ' (pending)' : ''}`).join('')}</div>` : ''}
+      ${row.sameBlog?.length ? `<div class="flag warn" style="display:block;border-radius:8px;padding:6px 10px;margin:0 0 8px">같은 블로그에 이미 기록된 기사가 있습니다. 같은 글이면 [제외]에서 '이미 등록한 기사와 같은 글'을 고르세요.${row.sameBlog.map(a => `<br>· <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.season)} ${a.format === 'Doubles' ? '더블' : '싱글'} 최종 ${esc(a.rank)}위 — ${esc(a.title)}</a>${a.status === 'pending' ? ' (pending)' : ''}${a.top ? ` <b>— 블로그 첫 페이지 주소로 기록됨</b> <button data-move-from="${esc(a.url)}">이 기록을 지금 기사 주소로 옮기기</button>` : ''}`).join('')}</div>` : ''}
       ${entry?.leadText ? `<p class="muted" style="margin:0 0 8px">목록: ${esc(entry.leadText)}</p>` : ''}
       <div class="meta">
         <label>작성자<input id="author" value="${esc(form.author)}"></label>
@@ -503,6 +503,18 @@
           if (!response.ok) return setMessage((await response.json()).error, 'error');
           await reload();
           return show('제외했습니다.', 'ok');
+        }
+        const moveFrom = event.target.closest('[data-move-from]');
+        if (moveFrom) {
+          const response = await fetch('/api/move', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ from: moveFrom.dataset.moveFrom, to: form.url }),
+          });
+          const result = await response.json();
+          if (!response.ok) return setMessage(result.error, 'error');
+          await reload();
+          return show(`기록 ${result.id}의 주소를 옮겼습니다. 같은 글이라 이 기사는 목록에서 빠졌습니다.`, 'ok');
         }
         if (event.target.id === 'later') move(1);
       });

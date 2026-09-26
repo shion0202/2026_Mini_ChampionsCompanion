@@ -1,7 +1,7 @@
 // 검토 화면(scripts/review-articles.mjs)의 판단 부분. 네트워크와 파일을 쓰지 않는
 // 순수 함수만 두어 테스트로 고정한다.
 import { reviewedArticles } from '../src/articles.js';
-import { articleKey } from './article-parse.mjs';
+import { articleKey, isBlogTop } from './article-parse.mjs';
 
 // 챔피언스에 나오는 포켓몬(기술 목록이 있는 것)만 고를 수 있게 한다. 이름이 겹치면
 // 키를 붙여 구분한다. 입력 칸은 한국어 이름을 받고 키로 바꾼다.
@@ -248,4 +248,26 @@ const sameBlog = (url, data) =>
       title: a.title,
       url: a.url,
       status: a.review?.status,
+      // 블로그 첫 페이지 주소로 기록된 것. 검토 화면이 지금 기사 주소로 옮기자고 제안한다.
+      top: isBlogTop(a.url),
     }));
+
+// 기록의 주소만 바꾼다. 첫 페이지 주소로 잘못 기록한 기사를 실제 기사 주소로 옮길 때 쓴다.
+export function moveArticle(data, from, to, today) {
+  const record = data.articles.find(article => article.url === from);
+  if (!record) return { error: '옮길 기록을 찾지 못했습니다.' };
+  if (
+    data.articles.some(article => article !== record && articleKey(article.url) === articleKey(to))
+  )
+    return { error: '옮길 주소로 이미 기록이 있습니다.' };
+  return {
+    data: {
+      ...data,
+      updatedAt: today,
+      articles: data.articles.map(article =>
+        article === record ? { ...article, url: to } : article,
+      ),
+    },
+    id: record.id,
+  };
+}
