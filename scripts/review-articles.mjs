@@ -68,6 +68,7 @@ const load = () =>
     readJson(queuePath, { entries: [] }),
     readJson('public/data/articles.json'),
     readJson('scripts/article-skip.json', { skipped: [] }),
+    readJson(`.cache/article-proposals-${season.toLowerCase()}.json`, { proposals: [] }),
   ]);
 
 // 화면에 필요한 것만 보낸다. 원문 본문은 보내지 않는다.
@@ -118,13 +119,18 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && pathname === '/api/options')
       return send(response, 200, options);
     if (request.method === 'GET' && pathname === '/api/list') {
-      const [queue, data, skip] = await load();
-      const list = reviewList(queue, data, skip, reference, { season: season.toUpperCase() }).map(
-        row => ({
-          ...row,
-          entry: slim(row.entry),
-        }),
-      );
+      const [queue, data, skip, proposals] = await load();
+      const list = reviewList(
+        queue,
+        data,
+        skip,
+        reference,
+        { season: season.toUpperCase() },
+        proposals,
+      ).map(row => ({
+        ...row,
+        entry: slim(row.entry),
+      }));
       return send(response, 200, { list, queueFile: queuePath });
     }
     // 수집기가 받아 둔 원문 사본. 원문 사이트가 열리지 않을 때(인증서 오류, 삭제) 본다.

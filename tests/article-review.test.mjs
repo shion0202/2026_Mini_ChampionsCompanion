@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { articleKey } from '../scripts/article-parse.mjs';
 import {
+  applyProposal,
   articleId,
   blogKey,
   authorFromUrl,
@@ -298,4 +299,40 @@ test('a record saved under a blog front page can be moved to the real article ad
   );
   assert.match(moveArticle(withTop, 'https://none.example/', article.url, 'd').error, /찾지 못/);
   assert.match(moveArticle(withTop, top.url, data.articles[0].url, 'd').error, /이미 기록/);
+});
+
+test('an AI proposal from the team image overrides the text guess, blanks stay unknown', () => {
+  const proposals = {
+    proposals: [
+      {
+        url: entry.url.replace('https:', 'http:'),
+        verdict: 'party',
+        author: 'TwistServe',
+        teamImage: 'https://cdn.example/team.png',
+        team: [
+          { pokemon: 'blazikenmega', item: 'blazikenite' },
+          { pokemon: 'corviknight', item: 'leftovers' },
+          { pokemon: 'garchomp', item: '' },
+          { pokemon: 'primarina', item: null },
+        ],
+        note: '결과 화면 이미지에서 도구 확인',
+      },
+    ],
+  };
+  const [row] = reviewList({ entries: [entry] }, data, { skipped: [] }, reference, {}, proposals);
+  assert.equal(row.form.author, 'TwistServe');
+  assert.equal(row.form.proposal.verdict, 'party');
+  assert.deepEqual(
+    row.form.team.map(member => [member.pokemon, member.item]),
+    [
+      ['blazikenmega', 'blazikenite'],
+      ['corviknight', 'leftovers'],
+      ['garchomp', ''],
+      ['primarina', null],
+      ['', ''],
+      ['', ''],
+    ],
+  );
+  assert.equal(row.form.rank, 84, '제안에 없는 칸은 본문 추측을 둔다');
+  assert.equal(applyProposal({ author: 'a' }, undefined).author, 'a');
 });

@@ -202,7 +202,43 @@ export const formatArticles = data =>
   ) + '\n';
 
 // 검토할 목록: 먼저 pending 기록, 그다음 큐. 이미 기록했거나 제외한 주소는 뺀다.
-export function reviewList(queue, data, skip, reference, defaults = {}) {
+// 로컬 AI가 팀 이미지를 보고 쓴 제안(.cache/article-proposals-<시즌>.json)을 본문 추측
+// 위에 덮는다. 빈칸('')은 모름이라 그대로 두고, 사람이 검토 화면에서 확정한다.
+// 모양: { proposals: [{ url, verdict, author, rank, season, format, teamImage,
+//   team: [{ pokemon, item }], note }] }. verdict는 party | not-party | unsure.
+export function applyProposal(form, proposal) {
+  if (!proposal) return form;
+  const next = {
+    ...form,
+    proposal: { verdict: proposal.verdict ?? 'party', note: proposal.note ?? '' },
+  };
+  for (const field of ['author', 'rank', 'season', 'format', 'publishedAt', 'teamImage', 'title'])
+    if (proposal[field] !== undefined && proposal[field] !== null && proposal[field] !== '')
+      next[field] = proposal[field];
+  if (Array.isArray(proposal.team) && proposal.team.length) {
+    const team = proposal.team.slice(0, 6).map(member => ({
+      pokemon: member?.pokemon ?? '',
+      item: member?.item === null ? null : (member?.item ?? ''),
+    }));
+    while (team.length < 6) team.push({ pokemon: '', item: '' });
+    next.team = team;
+  }
+  if (proposal.teamEvidence) next.teamEvidence = proposal.teamEvidence;
+  if (proposal.rankEvidence) next.rankEvidence = proposal.rankEvidence;
+  return next;
+}
+
+export function reviewList(
+  queue,
+  data,
+  skip,
+  reference,
+  defaults = {},
+  proposals = { proposals: [] },
+) {
+  const proposed = new Map(
+    (proposals.proposals ?? []).filter(p => p?.url).map(p => [articleKey(p.url), p]),
+  );
   const pending = data.articles
     .filter(article => article.review?.status === 'pending')
     .map(article => ({ kind: 'pending', entry: null, form: fromRecord(article) }));
@@ -215,7 +251,11 @@ export function reviewList(queue, data, skip, reference, defaults = {}) {
     const key = articleKey(entry.url);
     if (done.has(key)) continue;
     done.add(key);
-    queued.push({ kind: 'queue', entry, form: prefill(entry, reference, defaults) });
+    queued.push({
+      kind: 'queue',
+      entry,
+      form: applyProposal(prefill(entry, reference, defaults), proposed.get(key)),
+    });
   }
   return [...pending, ...queued].map(row => ({ ...row, sameBlog: sameBlog(row.form.url, data) }));
 }

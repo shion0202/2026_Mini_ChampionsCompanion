@@ -391,7 +391,8 @@
       <label style="margin-top:10px">팀 이미지 주소<input id="teamImage" value="${esc(form.teamImage)}"></label>
     </section>
     <section>
-      <div class="flags"><span class="flag">${row.kind === 'pending' ? '이미 기록된 pending' : esc(entry?.source ?? '')}</span>${flags}</div>
+      <div class="flags"><span class="flag">${row.kind === 'pending' ? '이미 기록된 pending' : esc(entry?.source ?? '')}</span>${form.proposal ? `<span class="flag${form.proposal.verdict === 'party' ? '' : ' warn'}">AI 제안: ${esc({ party: '파티 확인', 'not-party': '파티 기사 아님', unsure: '불확실' }[form.proposal.verdict] ?? form.proposal.verdict)}</span>` : ''}${flags}</div>
+      ${form.proposal?.note ? `<p class="muted" style="margin:0 0 8px">AI 메모: ${esc(form.proposal.note)}</p>` : ''}
       <p style="margin:4px 0 8px"><a href="${esc(form.url)}" target="_blank" rel="noopener noreferrer">${esc(form.title || form.url)} ↗</a>
         · <a href="/cached?url=${encodeURIComponent(form.url)}" target="_blank" title="원문이 열리지 않을 때 수집기가 받아 둔 사본을 연다">사본 보기</a></p>
       ${row.sameBlog?.length ? `<div class="flag warn" style="display:block;border-radius:8px;padding:6px 10px;margin:0 0 8px">같은 블로그에 이미 기록된 기사가 있습니다. 같은 글이면 [제외]에서 '이미 등록한 기사와 같은 글'을 고르세요.${row.sameBlog.map(a => `<br>· <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.season)} ${a.format === 'Doubles' ? '더블' : '싱글'} 최종 ${esc(a.rank)}위 — ${esc(a.title)}</a>${a.status === 'pending' ? ' (pending)' : ''}${a.top ? ` <b>— 블로그 첫 페이지 주소로 기록됨</b> <button data-move-from="${esc(a.url)}">이 기록을 지금 기사 주소로 옮기기</button>` : ''}`).join('')}</div>` : ''}

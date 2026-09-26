@@ -1,7 +1,7 @@
 # 구축 기사 판정 절차 (3단계)
 
-판정은 **검토 화면에서 사람이 한다.** AI 판정은 선택이며, 쓸 경우 결과는 `pending`으로만
-들어가고 같은 검토 화면에서 사람이 확인한다. 등록 기준은 [articles.md](articles.md)가 정한다.
+판정은 **검토 화면에서 사람이 한다.** 로컬 AI는 팀 이미지를 보고 제안 파일만 쓰고(아래
+`AI 제안`), 검토 화면이 그 제안을 미리 채운다. 등록 기준은 [articles.md](articles.md)가 정한다.
 
 ## 검토 화면 (기본)
 
@@ -47,126 +47,85 @@ npm run review -- --season M5
 목록에 없는 이름 등)을 알려 준다. 끝나면 `node --test tests/articles.test.mjs`를 돌리고
 `articles.json`과 `article-skip.json`을 커밋한다.
 
-## AI 판정 (선택)
+## AI 제안 (로컬 AI, 선택)
 
-아래는 AI 코딩 도구(Claude Code, GPT 계열 등)에게 미리 판정을 맡길 때의 절차다. 결과는
-모두 `pending`이며, 검토 화면에서 사람이 확인해 공개한다.
+본문 글자로 여섯 마리를 추측하면 거의 모든 파티를 고쳐야 했다. 기사 본문에는 구축 경위와
+상대 포켓몬이 섞이고, 도구는 결과 화면 이미지에만 있는 일이 많기 때문이다. 그래서 **로컬
+AI(Claude Code 등)가 팀 이미지를 보고 제안 파일을 쓰고**, 검토 화면이 그 제안을 미리
+채운다. 기록과 공개는 여전히 사람이 검토 화면에서 한다. AI는 `articles.json`을 고치지 않는다.
 
 요청 예:
 
-> docs/article-judging.md 절차대로 .cache/article-queue-m5.json에서 순위가 높은 5건을 판정해 줘
+> docs/article-judging.md의 "AI 제안" 절차대로 .cache/article-queue-m5.json 앞에서 10건의
+> 제안을 .cache/article-proposals-m5.json에 써 줘
 
-## 입력
+### 입력
 
-- `.cache/article-queue-<시즌>.json`의 `entries[]`. 기사마다 제목 파싱 결과(`rank`,
-  `season`, `format`), 후보 포켓몬 최대 16마리(`candidates[]`: 기본 종족 키 `base`, 본문에서
-  찾은 폼 `forms`, 근처 도구 `items`, 발췌 `excerpts`), `flags`, 이미지 주소 `images[]`와
-  같은 순서의 캐시 파일 `imageFiles[]`가 있다.
-- 원문 HTML은 `.cache/articles/<주소의 sha1>.html`에 있다.
+- `.cache/article-queue-<시즌>.json`의 `entries[]`: `url`, `title`, `rank`(목록·제목에서 읽은
+  순위), `leadText`(포케DB 카드 글), `images[]`(원래 주소)와 같은 순서의 `imageFiles[]`
+  (받아 둔 파일, 없으면 null), `candidates[]`(본문 후보, 참고용), `flags`.
+- 원문 사본: `.cache/articles/<주소의 sha1>.html`. UTF-8로 풀어 둔 것이다.
+- 이미 처리한 주소는 건너뛴다: `public/data/articles.json`의 `url`, `scripts/article-skip.json`의
+  `skipped[].url`, 이미 제안 파일에 있는 `url`.
 
-## 원칙
+### 원칙
 
-- **원문 전문을 읽지 않는다.** 큐의 후보·발췌와 팀 이미지로 판단하고, 부족할 때만 캐시
-  HTML에서 필요한 이름 주변을 검색해 짧게 본다.
-- 팀 이미지가 판정의 중심이다. 본문에는 도구가 빠지는 일이 흔하다(메가스톤, 스카프).
-- 모르는 것은 채우지 않는다. 확신이 없으면 3-3으로 넘긴다.
-- **원문 사이트에 접속하지 않는다.** `.cache`에 있는 파일만 쓴다. 수집기가 robots.txt로
-  거른 범위를 벗어나지 않기 위해서다. 이미지를 볼 수 없는 도구라면 모두 3-3으로 넘긴다.
+- **원문 사이트에 접속하지 않는다.** `.cache`의 파일만 본다. 수집기가 robots.txt로 거른 범위를
+  벗어나지 않기 위해서다.
+- 팀 이미지가 근거다. 인게임 화면은 둘이 흔하다.
+  - 스테이터스 화면: 여섯 마리 이름이 글자로 있고 능력치가 보인다. 도구는 없다.
+  - 결과(시즌 성적) 화면: 순위·레이트, 오른쪽에 여섯 마리와 **도구 아이콘**이 있다.
+  - 작성자가 만든 파티 이미지: 이름·도구·기술이 적혀 있다.
+  트레이너 카드의 다른 팀, 상대 파티, 과거 시즌 화면은 쓰지 않는다. 이미지의 별명을 종
+  이름으로 읽지 않는다.
+- **모르는 칸은 비운다(`""`).** 추측으로 채우지 않는다. 사람이 이미지를 보고 채운다. 도구가
+  없음이 확인된 경우만 `null`.
+- 이미지가 부족하면 원문 사본에서 필요한 부분(개별 해설의 `持ち物`, `@` 표기)만 찾아 본다.
+- 결과 화면의 시즌·배틀 룰·순위가 보이면 그것으로 시즌·형식·순위를 확인한다.
 
-## 순서
+### 키 찾기
 
-한 번에 요청받은 건수만 처리한다. **큐의 앞에서부터** 처리한다. 수집기가 사람이 고른
-주소(`source`가 `manual`·`index`, 포케DB 목록 등)를 앞에, 그 안에서 순위순으로 정렬해 둔다.
-검색·피드(`feed`, `hatena`)에서 온 기사는 다른 게임 기사가 섞일 수 있어 뒤에 둔다.
-
-게임 플래그: `before-champions`(M-1 시작 2026-04-08 이전 글), `other-game`(소드실드·SV
-표기만 있음)은 사람이 고른 주소에만 남는다. 둘 중 하나가 있으면 3-2로 넘기기 전에 한 번
-더 본다. `no-champions-mention`은 챔피언스 표기가 없다는 뜻일 뿐이라 이미지로 판단한다.
-
-### 1. 이미지 확인
-
-`imageFiles` 중 null이 아닌 이미지 파일을 열어 본다. 인게임 팀 화면(여섯 마리와 도구 아이콘)이나
-작성자가 만든 파티 이미지를 찾는다. 트레이너 카드, 상대 파티, 과거 시즌 파티, 교체 전
-구성은 쓰지 않는다([articles.md](articles.md) 2·3번). 이미지 속 별명을 종 이름으로 읽지 않는다.
-
-`image-not-cached` 플래그가 있거나 쓸 만한 이미지가 없으면 후보 발췌와 본문 검색만으로
-판단하되, 도구 여섯 개가 모두 확인되지 않으면 3-3으로 넘긴다.
-
-### 2. 대조
-
-- 여섯 마리: 이미지와 후보 목록(`candidates[].base`, `forms`)을 맞춘다. 후보에 없는
-  포켓몬이 이미지에 있으면 캐시 HTML에서 그 이름을 검색해 확인한다.
-- 메가: 최종 메가 폼 키를 쓴다(`charizardmegay`, `lucariomega`). 메가스톤은 폼에서 정해진다.
-- 도구: 이미지 아이콘과 `candidates[].items`를 맞춘다. 없음이 **확인된 경우만** `null`.
-- 순위: 제목의 `最終N位`, 또는 `rank-from-hint`면 목록 페이지에서 읽은 순위다. 본문
-  도입부·마무리에서 시즌 최종 순위인지 확인한다. 최고 순위, 중간 순위, 월간 챌린지
-  (`monthly-challenge`) 순위는 쓰지 않는다.
-- 시즌·형식: `season-missing`, `format-missing`이면 본문(시즌 표기, 싱글/더블, 선출 3/4)으로 정한다.
-
-키는 `public/data/reference.json`의 키다. 찾을 때:
+키는 `public/data/reference.json`의 키다. 메가는 최종 메가 폼 키(`charizardmegay`)와
+메가스톤(`charizarditey`)을 쓴다.
 
 ```
 node -e "const r=require('./public/data/reference.json');console.log(Object.keys(r.species).filter(k=>k.includes('garchomp')))"
 node -e "const r=require('./public/data/reference.json');console.log(Object.entries(r.held_item).filter(([k,v])=>v.japanese?.includes('スカーフ')).map(([k])=>k))"
+node -e "const r=require('./public/data/reference.json');const ko=require('./public/data/ko.json');console.log(Object.entries(ko.japanese.pokemon).filter(([k,v])=>v.includes('バシャーモ')))"
 ```
 
-### 3. 기록
+### 출력
 
-판정마다 셋 중 하나로 끝낸다.
-
-**3-1 파티 확정 → `public/data/articles.json`의 `articles` 끝에 추가**
+`.cache/article-proposals-<시즌>.json`. 있으면 끝에 더하고, 같은 `url`은 새 것으로 바꾼다.
 
 ```json
 {
-  "id": "m5-singles-twistserve",
-  "season": "M5",
-  "format": "Singles",
-  "rank": 84,
-  "author": "TwistServe",
-  "title": "【最終84位 M-5 メガバシャーモ軸】",
-  "url": "https://…",
-  "publishedAt": "2026-09-12",
-  "team": [{ "pokemon": "blazikenmega", "item": "blazikenite" }, "… 여섯 마리"],
-  "review": {
-    "status": "pending",
-    "checkedAt": "오늘 날짜",
-    "teamImage": "https://… (판정에 쓴 이미지의 원래 주소, images[]에서)",
-    "teamEvidence": "무엇과 무엇을 대조했고 무엇을 제외했는지 한두 문장, 자체 문장",
-    "rankEvidence": "순위를 어디서 확인했는지 한 문장"
-  }
+  "proposals": [
+    {
+      "url": "큐의 url 그대로",
+      "verdict": "party",
+      "author": "기사·카드에 적힌 작성자 이름",
+      "rank": 88,
+      "season": "M5",
+      "format": "Singles",
+      "teamImage": "판정에 쓴 이미지의 원래 주소(images[] 중 하나)",
+      "team": [
+        { "pokemon": "sceptile", "item": "" },
+        { "pokemon": "hippowdon", "item": "rockyhelmet" }
+      ],
+      "note": "결과 화면 이미지에서 여섯 마리와 도구 확인. 1번 도구 아이콘이 흐려 비움."
+    }
+  ]
 }
 ```
 
-- `id`는 `<시즌 소문자>-<형식 소문자>-<작성자 슬러그>`. 이미 있으면 뒤에 `-<순위>`.
-- `author`는 블로그 이름(`siteName`)이 아니라 작성자 이름이다. `excerpt`나 본문 서명에서 읽는다.
-- `title`은 원문 제목 그대로, 근거 문장은 원문을 옮기지 않고 한국어로 새로 쓴다.
-- `updatedAt`을 오늘 날짜로 바꾼다.
+- `verdict`: `party`(파티를 읽음), `not-party`(파티 기사가 아님, 다른 시즌·게임, 최종 파티
+  미공개), `unsure`(판단 불가). `not-party`·`unsure`는 `team` 없이 `note`에 이유만 적는다.
+- `team`은 이미지 순서대로 여섯 칸. 모르는 포켓몬·도구는 `""`.
+- 쓴 뒤 `node -e "JSON.parse(require('fs').readFileSync('.cache/article-proposals-m5.json','utf8'))"`로
+  JSON이 깨지지 않았는지 확인한다.
 
-**3-2 파티 기사가 아님 → `scripts/article-skip.json`의 `skipped`에 추가**
+### 보고
 
-```json
-{ "url": "https://…", "reason": "시즌 중간 기록, 최종 파티 아님", "checkedAt": "오늘 날짜" }
-```
-
-파티 기사가 아닌 글, 다른 시즌·형식, 월간 챌린지 성적만 있는 글, 최종 파티를 공개하지
-않은 글. 수집기는 이 주소를 다시 큐에 올리지 않는다.
-
-**3-3 판단 불가 → 사람 검토 목록으로**
-
-`leads/review-<시즌>.txt`에 한 줄 추가(`순위<탭>판정 보류<탭>주소<탭>이유`)하고, 같은
-주소를 3-2처럼 `article-skip.json`에도 넣는다(`reason`은 `사람 검토로 넘김: …`).
-이미지가 없음, 본문과 이미지가 충돌, 도구 일부를 알 수 없음 같은 경우다.
-
-### 4. 검증과 보고
-
-```
-node --test tests/articles.test.mjs
-```
-
-통과하지 않으면 고친다. 끝나면 사람에게 표로 보고한다: 기사마다 순위·작성자·결과(추가/
-제외/보류)·한 줄 이유. 추가한 기사는 여섯 마리와 도구를 한국어 이름으로 함께 적는다.
-
-## 사람이 하는 일
-
-`npm run review`로 검토 화면을 열면 AI가 넣은 `pending` 기록이 맨 앞에 나온다. 이미지와
-맞는지 보고 [추가 (공개)]를 누르거나 고친 뒤 누른다. 틀린 기록은 [제외]로 뺀다.
+기사마다 순위·작성자·verdict·비운 칸 수를 표로 짧게 보고한다. 사람은 `npm run review`를 열어
+제안이 채워진 화면(주황 `AI 제안` 표시와 `AI 메모`)을 보고 확정한다.
